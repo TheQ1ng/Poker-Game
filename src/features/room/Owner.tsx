@@ -21,8 +21,48 @@ import { Poker } from "./Poker";
 import { BigBlind, Dealer, SmallBlind } from "./Symbol";
 import { selectGame, selectRoom, selectSelf } from "./roomSlice";
 import { card2html } from "../gamehistory/GameHistory";
+
+// 牌型等级，用于判断是否需要高亮
+const handTypeRanks: { [key: string]: number } = {
+  "高牌": 1,
+  "一对": 2,
+  "两对": 3,
+  "三条": 4,
+  "顺子": 5,
+  "同花": 6,
+  "葫芦": 7,
+  "四条": 8,
+  "同花顺": 9,
+  "皇家同花顺": 10
+};
+
+// 语音播报牌型
+function speakHandType(handType: string) {
+  if ('speechSynthesis' in window) {
+    const utterance = new SpeechSynthesisUtterance(`Winner! ${handType}`);
+    utterance.lang = 'zh-CN';
+    utterance.volume = 1;
+    utterance.rate = 1;
+    utterance.pitch = 1;
+    speechSynthesis.speak(utterance);
+  }
+}
+
 const hintsound = require("../../assets/hint.wav");
 const dealcardsound = require("../../assets/dealcard.wav");
+
+// 头像图片映射
+const avatarImages: { [key: string]: string } = {
+  "playerIcon.png": require("../../assets/playerIcon.png"),
+  "playerIcon (1).png": require("../../assets/playerIcon (1).png"),
+  "playerIcon (2).png": require("../../assets/playerIcon (2).png"),
+  "playerIcon (3).png": require("../../assets/playerIcon (3).png"),
+  "playerIcon (4).png": require("../../assets/playerIcon (4).png"),
+  "playerIcon (5).png": require("../../assets/playerIcon (5).png"),
+  "playerIcon (6).png": require("../../assets/playerIcon (6).png"),
+  "playerIcon (7).png": require("../../assets/playerIcon (7).png"),
+  "playerIcon (8).png": require("../../assets/playerIcon (8).png"),
+};
 
 export function Owner({ zoom }: { zoom: number }) {
   const hintSoundRef = useRef<HTMLAudioElement>(null);
@@ -43,6 +83,10 @@ export function Owner({ zoom }: { zoom: number }) {
   const isSettling = game?.isSettling || false;
 
   const name = self?.name || "";
+  // 获取昵称，如果没有则使用用户名
+  const nickname = localStorage.getItem("nickname") || name;
+  // 获取头像
+  const avatar = localStorage.getItem("avatar") || "";
   const stack = self?.stack || 0;
   const bet = self?.bet || 0;
   const isActing = self?.isActing || false;
@@ -111,6 +155,13 @@ export function Owner({ zoom }: { zoom: number }) {
     }
   }, [game?.boardCards.length, room?.isGaming]);
 
+  // 当玩家获胜时，播报牌型
+  useEffect(() => {
+    if (self?.isWinner && self?.handsType) {
+      speakHandType(self.handsType);
+    }
+  }, [self?.isWinner, self?.handsType]);
+
   return (
     <div className="flex-row flex-center" style={{ height: "100%" }}>
       <audio src={hintsound} autoPlay={false} ref={hintSoundRef} />
@@ -119,23 +170,58 @@ export function Owner({ zoom }: { zoom: number }) {
         <div className={`owner ${!inGame ? "fold" : ""}`}>
           <Popover
             content={
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: `${card2html(
-                    self?.maxCards || []
-                  )} <strong style="color: #FF6F00">+$${
-                    self?.profits
-                  }</strong> `,
-                }}
-              ></div>
+              <div>
+                {avatar && avatarImages[avatar] ? (
+                  <img 
+                    src={avatarImages[avatar]} 
+                    alt="头像" 
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      borderRadius: "50%",
+                    }}
+                  />
+                ) : (
+                  <div dangerouslySetInnerHTML={{
+                    __html: `${card2html(self?.maxCards || [])} <strong style="color: #FF6F00">+$${(self?.profits || 0).toLocaleString()}</strong>`
+                  }} />
+                )}
+              </div>
             }
             trigger="click"
             visible={self?.isWinner && self.profits >= 0}
           >
-            <Avatar>{name.length > 0 ? name[0] : ""}</Avatar>
+            {avatar && avatarImages[avatar] ? (
+              <img 
+                src={avatarImages[avatar]} 
+                alt="头像" 
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                }}
+              />
+            ) : (
+              <Avatar style={{
+                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+                fontSize: "20px",
+                color: "white",
+              }}>{name.length > 0 ? name[0] : ""}</Avatar>
+            )}
           </Popover>
-          <div>{name}</div>
-          <div className="stack">
+          <div style={{ color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>{nickname}</div>
+          <div className="stack" style={{
+            background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)",
+            borderRadius: "20px",
+            padding: "2px 10px",
+            fontSize: "12px",
+            fontWeight: "bold",
+            color: "#333",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}>
             <span className="coins">$</span>
             {stack}
           </div>
@@ -159,10 +245,15 @@ export function Owner({ zoom }: { zoom: number }) {
         </div>
       </div>
       <div className="flex3 flex flex-column" style={{ height: "100%" }}>
-        <div className="bet">
+        <div className="bet" style={{ color: 'white', fontWeight: 'bold' }}>
           {self?.actionName}
           {bet == 0 ? null : (
-            <span>
+            <span style={{
+              background: "linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%)",
+              borderRadius: "20px",
+              padding: "2px 8px",
+              marginLeft: "8px",
+            }}>
               <span className="coins">$</span>
               {bet}
             </span>
@@ -173,16 +264,27 @@ export function Owner({ zoom }: { zoom: number }) {
             card={self?.hands[0] || null}
             index={0}
             showHand={isSettling && !selfAsUser?.hands[0]}
+            isSelected={!isSettling || (self?.hands[0] && self?.maxCards ? self.maxCards.includes(self.hands[0]) : false)}
           />
           <Poker
             card={self?.hands[1] || null}
             index={1}
             showHand={isSettling && !selfAsUser?.hands[1]}
+            isSelected={!isSettling || (self?.hands[1] && self?.maxCards ? self.maxCards.includes(self.hands[1]) : false)}
           />
-          {/* {[...(self?.hands || []), null, null].splice(0, 2).map((card, i) => (
-            <Poker card={card} index={i} showHand={isSettling} key={`${i}`} />
-          ))} */}
-          <div>{self?.handsType}</div>
+          <div 
+            style={{ 
+              fontWeight: 'bold', 
+              marginLeft: '10px',
+              ...(self?.handsType && handTypeRanks[self.handsType] >= 4 ? { 
+                color: '#ffd700',
+                textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
+                animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
+              } : { color: 'white' })
+            }}
+          >
+            {self?.handsType}
+          </div>
         </div>
         <div className="flex flex-row flex-center">
           {isActing ? (
@@ -211,10 +313,11 @@ export function Owner({ zoom }: { zoom: number }) {
         userSelect: "none",
       }}>
         {isWaiting ? (
-          <div>
+          <div style={{ color: 'white' }}>
             <Switch
               checked={autoCheck}
               onChange={() => setAutoCheck(!autoCheck)}
+              style={{ marginRight: '8px' }}
             />
             自动过牌或弃牌
           </div>

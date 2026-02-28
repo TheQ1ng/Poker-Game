@@ -11,7 +11,10 @@ import authMiddleware from "./middleware/auth";
 const app = websockify(new Koa());
 
 app
-  .use(serve(path.join(__dirname, "../../../build")))
+  .use(serve(path.join(__dirname, "../../../build"), {
+    maxage: 86400000, // 24小时缓存
+    gzip: true // 启用gzip压缩
+  }))
   .use(koaBody({ multipart: true }))
   .use(responseMiddleware)
   .use(authMiddleware)

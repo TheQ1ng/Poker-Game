@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { message } from "antd";
 import { ApiRsp } from "../../ApiType";
 import { RootState } from "../../app/store";
-import { createroom, joinroom } from "../home/homeAPI";
+import { createroom, joinroom, fetchRooms, RoomInfo } from "../home/homeAPI";
 
 type Status = "idle" | "loading" | "failed";
 
@@ -10,12 +10,16 @@ export interface CreateRoomState {
   createRoomStatus: Status;
   joinRoomStatus: Status;
   roomid: string;
+  rooms: RoomInfo[];
+  fetchRoomsStatus: Status;
 }
 
 const initialState: CreateRoomState = {
   roomid: "",
   createRoomStatus: "idle",
   joinRoomStatus: "idle",
+  rooms: [],
+  fetchRoomsStatus: "idle",
 };
 
 export const createRoomAsync = createAsyncThunk(
@@ -37,6 +41,13 @@ export const joinRoomAsync = createAsyncThunk(
   "home/joinroom",
   async (roomid: string) => {
     return await joinroom(roomid);
+  }
+);
+
+export const fetchRoomsAsync = createAsyncThunk(
+  "home/fetchrooms",
+  async () => {
+    return await fetchRooms();
   }
 );
 
@@ -74,6 +85,16 @@ export const createRoomSlice = createSlice({
         } else {
           message.error(rsp.error);
         }
+      })
+      .addCase(fetchRoomsAsync.pending, (state) => {
+        state.fetchRoomsStatus = "loading";
+      })
+      .addCase(fetchRoomsAsync.fulfilled, (state, action) => {
+        state.fetchRoomsStatus = "idle";
+        state.rooms = action.payload.rooms;
+      })
+      .addCase(fetchRoomsAsync.rejected, (state) => {
+        state.fetchRoomsStatus = "failed";
       });
   },
 });

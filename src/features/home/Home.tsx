@@ -1,20 +1,23 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { PageHeader, Button, Avatar, Dropdown, Menu } from "antd";
 import { DownOutlined } from "@ant-design/icons";
 
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
-import { Register } from "../register/Register";
 import {
   selectToken,
   logout,
   selectRoomID,
   loadRoomInfoAsync,
 } from "./homeSlice";
-import { Room } from "../room/Room";
-import { CreateRoom } from "../createroom/CreateRoom";
 import { connect2server } from "../../app/websocket";
+import Loading from "../../components/Loading";
 
-export function Home() {
+// 懒加载组件
+const Register = lazy(() => import("../register/Register"));
+const Room = lazy(() => import("../room/Room"));
+const CreateRoom = lazy(() => import("../createroom/CreateRoom"));
+
+function Home() {
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectToken);
   const roomid = useAppSelector(selectRoomID);
@@ -41,7 +44,11 @@ export function Home() {
         height: "100vh",
       }}
     >
-      {!token ? <Register /> : roomid ? <Room></Room> : <CreateRoom />}
+      <Suspense fallback={<Loading />}>
+        {!token ? <Register /> : roomid ? <Room></Room> : <CreateRoom />}
+      </Suspense>
     </div>
   );
 }
+
+export default Home;

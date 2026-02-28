@@ -47,3 +47,49 @@ export async function joinroom(roomid: string): Promise<ApiRsp> {
   });
   return await rsp.json();
 }
+
+export interface RoomInfo {
+  id: string;
+  smallBlind: number;
+  playerCount: number;
+  maxPlayers: number;
+  ownerName: string;
+}
+
+export async function fetchRooms(): Promise<{ rooms: RoomInfo[] }> {
+  const rsp = await fetch("/rooms", {
+    method: "GET",
+  });
+  return await rsp.json();
+}
+
+export interface UserProfile {
+  code: number;
+  data: {
+    name: string;
+    nickname: string;
+    avatar: string;
+  };
+}
+
+export async function fetchProfile(): Promise<UserProfile> {
+  const rsp = await fetch("/profile", {
+    method: "GET",
+    headers: {
+      Authorization: localStorage.getItem("token") || "",
+    },
+  });
+  return await rsp.json();
+}
+
+export async function updateProfile(nickname: string, avatar: string): Promise<UserProfile> {
+  const rsp = await fetch("/updateprofile", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: localStorage.getItem("token") || "",
+    },
+    body: JSON.stringify({ nickname, avatar }),
+  });
+  return await rsp.json();
+}

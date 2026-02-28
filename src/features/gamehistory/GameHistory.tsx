@@ -3,6 +3,7 @@ import { useAppSelector } from "../../app/hooks";
 import { selectGameHistory } from "./gameHistorySlice";
 import { useState } from "react";
 import { ws_sendMessage } from "../../app/websocket";
+import "./GameHistory.css";
 export function card2html(cards: Card[]): string {
   return cards
     .map((card) => {
@@ -69,7 +70,7 @@ export default function GameHistory() {
 
   const logs = useAppSelector(selectGameHistory);
   return (
-    <>
+    <div className="game-history-container">
     <div style={{ overflow: "auto", flex: 1 }}>
       {logs.map((log, i) => (
         <div
@@ -93,6 +94,6 @@ export default function GameHistory() {
           &gt;
         </button>
       </div>
-    </>
+    </div>
   );
 }

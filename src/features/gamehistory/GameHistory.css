@@ -1,0 +1,76 @@
+/* 游戏历史/聊天区域样式 - 深色主题 */
+.game-history-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  padding: 10px;
+  color: white;
+}
+
+.game-history-container strong {
+  color: #ffd700;
+}
+
+.game-history-container > div:first-child {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  padding-right: 5px;
+}
+
+.game-history-container > div:first-child > div {
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.game-history-container input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+}
+
+.game-history-container input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.game-history-container button {
+  background: #ffd700;
+  border: none;
+  color: #1a1a1a;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.game-history-container button:hover {
+  background: #ffed4a;
+}
+
+/* 滚动条样式 */
+.game-history-container ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.game-history-container ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.game-history-container ::-webkit-scrollbar-thumb {
+  background: rgba(255, 215, 0, 0.3);
+  border-radius: 3px;
+}
+
+.game-history-container ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 215, 0, 0.5);
+}
+

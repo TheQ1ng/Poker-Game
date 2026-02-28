@@ -108,6 +108,7 @@ body {
 .roominfo {
   width: 480px;
   margin: auto;
+  color: white;
 }
 
 .user {
@@ -145,16 +146,18 @@ body {
 
 .userinfo {
   border-radius: 2px;
-  background-color: #99ddff;
+  background-color: rgba(255, 255, 255, 0.15);
   width: 100%;
   flex: 1;
+  color: white;
 }
+
 .userinfo.fold {
-  background-color: #e8e8e8;
-  color: #838383;
+  background-color: rgba(128, 128, 128, 0.5);
+  color: #cccccc;
 }
 .userinfo.allin {
-  border: 1px solid red;
+  border: 1px solid #ff4444;
 }
 
 .userinfo .ant-avatar,
@@ -194,6 +197,31 @@ body {
   bottom: 0;
   left: 0;
   text-align: center;
+  color: white;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+}
+
+/* 弹窗深色主题样式 */
+.ant-modal-content {
+  background: linear-gradient(145deg, #1a3d28 0%, #0f2518 100%) !important;
+}
+
+.ant-modal-header {
+  background: linear-gradient(145deg, #2d5a3d 0%, #1a3d28 100%) !important;
+}
+
+.ant-modal-title {
+  color: white !important;
+}
+
+.ant-modal-close-x {
+  color: white !important;
+}
+
+.ant-modal-body {
+  background: linear-gradient(145deg, #1a3d28 0%, #0f2518 100%) !important;
+  color: white !important;
 }
 
 .stack,
@@ -217,6 +245,7 @@ body {
 
 .bet {
   font-weight: bold;
+  color: white;
 }
 
 .bet .coins {
@@ -241,6 +270,7 @@ body {
   margin: auto;
   text-align: center;
   position: relative;
+  color: white;
 }
 
 .user-actions button {
@@ -255,4 +285,5 @@ body {
   position: absolute;
   top: 60px;
   left: 0px;
+  z-index: 100;
 }

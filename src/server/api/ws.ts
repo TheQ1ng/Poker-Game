@@ -19,6 +19,7 @@ import {
   userShowHands,
   userWatch,
   userSendMessage,
+  addBotToRoom,
 } from "../service";
 import { Token } from "../service/User";
 import Room, { Game, RoomID } from "../service/Room";
@@ -165,6 +166,9 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
     case ActionType.SEND_MESSAGE:
       userSendMessage(token, data.message);
       break;
+    case ActionType.ADD_BOT:
+      addBotToRoom(data.roomid);
+      break;
   }
   if (data.action !== ActionType.LEAVE) {
     publish(token, data, ws);
@@ -239,6 +243,7 @@ function getSimpleUser(token: Token): SimpleUser {
   return {
     id: user.chipsRecordID,
     name: user.name,
+    nickname: user.nickname,
     avatar: user.avatar,
     hasCards: user.hands.length > 0,
     isRoomOwner: user.isRoomOwner,

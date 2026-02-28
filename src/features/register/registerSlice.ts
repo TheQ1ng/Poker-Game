@@ -4,6 +4,7 @@ import { ApiRsp } from '../../ApiType';
 import { RootState, AppThunk } from '../../app/store';
 import { updateToken } from '../home/homeSlice';
 import { registerApi } from './registerAPI';
+import { fetchProfile } from '../home/homeAPI';
 
 export interface RegisterState {
   error: string;
@@ -28,6 +29,15 @@ export const registerAsync = createAsyncThunk(
     if (rsp.code == 0) {
       localStorage['name'] = account.name;
       dispatch(updateToken(rsp.data));
+      
+      // 登录成功后获取用户资料并保存到 localStorage
+      try {
+        const profile = await fetchProfile();
+        localStorage.setItem("nickname", profile.data?.nickname || "");
+        localStorage.setItem("avatar", profile.data?.avatar || "");
+      } catch (e) {
+        console.error("Failed to fetch profile after login:", e);
+      }
     } else {
       message.error(rsp.error);
     }

@@ -8,6 +8,7 @@ export type Token = string;
 class User {
   token: Token = ""; // uuid
   name: string = ""; // string
+  nickname: string = ""; // 玩家昵称
   positon: string = ""; //
   avatar: string = ""; // string, url
   roomid: RoomID = ""; // Room
@@ -24,6 +25,7 @@ class User {
   isAllIn: boolean = false;
   isWinner: boolean = false;
   isSpectator: boolean = false;
+  isBot: boolean = false; // 是否是机器人
   needAction: boolean = false; // act each round
   actionName: string = "";
   stack: number = 0;

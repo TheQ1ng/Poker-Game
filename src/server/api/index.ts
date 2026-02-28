@@ -1,7 +1,8 @@
 import Router from "@koa/router";
 import * as jwt from "jsonwebtoken";
 import { secret } from "../config";
-import { createRoom, roomMap, userEnterRoom, userMap } from "../service";
+import { createRoom, roomMap, userEnterRoom, userMap, getAllRooms } from "../service";
+import { getUserProfile, updateUserProfile, saveUser, getUser } from "../service/database";
 import User from "../service/User";
 
 const router = new Router();
@@ -24,6 +25,13 @@ router.get("/json", (ctx) => {
 //   };
 // });
 
+// 获取所有房间列表
+router.get("/rooms", (ctx) => {
+  ctx.body = {
+    rooms: getAllRooms()
+  };
+});
+
 router.post("/register", (ctx) => {
   const { name, password, avatar } = ctx.request.body;
   if (name === null || name === "") {
@@ -35,11 +43,28 @@ router.post("/register", (ctx) => {
   if (password === null || password === "") {
     throw new Error(`password is empty`);
   }
-  const token = jwt.sign(name + "@" + password, secret);
-  if (!userMap[token]) {
-    userMap[token] = new User(token, name, avatar);
+
+  // 从数据库检查用户名是否已存在
+  const existingUser = getUser(name);
+  if (existingUser) {
+    // 用户已存在，验证密码
+    if (existingUser.password !== password) {
+      throw new Error(`密码错误`);
+    }
+    // 密码正确，生成token返回
+    const token = jwt.sign(name + "@" + password, secret);
+    if (!userMap[token]) {
+      userMap[token] = new User(token, name, existingUser.avatar);
+      userMap[token].nickname = existingUser.nickname;
+    }
+    ctx.data = token;
+  } else {
+    // 用户不存在，创建新用户并保存到数据库
+    saveUser(name, password, "", avatar || "");
+    const token = jwt.sign(name + "@" + password, secret);
+    userMap[token] = new User(token, name, avatar || "");
+    ctx.data = token;
   }
-  ctx.data = token;
 });
 
 router.get("/currentroom", (ctx) => {
@@ -71,4 +96,53 @@ router.post("/joinroom", (ctx) => {
   const { roomid } = ctx.request.body;
   userEnterRoom(token, roomid);
   ctx.data = roomid;
+});
+
+// 更新用户资料
+router.post("/updateprofile", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token]) {
+    userMap[token] = new User(token, ctx.user, "");
+  }
+  const { nickname, avatar } = ctx.request.body;
+  const username = userMap[token].name;
+  
+  // 更新数据库中的用户资料
+  if (nickname !== undefined) {
+    userMap[token].nickname = nickname;
+  }
+  if (avatar !== undefined) {
+    userMap[token].avatar = avatar;
+  }
+  if (avatar !== undefined) {
+    userMap[token].avatar = avatar;
+  }
+  updateUserProfile(username, userMap[token].nickname, userMap[token].avatar);
+  
+  ctx.data = { nickname: userMap[token].nickname, avatar: userMap[token].avatar };
+});
+
+// 获取用户资料
+router.get("/profile", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token]) {
+    userMap[token] = new User(token, ctx.user, "");
+  }
+  
+  // 从数据库加载最新资料
+  const username = userMap[token].name;
+  const userProfile = getUserProfile(username);
+  console.log("getUserProfile:", username, userProfile);
+  if (userProfile) {
+    userMap[token].nickname = userProfile.nickname || "";
+    userMap[token].avatar = userProfile.avatar || "";
+  }
+  
+  ctx.data = {
+    name: userMap[token].name,
+    nickname: userMap[token].nickname,
+    avatar: userMap[token].avatar,
+  };
 });

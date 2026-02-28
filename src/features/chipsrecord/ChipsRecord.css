@@ -1,0 +1,26 @@
+/* 积分榜深色主题样式 */
+.chips-record-table .ant-table {
+  background: transparent !important;
+  color: white !important;
+}
+
+.chips-record-table .ant-table-thead > tr > th {
+  background: rgba(0, 0, 0, 0.3) !important;
+  color: #ffd700 !important;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.3) !important;
+}
+
+.chips-record-table .ant-table-tbody > tr > td {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: white !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.chips-record-table .ant-table-tbody > tr:hover > td {
+  background: rgba(255, 215, 0, 0.1) !important;
+}
+
+.chips-record-table .ant-table-cell {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+

@@ -1,0 +1,95 @@
+
+> poker@0.1.0 start
+> node dist/src/server/app-server.js
+
+数据库初始化完成
+server at: http://localhost:8086
+client closed
+client closed
+client closed
+client closed
+client closed
+client closed
+client closed
+client closed
+client closed
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:01:38.810Z GET 404 /.well-known/appspecific/com.chrome.devtools.json
+/profile GET
+getUserProfile: 111 { nickname: 'TheQ1ng', avatar: 'playerIcon (1).png' }
+2026-02-27T09:01:38.929Z GET 200 /profile
+/currentroom GET
+2026-02-27T09:01:38.939Z GET 200 /currentroom
+/createroom POST
+2026-02-27T09:01:40.219Z POST 200 /createroom
+client connect eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y 111
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ENTER_GAME', roomid: '9695' }
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ADD_BOT', roomid: '9695' }
+机器人 福将 加入房间 9695
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ADD_BOT', roomid: '9695' }
+机器人 手气好 加入房间 9695
+client closed
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:01:52.809Z GET 404 /.well-known/appspecific/com.chrome.devtools.json
+/profile GET
+getUserProfile: 111 { nickname: 'TheQ1ng', avatar: 'playerIcon (1).png' }
+2026-02-27T09:01:52.897Z GET 200 /profile
+/currentroom GET
+2026-02-27T09:01:52.898Z GET 200 /currentroom
+client connect eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y 111
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ENTER_GAME', roomid: '9695' }
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ADD_BOT', roomid: '9695' }
+机器人 扑克侠 加入房间 9695
+client closed
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:01:57.007Z GET 404 /.well-known/appspecific/com.chrome.devtools.json
+/profile GET
+getUserProfile: 111 { nickname: 'TheQ1ng', avatar: 'playerIcon (1).png' }
+2026-02-27T09:01:57.110Z GET 200 /profile
+/currentroom GET
+2026-02-27T09:01:57.111Z GET 200 /currentroom
+client connect eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y 111
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ENTER_GAME', roomid: '9695' }
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ADD_BOT', roomid: '9695' }
+机器人 德州王 加入房间 9695
+client closed
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:02:02.337Z GET 404 /.well-known/appspecific/com.chrome.devtools.json
+/profile GET
+getUserProfile: 111 { nickname: 'TheQ1ng', avatar: 'playerIcon (1).png' }
+2026-02-27T09:02:02.421Z GET 200 /profile
+/currentroom GET
+2026-02-27T09:02:02.423Z GET 200 /currentroom
+client connect eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y 111
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ENTER_GAME', roomid: '9695' }
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ADD_BOT', roomid: '9695' }
+机器人 牌王 加入房间 9695
+client closed
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:02:08.253Z GET 404 /.well-known/appspecific/com.chrome.devtools.json
+/profile GET
+getUserProfile: 111 { nickname: 'TheQ1ng', avatar: 'playerIcon (1).png' }
+2026-02-27T09:02:08.333Z GET 200 /profile
+/currentroom GET
+2026-02-27T09:02:08.334Z GET 200 /currentroom
+client connect eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y 111
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ENTER_GAME', roomid: '9695' }
+client closed
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:02:41.444Z GET 404 /.well-known/appspecific/com.chrome.devtools.json
+client connect eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y 111
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ENTER_GAME', roomid: '9695' }
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ADD_BOT', roomid: '9695' }
+机器人 好运来 加入房间 9695
+client closed
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:03:49.912Z GET 404 /.well-known/appspecific/com.chrome.devtools.json
+/profile GET
+getUserProfile: 111 { nickname: 'TheQ1ng', avatar: 'playerIcon (1).png' }
+2026-02-27T09:03:50.030Z GET 200 /profile
+/currentroom GET
+2026-02-27T09:03:50.031Z GET 200 /currentroom
+client connect eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y 111
+handle eyJhbGciOiJIUzI1NiJ9.MTExQDExMQ.nV8r8Jsqv3sEOHPEWlDKSzlhc-6u_gx9VPt-eICac3Y { action: 'ENTER_GAME', roomid: '9695' }
+/.well-known/appspecific/com.chrome.devtools.json GET
+2026-02-27T09:03:57.922Z GET 404 /.well-known/appspecific/com.chrome.devtools.json

@@ -191,3 +191,10 @@ export function ws_sendMessage(message: string) {
     message,
   });
 }
+
+export function ws_addBot(roomid: string) {
+  send2server({
+    action: ActionType.ADD_BOT,
+    roomid,
+  });
+}

@@ -1,0 +1,871 @@
+/* ========================================
+   德州扑克美化样式 - 牌桌、动画、特效
+   ======================================== */
+
+/* ----------------------------------------
+   1. 牌桌整体风格
+   ---------------------------------------- */
+
+/* 牌桌背景 - 绿色毛毯纹理 */
+.poker-table {
+  background: 
+    radial-gradient(ellipse at center, #2d5a3d 0%, #1a3d28 70%, #0f2518 100%);
+  position: relative;
+  border-radius: 120px;
+  box-shadow: 
+    0 0 0 15px #4a2c17,
+    0 0 0 20px #8b5a2b,
+    0 0 0 25px #2c1810,
+    inset 0 0 100px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* 牌桌木质边框 */
+.poker-table::before {
+  content: '';
+  position: absolute;
+  top: -30px;
+  left: -30px;
+  right: -30px;
+  bottom: -30px;
+  border-radius: 150px;
+  background: linear-gradient(145deg, #5c3d2e 0%, #3d2517 50%, #2c1810 100%);
+  z-index: -1;
+  box-shadow: 
+    inset 0 2px 10px rgba(255, 255, 255, 0.1),
+    0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* 牌桌边缘装饰 */
+.poker-table::after {
+  content: '';
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  right: 5px;
+  bottom: 5px;
+  border-radius: 115px;
+  border: 3px solid rgba(201, 162, 39, 0.3);
+  pointer-events: none;
+}
+
+/* 牌桌中心的-logo或标记 */
+.table-center-mark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 4px solid rgba(201, 162, 39, 0.4);
+  background: radial-gradient(circle, rgba(0,0,0,0.3) 0%, transparent 70%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-center-mark::before {
+  content: '♠ ♥ ♣ ♦';
+  font-size: 24px;
+  color: rgba(201, 162, 39, 0.3);
+  letter-spacing: 8px;
+}
+
+/* ----------------------------------------
+   2. 扑克牌美化样式
+   ---------------------------------------- */
+
+.beautiful-poker-card {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
+.beautiful-poker-card:hover {
+  transform: translateY(-5px);
+}
+
+/* 扑克牌背面 */
+.poker-card-back {
+  background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 50%, #1a472a 100%);
+  border: 2px solid #c9a227;
+  border-radius: 6px;
+}
+
+/* 发牌动画 - 增强版 */
+@keyframes dealCard {
+  0% {
+    transform: translate(-500px, -200px) rotate(-180deg) scale(0.3);
+    opacity: 0;
+  }
+  20% {
+    transform: translate(-300px, -100px) rotate(-120deg) scale(0.5);
+    opacity: 0.3;
+  }
+  40% {
+    transform: translate(-100px, -50px) rotate(-60deg) scale(0.8);
+    opacity: 0.6;
+  }
+  60% {
+    transform: translate(20px, 10px) rotate(-10deg) scale(1.1);
+    opacity: 1;
+  }
+  80% {
+    transform: translate(-10px, -5px) rotate(5deg) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.animation-deal {
+  animation: dealCard 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* 翻牌动画 - 增强版 */
+@keyframes cardFlip {
+  0% {
+    transform: rotateY(0deg) scale(1);
+  }
+  50% {
+    transform: rotateY(90deg) scale(1.1);
+  }
+  100% {
+    transform: rotateY(0deg) scale(1);
+  }
+}
+
+.animation-flip {
+  animation: cardFlip 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 翻牌3D效果 */
+.card-flip-container {
+  perspective: 1500px;
+}
+
+.card-flip-inner {
+  transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-style: preserve-3d;
+}
+
+.card-flip-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-front,
+.card-back-3d {
+  backface-visibility: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.card-back-3d {
+  transform: rotateY(180deg);
+}
+
+/* 社区牌发牌动画 - 增强版 */
+@keyframes communityCardDeal {
+  0% {
+    transform: translateY(-150px) scale(0.3) rotateX(45deg);
+    opacity: 0;
+  }
+  30% {
+    transform: translateY(-75px) scale(0.6) rotateX(20deg);
+    opacity: 0.5;
+  }
+  60% {
+    transform: translateY(15px) scale(1.1) rotateX(0deg);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-5px) scale(1.05) rotateX(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0) scale(1) rotateX(0deg);
+    opacity: 1;
+  }
+}
+
+.community-card-deal {
+  animation: communityCardDeal 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* 牌型高亮效果 */
+.hand-type-highlight {
+  color: #ffd700 !important;
+  font-weight: bold !important;
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.8) !important;
+  animation: handTypeGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes handTypeGlow {
+  from {
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.6), 0 0 20px rgba(255, 215, 0, 0.4);
+  }
+  to {
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.8), 0 0 30px rgba(255, 215, 0, 0.6), 0 0 40px rgba(255, 215, 0, 0.4);
+  }
+}
+
+/* 非选中牌的阴影效果 */
+.card-not-selected {
+  filter: brightness(0.5) grayscale(0.7);
+  transform: scale(0.9);
+  transition: all 0.3s ease;
+}
+
+/* All in 着火特效 */
+@keyframes allinFire {
+  0% {
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5), 0 0 20px rgba(255, 100, 100, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 68, 68, 0.8), 0 0 40px rgba(255, 100, 100, 0.6), 0 0 60px rgba(255, 140, 140, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5), 0 0 20px rgba(255, 100, 100, 0.3);
+  }
+}
+
+.user-seat.allin {
+  border-color: #ff4444;
+  animation: allinFire 1.5s ease-in-out infinite;
+}
+
+/* 筹码推出去的动画 */
+@keyframes chipsPush {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.chips-push-animation {
+  animation: chipsPush 0.5s ease-in-out;
+}
+
+/* ----------------------------------------
+   3. 玩家区域美化
+   ---------------------------------------- */
+
+.user-seat {
+  background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(0,0,0,0.1) 100%);
+  border-radius: 12px;
+  padding: 8px;
+  margin: 5px;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.3s ease;
+}
+
+.user-seat:hover {
+  background: linear-gradient(180deg, rgba(255,255,255,0.2) 0%, rgba(0,0,0,0.15) 100%);
+  transform: scale(1.02);
+}
+
+.user-seat.active {
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  border-color: rgba(255, 215, 0, 0.8);
+}
+
+.user-seat.owner {
+  border-color: #ffd700;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+.user-seat.allin {
+  border-color: #ff4444;
+  animation: allinPulse 1s infinite;
+}
+
+@keyframes allinPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(255, 68, 68, 0.8);
+  }
+}
+
+.user-seat.folded {
+  opacity: 0.6;
+}
+
+/* 玩家头像区域 */
+.user-avatar-area {
+  position: relative;
+}
+
+.user-avatar-bg {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.user-name {
+  font-size: 12px;
+  color: white !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 玩家筹码显示 */
+.user-stack {
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  border-radius: 20px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 玩家下注区域 */
+.user-bet-area {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+}
+
+.user-bet {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 玩家动作提示 */
+.user-action-indicator {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.user-action-indicator.fold {
+  background: #666;
+  color: white;
+}
+
+.user-action-indicator.check {
+  background: #4caf50;
+  color: white;
+}
+
+.user-action-indicator.call {
+  background: #2196f3;
+  color: white;
+}
+
+.user-action-indicator.raise {
+  background: #ff9800;
+  color: white;
+}
+
+.user-action-indicator.allin {
+  background: #f44336;
+  color: white;
+  animation: allinIndicator 0.5s infinite;
+}
+
+@keyframes allinIndicator {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.1); }
+}
+
+/* ----------------------------------------
+   4. 底池区域美化
+   ---------------------------------------- */
+
+.pots-container {
+  background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
+  border-radius: 20px;
+  padding: 10px 20px;
+  border: 2px solid rgba(255, 215, 0, 0.3);
+}
+
+.pots-amount {
+  font-size: 24px;
+  font-weight: bold;
+  color: #ffd700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.pots-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+/* ----------------------------------------
+   5. 结算特效
+   ---------------------------------------- */
+
+/* 赢家高亮 */
+.winner-highlight {
+  animation: winnerGlow 1.5s infinite;
+}
+
+@keyframes winnerGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 215, 0, 1), 0 0 60px rgba(255, 215, 0, 0.5);
+  }
+}
+
+/* 赢家飘字 */
+.winner-text-popup {
+  position: absolute;
+  animation: winnerTextPop 2s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes winnerTextPop {
+  0% {
+    transform: translateY(0) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    transform: translateY(-20px) scale(1.2);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(-30px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-50px) scale(0.8);
+    opacity: 0;
+  }
+}
+
+/* 筹码收集动画 */
+@keyframes chipsCollect {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(0) translateY(-100px);
+    opacity: 0;
+  }
+}
+
+.chips-collecting {
+  animation: chipsCollect 0.5s ease-in forwards;
+}
+
+/* 胜负结果显示 */
+.game-result-display {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: linear-gradient(135deg, rgba(0,0,0,0.9) 0%, rgba(30,30,30,0.95) 100%);
+  border-radius: 20px;
+  padding: 30px 50px;
+  z-index: 1000;
+  border: 3px solid rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+  animation: resultAppear 0.5s ease-out;
+}
+
+@keyframes resultAppear {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+.result-title {
+  font-size: 32px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.result-title.win {
+  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
+.result-title.lose {
+  color: #888;
+}
+
+.result-cards {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.result-amount {
+  font-size: 28px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.result-amount.positive {
+  color: #4caf50;
+}
+
+.result-amount.negative {
+  color: #f44336;
+}
+
+/* ----------------------------------------
+   6. 按钮美化
+   ---------------------------------------- */
+
+.poker-btn {
+  border-radius: 25px;
+  padding: 8px 24px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.poker-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.poker-btn.primary {
+  background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+  border-color: #4caf50;
+}
+
+.poker-btn.primary:hover {
+  background: linear-gradient(135deg, #5cbf60 0%, #489e4c 100%);
+}
+
+.poker-btn.danger {
+  background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+  border-color: #f44336;
+}
+
+.poker-btn.warning {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  border-color: #ff9800;
+}
+
+/* ----------------------------------------
+   7. 动画工具类
+   ---------------------------------------- */
+
+/* 淡入 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* 弹跳 */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.bounce {
+  animation: bounce 0.6s ease-in-out;
+}
+
+/* 闪烁 */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.blink {
+  animation: blink 1s infinite;
+}
+
+/* 脉冲 */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.pulse {
+  animation: pulse 2s infinite;
+}
+
+/* 摇晃 */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.shake {
+  animation: shake 0.3s ease-in-out;
+}
+
+/* 旋转 */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ----------------------------------------
+   8. 响应式调整
+   ---------------------------------------- */
+
+@media (max-width: 1200px) {
+  .poker-table {
+    border-radius: 80px;
+  }
+  
+  .beautiful-poker-card {
+    transform: scale(0.9);
+  }
+}
+
+@media (max-width: 768px) {
+  .poker-table {
+    border-radius: 40px;
+  }
+  
+  .beautiful-poker-card {
+    transform: scale(0.7);
+  }
+  
+  .user-seat {
+    padding: 5px;
+    margin: 3px;
+  }
+}
+
+/* ========================================
+   德州扑克风格按钮
+   ======================================== */
+
+/* 主按钮区域 - 扑克风格 */
+.main-btn .ant-btn {
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 8px 20px;
+  height: auto;
+  border: 2px solid;
+  margin: 0 4px;
+  transition: all 0.2s ease;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+/* 弃牌按钮 - 红色 */
+.main-btn .ant-btn-primary:nth-child(1) {
+  background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);
+  border-color: #922b21;
+  color: white;
+}
+
+.main-btn .ant-btn-primary:nth-child(1):hover {
+  background: linear-gradient(180deg, #ff6b5b 0%, #e74c3c 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(231, 76, 60, 0.4);
+}
+
+/* 过牌按钮 - 蓝色 */
+.main-btn .ant-btn-primary:nth-child(2),
+.main-btn .ant-btn-primary:not([danger]):not(:nth-child(1)) {
+  background: linear-gradient(180deg, #3498db 0%, #2980b9 100%);
+  border-color: #1a5276;
+  color: white;
+}
+
+.main-btn .ant-btn-primary:not([danger]):not(:nth-child(1)):hover {
+  background: linear-gradient(180deg, #5dade2 0%, #3498db 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(52, 152, 219, 0.4);
+}
+
+/* 跟注按钮 - 绿色 */
+.main-btn .ant-btn-primary[disabled]:not([danger]) {
+  background: linear-gradient(180deg, #7f8c8d 0%, #626567 100%);
+  border-color: #424949;
+  color: #bdc3c7;
+}
+
+/* AllIn 按钮 - 金色/橙色 */
+.main-btn .ant-btn-dangerous {
+  background: linear-gradient(180deg, #f39c12 0%, #d68910 100%);
+  border-color: #9c640c;
+  color: white;
+  font-size: 15px;
+}
+
+.main-btn .ant-btn-dangerous:hover {
+  background: linear-gradient(180deg, #f5b041 0%, #f39c12 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(243, 156, 18, 0.5);
+}
+
+/* 快速加注按钮区域 */
+.owner .ant-btn {
+  border-radius: 6px;
+  font-weight: bold;
+  margin: 2px 3px;
+  padding: 4px 10px;
+  height: auto;
+  background: linear-gradient(180deg, #9b59b6 0%, #8e44ad 100%);
+  border-color: #6c3483;
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.owner .ant-btn:hover {
+  background: linear-gradient(180deg, #af7ac5 0%, #9b59b6 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(155, 89, 182, 0.4);
+}
+
+/* 加注输入框 */
+.owner .ant-input-number {
+  border-radius: 6px;
+  border: 2px solid #d4ac0d;
+  background: linear-gradient(180deg, #2c3e50 0%, #1a252f 100%);
+}
+
+.owner .ant-input-number input {
+  color: #f1c40f;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* 筹码滑动条 */
+.owner .ant-slider-rail {
+  background: #34495e;
+}
+
+.owner .ant-slider-track {
+  background: linear-gradient(90deg, #f39c12, #e67e22);
+}
+
+.owner .ant-slider-handle {
+  border-color: #f39c12;
+  background: #f39c12;
+  box-shadow: 0 2px 6px rgba(243, 156, 18, 0.5);
+}
+
+/* 房间顶部操作按钮 - 扑克风格 */
+.roominfo .room-action-btn {
+  background: linear-gradient(180deg, #34495e 0%, #2c3e50 100%);
+  border: 2px solid #1abc9c;
+  color: #1abc9c;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.roominfo .room-action-btn:hover {
+  background: linear-gradient(180deg, #1abc9c 0%, #16a085 100%);
+  color: white;
+  transform: scale(1.05);
+}
+
+.roominfo .room-action-btn.ant-btn-primary {
+  background: linear-gradient(180deg, #1abc9c 0%, #16a085 100%);
+  border-color: #117a65;
+  color: white;
+}
+
+/* 自动过牌开关 */
+.owner .ant-switch {
+  background: #7f8c8d;
+}
+
+.owner .ant-switch-checked {
+  background: #27ae60;
+}
+
+/* 观战按钮 */
+.spectators .ant-btn {
+  background: linear-gradient(180deg, #95a5a6 0%, #7f8c8d 100%);
+  border-color: #616a6b;
+  color: white;
+}
+
+/* 迷你牌样式 - 头像前的两张背面缩小牌 */
+.mini-cards {
+  position: absolute;
+  bottom: -15px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.8);
+  z-index: 10;
+  display: flex;
+  gap: 2px;
+}
+
+/* 弃牌动画 */
+@keyframes foldCard {
+  0% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: rotate(90deg) scale(0.8);
+    opacity: 0.5;
+  }
+  100% {
+    transform: rotate(180deg) scale(0.5) translate(50px, 50px);
+    opacity: 0;
+  }
+}
+
+.fold-animation {
+  animation: foldCard 1s ease-in-out forwards;
+}
+
+

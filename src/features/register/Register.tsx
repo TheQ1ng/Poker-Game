@@ -4,7 +4,7 @@ import { useAppSelector, useAppDispatch } from '../../app/hooks';
 import { registerAsync, selectError } from './registerSlice';
 import { Form, Input, Button, Row, Col } from 'antd';
 
-export function Register() {
+function Register() {
   const dispatch = useAppDispatch();
   const error = useAppSelector(selectError);
 
@@ -51,3 +51,5 @@ export function Register() {
     </div>
   );
 }
+
+export default Register;

@@ -2,6 +2,7 @@ import { Table } from "antd";
 import { ColumnsType } from "antd/lib/table";
 import { useAppSelector } from "../../app/hooks";
 import { selectChipsRecord } from "./chipsRecordSlice";
+import "./ChipsRecord.css";
 
 export interface TableData {
   id: string;
@@ -46,11 +47,13 @@ export function ChipsRecord() {
     },
   ];
   return (
-    <Table
-      rowKey={"id"}
-      columns={columns}
-      dataSource={data}
-      pagination={false}
-    />
+    <div className="chips-record-table">
+      <Table
+        rowKey={"id"}
+        columns={columns}
+        dataSource={data}
+        pagination={false}
+      />
+    </div>
   );
 }

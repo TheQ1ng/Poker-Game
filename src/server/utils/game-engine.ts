@@ -254,23 +254,23 @@ export enum PokerType {
 export function pokerTypeName(type: PokerType) {
   switch (type) {
     case PokerType.StraightFlush:
-      return "同花顺";
+      return "Straight Flush";
     case PokerType.FourKinds:
-      return "四条";
+      return "Four of a Kind";
     case PokerType.FullHouse:
-      return "葫芦";
+      return "Full House";
     case PokerType.Flush:
-      return "同花";
+      return "Flush";
     case PokerType.Straight:
-      return "顺子";
+      return "Straight";
     case PokerType.ThreeKinds:
-      return "三条";
+      return "Three of a Kind";
     case PokerType.TwoPair:
-      return "两对";
+      return "Two Pair";
     case PokerType.OnePair:
-      return "一对";
+      return "One Pair";
     case PokerType.HighCards:
-      return "高牌";
+      return "High Cards";
   }
 }
 

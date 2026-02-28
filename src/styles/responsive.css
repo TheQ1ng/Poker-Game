@@ -1,0 +1,692 @@
+/* 德州扑克 - 移动端响应式适配样式 */
+
+/* ==================== 基础响应式设置 ==================== */
+
+/* 侧边按钮文本显示 */
+.sidebar-btn .btn-text {
+  display: inline;
+}
+
+/* iPad 竖屏 (768px - 1024px) */
+@media only screen and (min-width: 768px) and (max-width: 1024px) {
+  .roominfo {
+    width: 90%;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .roominfo .ant-btn {
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+
+  .roominfo .ant-input {
+    width: 70px !important;
+  }
+}
+
+/* iPad 横屏 (1024px - 1366px) */
+@media only screen and (min-width: 1024px) and (max-width: 1366px) {
+  .roominfo {
+    width: 85%;
+  }
+}
+
+/* 手机竖屏 (小于 768px) */
+@media only screen and (max-width: 767px) {
+  /* 顶部房间信息栏 - 改成一行图标按钮 */
+  .roominfo {
+    width: 100%;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    overflow-x: auto !important;
+    padding: 5px !important;
+    gap: 3px !important;
+  }
+
+  /* 房间ID输入框 */
+  .roominfo .room-id-input {
+    width: 50px !important;
+    height: 28px !important;
+    font-size: 10px !important;
+    min-width: 50px !important;
+  }
+
+  /* 操作按钮 - 圆形图标按钮 */
+  .roominfo .room-action-btn {
+    min-width: 32px !important;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin-right: 3px !important;
+    border-radius: 50% !important;
+    font-size: 14px !important;
+  }
+
+  .roominfo .room-action-btn .anticon {
+    font-size: 14px !important;
+    margin: 0 !important;
+  }
+
+  /* 隐藏侧边按钮文本，只显示图标 */
+  .sidebar-btn .btn-text {
+    display: none;
+  }
+  
+  .sidebar-btn {
+    width: 44px !important;
+    height: 44px !important;
+    padding: 0 !important;
+    min-width: 44px !important;
+  }
+
+  /* 整体布局 */
+  .App {
+    overflow-x: hidden;
+  }
+
+  /* 手机端上方的按钮移到右侧竖直显示 */
+  .roominfo {
+    position: absolute !important;
+    right: 10px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    z-index: 99 !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    padding: 10px !important;
+    border-radius: 10px !important;
+  }
+
+  /* 调整按钮样式，使其在垂直方向排列 */
+  .roominfo .room-action-btn {
+    margin: 5px 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* 隐藏房间ID输入框，只显示按钮 */
+  .roominfo .room-id-input {
+    display: none !important;
+  }
+
+  /* 左上角信息按钮在手机端始终可见 */
+  .sidebar-btn {
+    position: absolute !important;
+    left: 10px !important;
+    top: 10px !important;
+    z-index: 100 !important;
+  }
+
+  /* 增加玩家之间的水平间距 */
+  .user {
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+  }
+
+  /* 按钮区域 */
+  .user-actions,
+  .main-btn {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .user-actions button,
+  .main-btn button {
+    margin: 3px 3px !important;
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    height: auto !important;
+    min-height: 32px;
+  }
+
+  /* 玩家信息 */
+  .user {
+    height: 120px !important;
+    width: 70px !important;
+    margin: 0 3px !important;
+  }
+
+  .user .ant-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 14px !important;
+  }
+
+  .userinfo {
+    padding: 3px !important;
+    font-size: 10px !important;
+  }
+
+  .userinfo > div {
+    font-size: 10px !important;
+    margin: 1px 0;
+  }
+
+  .stack {
+    font-size: 10px !important;
+  }
+
+  .coins {
+    width: 12px !important;
+    height: 12px !important;
+    font-size: 9px !important;
+  }
+
+  /* 手机端 mini-cards 与筹码数并排显示 */
+  .userinfo {
+    position: relative;
+  }
+
+  .mini-cards {
+    position: relative !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    transform: none !important;
+    margin-bottom: 5px !important;
+  }
+
+  .bet {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 2px !important;
+  }
+
+  /* 扑克牌 - 移动端缩小 */
+  beautiful-poker-card {
+    height: 50px !important;
+    width: 35px !important;
+    font-size: 14px !important;
+    margin: 0 3px !important;
+  }
+
+  /* 玩家手牌区域 */
+  .card-box beautiful-poker-card {
+    width: 22px !important;
+    height: 30px !important;
+    font-size: 10px !important;
+  }
+
+  .card-box {
+    height: 50px !important;
+  }
+
+  .card-box .handstype {
+    font-size: 9px !important;
+  }
+
+  /* 位置标记 */
+  .position img,
+  .position img {
+    height: 18px !important;
+  }
+
+  /* All In 标记 */
+  .allin img {
+    height: 20px !important;
+  }
+
+  .allin {
+    bottom: 20px !important;
+  }
+
+  /* 底池信息 */
+  .pots {
+    padding: 5px 10px !important;
+    margin-bottom: 10px !important;
+    font-size: 10px !important;
+  }
+
+  .pots span:first-child {
+    font-size: 10px !important;
+    margin-right: 5px !important;
+  }
+
+  .pots span:last-child {
+    font-size: 16px !important;
+  }
+
+  /* 公共牌区域 */
+  .boards {
+    transform: scale(0.8);
+  }
+
+  /* 庄家区域 */
+  .owner {
+    width: 70px !important;
+  }
+
+  .owner .ant-avatar {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  /* 侧边按钮 - 战况/积分 */
+  .ant-btn[icon*="History"],
+  .ant-btn[icon*="BarChart"] {
+    width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+  }
+
+  .ant-btn[icon*="History"] span,
+  .ant-btn[icon*="BarChart"] span {
+    display: none;
+  }
+
+  .ant-btn[icon*="History"]::after,
+  .ant-btn[icon*="BarChart"]::after {
+    content: attr(icon);
+  }
+
+  /* 弹窗适配 */
+  .ant-modal {
+    width: 90% !important;
+    max-width: 95vw !important;
+    margin: 10px auto !important;
+  }
+
+  .ant-modal-content {
+    max-height: 80vh;
+  }
+
+  .ant-modal-body {
+    max-height: 60vh;
+    overflow: auto;
+  }
+
+  /* 发牌次数选择 */
+  .ant-modal .ant-btn {
+    margin: 5px !important;
+    padding: 6px 12px !important;
+  }
+
+  /* 倒计时 */
+  .countdown {
+    font-size: 14px !important;
+  }
+
+  /* 观战者 */
+  .spectators {
+    top: 30px !important;
+    font-size: 10px !important;
+  }
+
+  .spectators .ant-tag {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+  }
+}
+
+/* ==================== 超小屏幕 (小于 400px) ==================== */
+@media only screen and (max-width: 400px) {
+  .user {
+    height: 85px !important;
+    width: 50px !important;
+    margin: 0 2px !important;
+  }
+
+  .user .ant-avatar {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 12px !important;
+  }
+
+  .userinfo {
+    font-size: 9px !important;
+  }
+
+  beautiful-poker-card {
+    height: 40px !important;
+    width: 28px !important;
+    font-size: 12px !important;
+    margin: 0 2px !important;
+  }
+
+  .card-box beautiful-poker-card {
+    width: 18px !important;
+    height: 25px !important;
+    font-size: 8px !important;
+  }
+
+  .roominfo .ant-input {
+    width: 50px !important;
+    height: 24px;
+    font-size: 10px;
+  }
+
+  .roominfo .ant-btn {
+    padding: 1px 6px;
+    font-size: 10px;
+    height: 24px;
+  }
+
+  .position img,
+  .allin img {
+    height: 16px !important;
+  }
+
+  .pots span:last-child {
+    font-size: 14px !important;
+  }
+}
+
+/* ==================== 横屏模式优化 ==================== */
+@media only screen and (orientation: landscape) and (max-height: 500px) {
+  .user {
+    height: 80px !important;
+    width: 55px !important;
+  }
+
+  .card-box {
+    height: 45px !important;
+  }
+
+  beautiful-poker-card {
+    height: 45px !important;
+    width: 32px !important;
+    font-size: 12px !important;
+  }
+
+  .roominfo {
+    padding: 4px !important;
+  }
+
+  .roominfo .ant-btn {
+    padding: 2px 6px !important;
+    font-size: 10px !important;
+    height: 24px !important;
+  }
+
+  .roominfo .ant-input {
+    height: 24px !important;
+    width: 60px !important;
+  }
+}
+
+/* ==================== 触摸设备优化 ==================== */
+@media (hover: none) and (pointer: coarse) {
+  /* 触摸设备更大的点击区域 */
+  .ant-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  beautiful-poker-card {
+    cursor: pointer;
+  }
+
+  /* 移除某些hover效果 */
+  .user:hover .userinfo {
+    transform: none;
+  }
+}
+
+/* ==================== iPad 专用 ==================== */
+@media only screen and (min-width: 768px) and (max-width: 1024px) {
+  .user {
+    height: 120px !important;
+    width: 70px !important;
+    margin: 0 5px !important;
+  }
+
+  .user .ant-avatar {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  beautiful-poker-card {
+    height: 70px !important;
+    width: 50px !important;
+    font-size: 18px !important;
+  }
+
+  .card-box beautiful-poker-card {
+    width: 28px !important;
+    height: 40px !important;
+  }
+
+  .card-box {
+    height: 60px !important;
+  }
+
+  .roominfo {
+    width: 95%;
+  }
+
+  .roominfo .ant-input {
+    width: 80px !important;
+  }
+
+  .roominfo .ant-btn {
+    padding: 4px 10px;
+  }
+
+  .pots span:last-child {
+    font-size: 20px !important;
+  }
+
+  .boards {
+    transform: scale(0.9);
+  }
+}
+
+/* ==================== iPad Pro 适配 ==================== */
+@media only screen and (min-width: 1024px) and (max-width: 1366px) {
+  .user {
+    height: 130px !important;
+    width: 75px !important;
+  }
+
+  beautiful-poker-card {
+    height: 80px !important;
+    width: 58px !important;
+    font-size: 20px !important;
+  }
+}
+
+/* ==================== 安全区域适配 (iPhone X+) ==================== */
+@supports (padding: env(safe-area-inset-top)) {
+  @media only screen and (max-width: 767px) {
+    .App {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    .roominfo {
+      padding-top: calc(8px + env(safe-area-inset-top));
+    }
+  }
+}
+
+/* ==================== Owner 组件操作区域适配 ==================== */
+
+/* 移动端操作按钮区域 */
+@media only screen and (max-width: 767px) {
+  .user-actions {
+    transform: scale(1) !important;
+    zoom: 1 !important;
+    flex: 4 !important;
+    padding: 5px !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+  }
+
+  .user-actions .main-btn {
+    flex-wrap: wrap !important;
+    gap: 5px !important;
+  }
+
+  .user-actions .main-btn .ant-btn {
+    min-width: 70px !important;
+    height: 40px !important;
+    font-size: 12px !important;
+    margin: 3px !important;
+    flex: 1 1 45% !important;
+    max-width: 45% !important;
+  }
+
+  /* 加注选项按钮 */
+  .user-actions .ant-btn-group .ant-btn,
+  .user-actions > div:not(.main-btn) .ant-btn {
+    padding: 4px 8px !important;
+    font-size: 11px !important;
+    min-height: 30px !important;
+    margin: 2px !important;
+  }
+
+  /* 输入框 */
+  .user-actions .ant-input-number {
+    width: 60px !important;
+    height: 30px !important;
+  }
+
+  /* 滑动条 */
+  .user-actions .ant-slider {
+    width: 120px !important;
+  }
+
+  /* 自动弃牌开关 */
+  .user-actions .ant-switch {
+    transform: scale(0.8);
+  }
+
+  .user-actions > div:first-child {
+    font-size: 11px !important;
+    margin-bottom: 5px !important;
+  }
+}
+
+/* 超小屏幕 */
+@media only screen and (max-width: 400px) {
+  .user-actions .main-btn .ant-btn {
+    min-width: 60px !important;
+    height: 36px !important;
+    font-size: 11px !important;
+    flex: 1 1 45% !important;
+  }
+
+  .user-actions .ant-slider {
+    width: 100px !important;
+  }
+}
+
+/* iPad */
+@media only screen and (min-width: 768px) and (max-width: 1024px) {
+  .user-actions {
+    transform: scale(0.9) !important;
+    zoom: 0.9 !important;
+    flex: 4 !important;
+  }
+
+  .user-actions .main-btn .ant-btn {
+    min-width: 80px !important;
+    margin: 5px !important;
+  }
+}
+
+/* ==================== 注册页面适配 ==================== */
+@media only screen and (max-width: 767px) {
+  .ant-modal {
+    width: 90% !important;
+    max-width: 350px !important;
+  }
+
+  .ant-modal-content {
+    max-height: 80vh;
+  }
+
+  .ant-modal-body {
+    padding: 20px !important;
+  }
+
+  .ant-input {
+    height: 40px !important;
+    font-size: 14px !important;
+  }
+
+  .ant-btn {
+    width: 100% !important;
+    height: 40px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* ==================== 竖屏提示横屏使用 ==================== */
+
+/* 竖屏提示遮罩层 - 默认隐藏 */
+.rotate-device-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, #0d4d2b 0%, #0a3d23 50%, #072d18 100%);
+  z-index: 9999;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.rotate-device-overlay .rotate-icon {
+  font-size: 60px;
+  color: #c9a227;
+  margin-bottom: 20px;
+  animation: rotate-pulse 2s ease-in-out infinite;
+}
+
+.rotate-device-overlay .rotate-text {
+  font-size: 20px;
+  color: #fff;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.rotate-device-overlay .rotate-hint {
+  font-size: 14px;
+  color: rgba(255,255,255,0.6);
+}
+
+@keyframes rotate-pulse {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-30deg); }
+  75% { transform: rotate(30deg); }
+}
+
+@media screen and (orientation: portrait) and (max-width: 768px) {
+  /* 竖屏时显示提示遮罩 */
+  .rotate-device-overlay {
+    display: flex !important;
+  }
+  
+  /* 隐藏游戏内容 */
+  .poker-table,
+  .roominfo,
+  .user-actions {
+    display: none !important;
+  }
+}
+
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  .poker-table {
+    transform: scale(0.85);
+    transform-origin: center center;
+  }
+  
+  .roominfo {
+    padding: 3px !important;
+    font-size: 11px !important;
+  }
+}
+

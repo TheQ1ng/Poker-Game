@@ -4,7 +4,7 @@ import { secret } from '../config';
 
 export default async (ctx: Context, next: () => Promise<any>) => {
   console.log(ctx.url, ctx.method);
-  const urls = ['/currentroom', '/createroom', '/joinroom'];
+  const urls = ['/currentroom', '/createroom', '/joinroom', '/profile', '/updateprofile'];
   if (urls.indexOf(ctx.url) != -1) {
     try {
       const user = jwt.verify(ctx.headers.authorization || '', secret);

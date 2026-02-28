@@ -1,0 +1,808 @@
+/* 德扑首页容器 - 绿色牌桌风格 */
+.poker-home-container {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0d4d2b 0%, #0a3d23 50%, #072d18 100%);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 牌桌纹理背景 */
+.poker-home-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+}
+
+/* 顶部标题栏 */
+.poker-home-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
+  border-bottom: 3px solid #c9a227;
+  position: relative;
+  z-index: 10;
+}
+
+.poker-table-logo {
+  font-size: 22px;
+  font-weight: bold;
+  color: #c9a227;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  letter-spacing: 1px;
+}
+
+.user-dropdown {
+  color: #fff !important;
+  font-size: 16px;
+  font-weight: 500;
+  padding: 8px 16px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.user-dropdown:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.username {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 下拉菜单样式 */
+.user-menu {
+  background: rgba(20, 60, 40, 0.95) !important;
+  border: 1px solid #c9a227 !important;
+  border-radius: 8px !important;
+}
+
+.user-menu .ant-menu-item {
+  color: #fff !important;
+}
+
+.user-menu .ant-menu-item:hover {
+  background: rgba(201, 162, 39, 0.2) !important;
+}
+
+.user-menu .ant-menu-item-danger {
+  color: #ff4d4f !important;
+}
+
+/* 主内容区 */
+.poker-home-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* 牌桌表面 */
+.poker-table-surface {
+  width: 100%;
+  max-width: 420px;
+  background: linear-gradient(145deg, #1a5c38, #0d4d2b);
+  border-radius: 20px;
+  padding: 30px 20px;
+  box-shadow: 
+    0 20px 60px rgba(0,0,0,0.5),
+    inset 0 2px 0 rgba(255,255,255,0.1),
+    inset 0 -2px 0 rgba(0,0,0,0.2);
+  border: 4px solid #8b6914;
+  position: relative;
+}
+
+/* 牌桌边缘装饰 */
+.poker-table-surface::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border: 2px solid #c9a227;
+  border-radius: 24px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Tab 样式 */
+.poker-tabs .ant-tabs-nav {
+  margin-bottom: 20px;
+}
+
+.poker-tabs .ant-tabs-nav::before {
+  border-bottom: 2px solid rgba(201, 162, 39, 0.3) !important;
+}
+
+.poker-tabs .ant-tabs-tab {
+  padding: 12px 20px;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px 10px 0 0;
+  margin: 0 3px;
+  transition: all 0.3s ease;
+  color: rgba(255,255,255,0.7) !important;
+}
+
+.poker-tabs .ant-tabs-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff !important;
+}
+
+.poker-tabs .ant-tabs-tab-active {
+  background: linear-gradient(145deg, #c9a227, #8b6914) !important;
+}
+
+.poker-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #1a1a1a !important;
+  font-weight: 600;
+}
+
+.poker-tabs .ant-tabs-ink-bar {
+  display: none;
+}
+
+/* 首页大卡片 */
+.home-card {
+  background: rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(10px);
+  border-radius: 16px !important;
+  border: 1px solid rgba(201, 162, 39, 0.3) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.home-card .ant-card-body {
+  padding: 20px;
+}
+
+/* 表单组 */
+.poker-form-group {
+  margin-bottom: 16px;
+}
+
+/* 输入框标签 */
+.label {
+  color: #c9a227;
+  font-size: 14px;
+  margin-right: 8px;
+  font-weight: 500;
+}
+
+.label-text {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.divider {
+  color: rgba(255, 255, 255, 0.4);
+  margin: 0 8px;
+}
+
+/* 输入框样式 */
+.poker-input {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(201, 162, 39, 0.4) !important;
+  border-radius: 8px !important;
+}
+
+.poker-input input {
+  color: #fff !important;
+  background: transparent !important;
+  font-size: 16px;
+}
+
+.poker-input input::placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.poker-input .ant-input-number-handler-wrap {
+  background: rgba(201, 162, 39, 0.2) !important;
+  border-radius: 0 8px 8px 0;
+}
+
+.poker-input .ant-input-number-handler span {
+  color: #c9a227 !important;
+}
+
+.blind-input {
+  width: 80px !important;
+}
+
+.buyin-input,
+.rebuy-input {
+  width: 120px !important;
+}
+
+.manual-input {
+  width: 100% !important;
+}
+
+/* 按钮样式 */
+.poker-btn {
+  height: 48px !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  border: none !important;
+  transition: all 0.3s ease !important;
+}
+
+.create-btn {
+  background: linear-gradient(145deg, #c9a227, #8b6914) !important;
+  box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4) !important;
+  color: #1a1a1a !important;
+}
+
+.create-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201, 162, 39, 0.6) !important;
+}
+
+.join-btn {
+  background: linear-gradient(145deg, #27ae60, #1e8449) !important;
+  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4) !important;
+  color: #fff !important;
+}
+
+.join-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(39, 174, 96, 0.6) !important;
+}
+
+.join-btn:disabled {
+  background: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: none !important;
+  color: rgba(255,255,255,0.5) !important;
+}
+
+/* 分隔符 */
+.or-divider {
+  display: block;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+
+/* 提示文字 */
+.numpad-hint {
+  display: block;
+  text-align: center;
+  color: #c9a227;
+  font-size: 14px;
+  margin-bottom: 15px;
+}
+
+/* 九宫格数字键盘容器 */
+.number-pad-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+/* 数字显示框 */
+.number-display {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.digit-box {
+  width: 48px;
+  height: 56px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(201, 162, 39, 0.4);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  font-weight: bold;
+  color: #fff;
+  transition: all 0.2s ease;
+}
+
+.digit-box.filled {
+  background: linear-gradient(145deg, #c9a227, #8b6914);
+  border-color: #c9a227;
+  box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4);
+}
+
+/* 九宫格键盘 */
+.number-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.number-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.number-key {
+  width: 70px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.number-key:active {
+  transform: scale(0.95);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.number-key.function-key {
+  background: rgba(201, 162, 39, 0.2);
+  border-color: rgba(201, 162, 39, 0.3);
+  font-size: 16px;
+}
+
+.number-key.function-key:active {
+  background: rgba(201, 162, 39, 0.4);
+}
+
+/* 历史记录弹窗 */
+.history-modal .ant-modal-content {
+  background: linear-gradient(145deg, #1a3d2a, #0d2818) !important;
+  border: 2px solid #c9a227 !important;
+}
+
+.history-modal .ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.3) !important;
+}
+
+.history-modal .ant-modal-title {
+  color: #c9a227 !important;
+}
+
+.history-modal .ant-modal-close-x {
+  color: #fff !important;
+}
+
+/* ==================== 响应式设计 ==================== */
+
+/* iPad 横屏 */
+@media (max-width: 1024px) and (orientation: landscape) {
+  .poker-table-surface {
+    max-width: 380px;
+    padding: 25px 15px;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+  
+  .poker-table-logo {
+    font-size: 20px;
+  }
+  
+  .number-key {
+    width: 64px;
+    height: 50px;
+  }
+  
+  .digit-box {
+    width: 44px;
+    height: 52px;
+    font-size: 24px;
+  }
+}
+
+/* iPad 竖屏 */
+@media (max-width: 768px) and (orientation: portrait) {
+  .poker-home-header {
+    padding: 12px 16px;
+  }
+  
+  .poker-table-logo {
+    font-size: 18px;
+  }
+  
+  .poker-table-surface {
+    padding: 20px 15px;
+    border-width: 3px;
+    min-height: 70vh;
+  }
+  
+  .poker-tabs .ant-tabs-tab {
+    padding: 10px 16px;
+    font-size: 14px;
+  }
+  
+  .digit-box {
+    width: 52px;
+    height: 56px;
+    font-size: 24px;
+  }
+  
+  .number-key {
+    width: 72px;
+    height: 52px;
+    font-size: 18px;
+  }
+  
+  .poker-btn {
+    height: 44px !important;
+    font-size: 15px !important;
+  }
+  
+  .blind-input {
+    width: 70px !important;
+  }
+  
+  .buyin-input,
+  .rebuy-input {
+    width: 100px !important;
+  }
+}
+
+/* 手机横屏 */
+@media (max-width: 667px) and (orientation: landscape) {
+  .poker-home-header {
+    padding: 10px 16px;
+  }
+  
+  .poker-table-logo {
+    font-size: 16px;
+  }
+  
+  .user-dropdown {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
+  
+  .poker-table-surface {
+    max-width: 340px;
+    padding: 15px;
+  }
+  
+  .poker-form-group {
+    margin-bottom: 12px;
+  }
+  
+  .digit-box {
+    width: 48px;
+    height: 48px;
+    font-size: 20px;
+  }
+  
+  .number-key {
+    width: 60px;
+    height: 44px;
+    font-size: 16px;
+  }
+  
+  .numpad-hint {
+    font-size: 13px;
+    margin-bottom: 10px;
+  }
+  
+  .number-display {
+    gap: 6px;
+  }
+  
+  .number-row {
+    gap: 6px;
+  }
+  
+  .poker-btn {
+    height: 40px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* 手机竖屏 */
+@media (max-width: 480px) and (orientation: portrait) {
+  .poker-home-header {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .poker-table-logo {
+    font-size: 16px;
+  }
+  
+  .user-dropdown {
+    font-size: 14px;
+    padding: 6px 10px;
+  }
+  
+  .poker-home-content {
+    padding: 15px 10px;
+  }
+  
+  .poker-table-surface {
+    padding: 15px 12px;
+    border-width: 2px;
+  }
+  
+  .poker-tabs .ant-tabs-tab {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .poker-form-group {
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .label {
+    font-size: 13px;
+    width: 100%;
+    margin-bottom: 4px;
+  }
+  
+  .divider {
+    display: none;
+  }
+  
+  .blind-input,
+  .buyin-input,
+  .rebuy-input {
+    width: calc(50% - 4px) !important;
+  }
+  
+  .label-text {
+    width: 100%;
+    font-size: 11px;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+  
+  /* 数字键盘 */
+  .number-display {
+    gap: 8px;
+  }
+  
+  .digit-box {
+    width: 48px;
+    height: 50px;
+    font-size: 22px;
+  }
+  
+  .number-pad {
+    gap: 6px;
+  }
+  
+  .number-row {
+    gap: 6px;
+  }
+  
+  .number-key {
+    width: 64px;
+    height: 46px;
+    font-size: 16px;
+  }
+  
+  .poker-btn {
+    height: 42px !important;
+    font-size: 14px !important;
+  }
+  
+  .or-divider {
+    margin: 10px 0;
+  }
+}
+
+/* 超小屏幕 */
+@media (max-width: 360px) {
+  .digit-box {
+    width: 44px;
+    height: 46px;
+    font-size: 20px;
+  }
+  
+  .number-key {
+    width: 58px;
+    height: 42px;
+    font-size: 14px;
+  }
+  
+  .blind-input,
+  .buyin-input,
+  .rebuy-input {
+    width: calc(50% - 2px) !important;
+  }
+}
+
+/* ==================== 手机端整体缩放 ==================== */
+@media (max-width: 400px) {
+  .poker-home-content {
+    transform: scale(0.5);
+    transform-origin: top center;
+  }
+  
+  /* 数字键盘进一步缩小 */
+  .number-display {
+    gap: 4px;
+  }
+  
+  .digit-box {
+    width: 32px;
+    height: 38px;
+    font-size: 16px;
+  }
+  
+  .number-pad {
+    gap: 4px;
+  }
+  
+  .number-row {
+    gap: 4px;
+  }
+  
+  .number-key {
+    width: 48px;
+    height: 34px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .poker-home-content {
+    transform: scale(0.5);
+    transform-origin: top center;
+  }
+  
+  /* 数字键盘更小 */
+  .number-display {
+    gap: 3px;
+  }
+  
+  .digit-box {
+    width: 28px;
+    height: 34px;
+    font-size: 14px;
+  }
+  
+  .number-pad {
+    gap: 3px;
+  }
+  
+  .number-row {
+    gap: 3px;
+  }
+  
+  .number-key {
+    width: 42px;
+    height: 30px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 320px) {
+  .poker-home-content {
+    transform: scale(0.5);
+    transform-origin: top center;
+  }
+  
+  /* 数字键盘最小 */
+  .number-display {
+    gap: 2px;
+  }
+  
+  .digit-box {
+    width: 24px;
+    height: 30px;
+    font-size: 12px;
+  }
+  
+  .number-pad {
+    gap: 2px;
+  }
+  
+  .number-row {
+    gap: 2px;
+  }
+  
+  .number-key {
+    width: 36px;
+    height: 26px;
+    font-size: 10px;
+  }
+}
+
+/* 个人资料弹窗 */
+.profile-form {
+  padding: 10px 0;
+}
+
+.profile-field {
+  margin-bottom: 20px;
+}
+
+.profile-field label {
+  display: block;
+  color: #ffd700;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+
+.profile-field .ant-input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  color: white;
+}
+
+.profile-field .ant-input:disabled {
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.avatar-option {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 215, 0, 0.3);
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.avatar-option:hover {
+  border-color: rgba(255, 215, 0, 0.6);
+  transform: scale(1.05);
+}
+
+.avatar-option.selected {
+  border-color: #ffd700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.avatar-option img {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}

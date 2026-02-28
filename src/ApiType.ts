@@ -34,6 +34,7 @@ export interface SimpleGame {
 export interface SimpleUser {
   id: string;
   name: string;
+  nickname: string;
   avatar: string;
   hasCards: boolean;
   isRoomOwner: boolean;
@@ -98,4 +99,5 @@ export enum ActionType {
   WATCH = "WATCH",
   SET_SETTLE_TIMES = "SET_SETTLE_TIMES",
   SEND_MESSAGE = "SEND_MESSAGE",
+  ADD_BOT = "ADD_BOT",
 }
