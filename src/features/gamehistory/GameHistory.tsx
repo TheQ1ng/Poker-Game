@@ -30,8 +30,12 @@ export function card2html(cards: Card[]): string {
           : s === "s"
           ? "♠︎"
           : "");
-      if (s === "d" || s === "h") {
+      if (s === "h") {
         return `<span style="color: #ae2f11">${ret}</span>`;
+      } else if (s === "d") {
+        return `<span style="color: #1976d2">${ret}</span>`;
+      } else if (s === "c") {
+        return `<span style="color: #2e7d32">${ret}</span>`;
       } else {
         return ret;
       }
@@ -72,10 +76,10 @@ export default function GameHistory() {
   return (
     <div className="game-history-container">
     <div style={{ overflow: "auto", flex: 1 }}>
-      {logs.map((log, i) => (
+      {logs.slice().reverse().map((log, i) => (
         <div
           dangerouslySetInnerHTML={prettify(log)}
-          key={logs.length - i}
+          key={i}
         ></div>
       ))}
       </div>

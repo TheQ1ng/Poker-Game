@@ -270,6 +270,7 @@ function getSimpleUser(token: Token): SimpleUser {
     profits: user.profits,
     position: user.positon,
     handsType: user.shouldShowHand ? user.handsType : "",
+    shouldShowHand: user.shouldShowHand,
 
     stack: user.stack - sum(user.bets),
     bet: room.game ? user.bets[room.game.round] : 0,

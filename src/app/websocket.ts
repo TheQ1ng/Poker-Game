@@ -101,6 +101,8 @@ export const connect2server =
             // 房间状态会通过publish2all自动更新
           }
 
+
+
           console.log(data);
         } catch (e) {
           console.log(msg.data);

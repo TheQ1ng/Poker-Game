@@ -349,14 +349,17 @@ function Room() {
                 <div className="boards flex-row flex-center">
                   {[...cards, null, null, null, null, null]
                     .splice(0, 5)
-                    .map((card, i) => (
-                      <Poker
-                        card={card}
-                        key={`${card ? `${card.num}${card.suit}` : i}`}
-                        isSelected={true}
-                        animation={card ? "deal" : "none"}
-                      />
-                    ))}
+                    .map((card, i) => {
+                      let isSelected = true;
+                      return (
+                        <Poker
+                          card={card}
+                          key={`${card ? `${card.num}${card.suit}` : i}`}
+                          isSelected={isSelected}
+                          animation={card ? "deal" : "none"}
+                        />
+                      );
+                    })}
                 </div>
                 <div className="pots" style={{
                   background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)",

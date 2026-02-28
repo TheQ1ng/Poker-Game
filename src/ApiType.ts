@@ -53,6 +53,7 @@ export interface SimpleUser {
   maxCards: Card[];
   profits: number;
   position: string;
+  shouldShowHand: boolean;
 
   stack: number;
   bet: number;

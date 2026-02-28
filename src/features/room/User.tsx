@@ -88,6 +88,18 @@ export function User({ id }: { id: string }) {
       soundManager.play('allin');
     }
   }, [user?.isAllIn]);
+
+  // 处理牌型语音播报
+  useEffect(() => {
+    if (user?.shouldShowHand && user?.handsType) {
+      // 语音播报牌型
+      if ('speechSynthesis' in window) {
+        const speech = new SpeechSynthesisUtterance(user.handsType);
+        speech.lang = 'zh-CN';
+        window.speechSynthesis.speak(speech);
+      }
+    }
+  }, [user?.shouldShowHand, user?.handsType]);
   return (
     <div className={`user flex-column flex-center ${user?.isFoled ? "folded" : ""}`}>
       <div
@@ -105,8 +117,9 @@ export function User({ id }: { id: string }) {
           }
           trigger="click"
           visible={user?.isWinner && user?.profits >= 0}
+          style={{ zIndex: 1000 }}
         >
-        <div className={`avatar-container ${user?.isAllIn ? 'allinFire' : ''}`} style={{ transform: isSelf ? 'scale(1)' : 'scale(0.8)', position: 'relative' }}>
+        <div className="avatar-container" style={{ transform: isSelf ? 'scale(1)' : 'scale(0.8)', position: 'relative' }}>
         {avatar && avatarImages[avatar] ? (
           <img 
             src={avatarImages[avatar]} 
@@ -153,9 +166,46 @@ export function User({ id }: { id: string }) {
             width: '100%',
             height: '100%',
             borderRadius: '50%',
-            backgroundColor: 'rgba(255, 0, 0, 0.6)',
+            backgroundColor: 'rgba(255, 0, 0, 0.5)',
             pointerEvents: 'none',
           }} />
+        )}
+        {/* 赢家头像高亮 */}
+        {user?.isWinner && (
+          <div style={{
+            position: 'absolute',
+            top: -5,
+            left: -5,
+            right: -5,
+            bottom: -5,
+            borderRadius: '50%',
+            border: '3px solid #ffd700',
+            boxShadow: '0 0 20px rgba(255, 215, 0, 0.8)',
+            animation: 'winnerGlow 2s ease-in-out infinite alternate',
+            pointerEvents: 'none',
+          }} />
+        )}
+        {/* 牌型显示 */}
+        {user?.shouldShowHand && user?.handsType && (
+          <div style={{
+            position: 'absolute',
+            top: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginTop: '5px',
+            padding: '4px 12px',
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            borderRadius: '15px',
+            color: '#ffd700',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            textShadow: '0 0 10px rgba(255, 215, 0, 0.8)',
+            animation: 'handTypeGlow 1.5s ease-in-out infinite alternate',
+            whiteSpace: 'nowrap',
+            zIndex: 10,
+          }}>
+            {user.handsType}
+          </div>
         )}
         </div>
         </Popover>
@@ -208,7 +258,7 @@ export function User({ id }: { id: string }) {
             />
           </div>
         )} */}
-        {user?.actionName && (
+        {user?.actionName && user.actionName.toLowerCase() !== 'allin' && (
           <span className={`user-action-indicator ${user.actionName.toLowerCase()}`}>
             {user.actionName}
           </span>
@@ -249,7 +299,8 @@ export function User({ id }: { id: string }) {
             <Poker
               card={card}
               key={`${card ? `${card.num}${card.suit}` : i}`}
-              isSelected={!isSettling || (card && user?.maxCards ? user.maxCards.includes(card) : false)}
+              isSelected={true}
+              showHand={user?.shouldShowHand}
             />
           ))}
         </div>

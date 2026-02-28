@@ -219,22 +219,8 @@
   transition: all 0.3s ease;
 }
 
-/* All in 着火特效 */
-@keyframes allinFire {
-  0% {
-    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5), 0 0 20px rgba(255, 100, 100, 0.3);
-  }
-  50% {
-    box-shadow: 0 0 25px rgba(255, 68, 68, 0.8), 0 0 40px rgba(255, 100, 100, 0.6), 0 0 60px rgba(255, 140, 140, 0.4);
-  }
-  100% {
-    box-shadow: 0 0 10px rgba(255, 68, 68, 0.5), 0 0 20px rgba(255, 100, 100, 0.3);
-  }
-}
-
 .user-seat.allin {
   border-color: #ff4444;
-  animation: allinFire 1.5s ease-in-out infinite;
 }
 
 /* 筹码推出去的动画 */
@@ -394,12 +380,6 @@
 .user-action-indicator.allin {
   background: #f44336;
   color: white;
-  animation: allinIndicator 0.5s infinite;
-}
-
-@keyframes allinIndicator {
-  0%, 100% { transform: translateX(-50%) scale(1); }
-  50% { transform: translateX(-50%) scale(1.1); }
 }
 
 /* ----------------------------------------

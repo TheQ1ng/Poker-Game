@@ -170,7 +170,7 @@ export function Owner({ zoom }: { zoom: number }) {
         <div className={`owner ${!inGame ? "fold" : ""}`}>
           <Popover
             content={
-              <div>
+              <div style={{ width: '200px', height: '200px', textAlign: 'center' }}>
                 {avatar && avatarImages[avatar] ? (
                   <img 
                     src={avatarImages[avatar]} 

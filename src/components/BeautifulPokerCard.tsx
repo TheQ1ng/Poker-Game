@@ -14,6 +14,7 @@ interface PokerCardProps {
   style?: React.CSSProperties;
   onClick?: () => void;
   animation?: 'flip' | 'deal' | 'none';
+  isSelected?: boolean; // 是否被选中
 }
 
 const suitSymbols: Record<CardSuit, string> = {
@@ -26,8 +27,8 @@ const suitSymbols: Record<CardSuit, string> = {
 const suitColors: Record<CardSuit, string> = {
   s: '#1a1a1a',  // 黑色
   h: '#e74c3c',  // 红色
-  d: '#e74c3c',  // 红色
-  c: '#1a1a1a',  // 黑色
+  d: '#1976d2',  // 蓝色
+  c: '#2e7d32',  // 绿色
 };
 
 const numDisplay: Record<CardNum, string> = {
@@ -49,6 +50,7 @@ export const BeautifulPokerCard: React.FC<PokerCardProps> = ({
   style = {},
   onClick,
   animation = 'none',
+  isSelected = true,
 }) => {
   const sizeMap = {
     small: { width: 50, height: 70, fontSize: 12 },
@@ -125,6 +127,12 @@ export const BeautifulPokerCard: React.FC<PokerCardProps> = ({
     animation: 'dealCard 0.5s ease-out',
   } : {};
   
+  // 未选中的卡片样式
+  const unselectedStyle = !isSelected ? {
+    opacity: 0.4,
+    filter: 'grayscale(0.8)',
+  } : {};
+
   return (
     <div 
       className={`beautiful-poker-card ${animation !== 'none' ? `animation-${animation}` : ''}`}
@@ -135,6 +143,7 @@ export const BeautifulPokerCard: React.FC<PokerCardProps> = ({
         cursor: onClick ? 'pointer' : 'default',
         perspective: '1000px',
         ...animationStyle,
+        ...unselectedStyle,
         ...style,
       }}
     >

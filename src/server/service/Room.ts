@@ -13,7 +13,7 @@ import {
   settle,
 } from "../utils/game-engine";
 import { logGame } from "../tests/utils";
-import { publish2all, publishLog2all, send2user } from "../api/ws";
+import { publish2all, publishLog2all, send2user, send2all } from "../api/ws";
 import { Card } from "../../ApiType";
 
 export type RoomID = string;
@@ -65,6 +65,8 @@ export class Game {
   multiSettleTimes: number = 1; // settle times
   multiSettleIndex: number = 0;
   multiSettleTimer = setTimeout(() => { }, 0);
+
+
 
   constructor(
     roomid: RoomID,
@@ -252,7 +254,7 @@ export class Game {
       chips
     );
 
-    let log = `${user.name} `;
+    let log = `${user.nickname || user.name} `;
     const delta = chips - user.bets[this.round];
     if (chips == availableStack) {
       log += `AllIn $${chips}`;
@@ -295,7 +297,7 @@ export class Game {
       throw "not your action now";
     }
     console.log(`USER Fold: ${user.name}`.green, prettify(user.hands));
-    publishLog2all(this.roomid, [`${user.name} Fold`]);
+    publishLog2all(this.roomid, [`${user.nickname || user.name} Fold`]);
     user.isFolded = true;
     user.actionName = "Fold";
     this.setActed(token);
@@ -394,17 +396,21 @@ export class Game {
       user.shouldShowHand =
         this.round === GameRound.River &&
         availableUsers.length > 1 &&
-        (user.isAllIn || (!user.isFolded && index <= lastWinnerIndex));
+        (!user.isFolded || user.isAllIn);
 
+      let profitText = "";
+      if (profits !== 0) {
+        profitText = `${profits >= 0 ? "win💰" : "lose"} ${profits}`;
+      }
       logs.push(
-        `${user.name} ${user.shouldShowHand
+        `${user.nickname || user.name} ${user.shouldShowHand
           ? `【${user.hands
             .map((c) => `${c.num}${c.suit}`)
             .join("")}】${p.maxCards
               ?.map((c) => `${c.num}${c.suit}`)
               .join("")} ${user.handsType} `
           : ""
-        }${profits >= 0 ? "win💰" : "lose"} ${profits}`
+        }${profitText}`
       );
       if (user.stack < this.smallBlind * 2) {
         user.isReady = false;
@@ -444,9 +450,9 @@ export class Game {
       return;
     }
 
-    // next game
     this.isSettling = true;
-    const delay = 6000; // after 6s, start next game
+
+    const delay = 8000; // after 8s, start next game
     this.nextGameTime = Date.now() + delay;
     publish2all(this.roomid);
     
@@ -463,6 +469,8 @@ export class Game {
       }, delay);
     }
   }
+
+
   dealCards2User() {
     // deal cards to ready user
     this.sortedUsers.forEach((t) => {
@@ -547,7 +555,7 @@ export class Game {
 
         const log =
           "玩家" +
-          settleUsers.map((t) => userMap[t].name).join(", ") +
+          settleUsers.map((t) => userMap[t].nickname || userMap[t].name).join(", ") +
           "决定发牌次数";
         publishLog2all(this.roomid, [log]);
 

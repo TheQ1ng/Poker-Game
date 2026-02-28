@@ -55,6 +55,7 @@ export function Poker({
         showBack={!card}
         animation={showHand && card ? "flip" : animation}
         className={!card ? "poker-card-back" : ""}
+        isSelected={isSelected}
       />
       {card && showHand ? (
         <Button
