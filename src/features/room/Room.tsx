@@ -39,6 +39,8 @@ import {
   ws_userReady,
   ws_userWatch,
   ws_addBot,
+  ws_kickUser,
+  ws_settleGame,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -203,20 +205,23 @@ function Room() {
               />
             </Tooltip>
             <Tooltip title={soundEnabled ? "关闭音效" : "开启音效"}>
-              <Button
-                className="room-action-btn"
-                icon={soundEnabled ? <SoundOutlined /> : <AudioMutedOutlined />}
-                style={{ marginRight: 10 }}
-                onClick={() => {
-                  const newState = !soundEnabled;
-                  setSoundEnabled(newState);
-                  soundManager.setEnabled(newState);
-                  if (newState) {
-                    soundManager.playButton();
-                  }
-                }}
-              />
-            </Tooltip>
+                  <Button
+                    className="room-action-btn"
+                    icon={soundEnabled ? <SoundOutlined /> : <AudioMutedOutlined />}
+                    style={{ marginRight: 10 }}
+                    onClick={async () => {
+                      // 确保音效管理器已经初始化
+                      await soundManager.init().catch(err => console.warn('Sound init failed:', err));
+                      
+                      const newState = !soundEnabled;
+                      setSoundEnabled(newState);
+                      soundManager.setEnabled(newState);
+                      if (newState) {
+                        soundManager.playButton();
+                      }
+                    }}
+                  />
+                </Tooltip>
             {self?.isRoomOwner ? (
               room?.isGaming ? (
                 <Tooltip title="下一场暂停游戏">
@@ -239,13 +244,14 @@ function Room() {
                 </Tooltip>
               )
             ) : null}
-            {/* 添加机器人按钮 - 仅房主可见 */}
+            {/* 结算按钮 - 仅房主可见 */}
             {self?.isRoomOwner && roomid && (
-              <Tooltip title="添加机器人">
+              <Tooltip title="结算游戏">
                 <Button
                   className="room-action-btn"
-                  icon={<UserAddOutlined />}
-                  onClick={() => ws_addBot(roomid)}
+                  type="primary"
+                  icon={<DollarOutlined />}
+                  onClick={ws_settleGame}
                 />
               </Tooltip>
             )}

@@ -57,6 +57,7 @@ export class Game {
   raiseUser: string = "";
   raiseBet: number = 0; // bet of the raise
   raiseBetDiff: number = 0; //  valid rasize count
+  settleAfterRound: boolean = false; // 结算后解散房间
 
   multiSettleStart: boolean = false;
   multiSettleRound: GameRound = GameRound.PreFlop;
@@ -448,9 +449,19 @@ export class Game {
     const delay = 6000; // after 6s, start next game
     this.nextGameTime = Date.now() + delay;
     publish2all(this.roomid);
-    delayTry(() => {
-      this.nextGame();
-    }, delay);
+    
+    if (this.settleAfterRound) {
+      // 结算后解散房间
+      delayTry(() => {
+        // 导入settleAndDissolveRoom函数
+        const { settleAndDissolveRoom } = require(".");
+        settleAndDissolveRoom(this.roomid);
+      }, delay);
+    } else {
+      delayTry(() => {
+        this.nextGame();
+      }, delay);
+    }
   }
   dealCards2User() {
     // deal cards to ready user
@@ -797,6 +808,8 @@ class Room {
         cr.chips += this.buyIn;
       }
     });
+    // 重新买入后自动设置为准备状态
+    user.isReady = true;
   }
 }
 

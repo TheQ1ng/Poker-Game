@@ -1,6 +1,6 @@
 import User, { Token } from "./User";
 import Room, { RoomID } from "./Room";
-import { PokerWebSocket, publishLog2all, send2all, send2user } from "../api/ws";
+import { PokerWebSocket, publishLog2all, send2all, send2user, publish2all } from "../api/ws";
 import { getUser, saveUser, getUserProfile, initDatabase } from "./database";
 
 type UserMap = {
@@ -384,3 +384,101 @@ export function stopBotActions() {
 
 // 启动机器人服务
 startBotActions();
+
+// 踢人功能
+export function kickUser(token: Token, userId: string) {
+  const user = userMap[token];
+  if (!user || !user.isRoomOwner) {
+    throw "只有房主可以踢人";
+  }
+  
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+  if (!room) {
+    throw "房间不存在";
+  }
+  
+  // 找到要踢的用户的token
+  let targetToken: Token | null = null;
+  for (const t in userMap) {
+    if (userMap[t].chipsRecordID === userId) {
+      targetToken = t;
+      break;
+    }
+  }
+  
+  if (!targetToken) {
+    throw "用户不存在";
+  }
+  
+  // 从房间中移除用户
+  room.removeUser(targetToken);
+  
+  // 通知被踢的用户
+  send2user(targetToken, {
+    leave: true,
+    message: "你已被房主移出房间",
+  });
+  
+  // 通知所有用户
+  send2all(roomid, {
+    type: "game",
+    action: "userKicked",
+    userId: userId,
+  });
+  
+  // 发布房间状态更新，确保所有玩家看到最新状态
+  publish2all(roomid);
+}
+
+// 结算游戏功能
+export function settleGame(token: Token) {
+  const user = userMap[token];
+  if (!user || !user.isRoomOwner) {
+    throw "只有房主可以结算游戏";
+  }
+  
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+  if (!room) {
+    throw "房间不存在";
+  }
+  
+  // 如果游戏正在进行中，标记为结算后解散
+  if (room.isGaming && room.game) {
+    room.game.settleAfterRound = true;
+    send2all(roomid, {
+      type: "game",
+      action: "settleRequested",
+    });
+  } else {
+    // 直接结算并解散房间
+    settleAndDissolveRoom(roomid);
+  }
+}
+
+// 结算并解散房间
+function settleAndDissolveRoom(roomid: RoomID) {
+  const room = roomMap[roomid];
+  if (!room) return;
+  
+  // 保存积分历史记录
+  const chipsRecords = room.chipsRecords;
+  
+  // 通知所有用户结算结果
+  send2all(roomid, {
+    type: "game",
+    action: "gameSettled",
+    chipsRecords: chipsRecords,
+  });
+  
+  // 移除房间
+  delete roomMap[roomid];
+  
+  // 通知所有用户房间已解散
+  room.users.forEach(token => {
+    send2user(token, {
+      leave: true,
+    });
+  });
+}

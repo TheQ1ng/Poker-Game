@@ -440,6 +440,21 @@ class SoundManager {
   // 设置音效开关
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
+    
+    // 控制 AudioContext 的状态来实现标签页级别的静音
+    if (this.audioContext) {
+      if (enabled) {
+        // 恢复音频
+        if (this.audioContext.state === 'suspended') {
+          this.audioContext.resume();
+        }
+      } else {
+        // 暂停音频
+        if (this.audioContext.state === 'running') {
+          this.audioContext.suspend();
+        }
+      }
+    }
   }
   
   // 设置音量

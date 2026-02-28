@@ -20,6 +20,8 @@ import {
   userWatch,
   userSendMessage,
   addBotToRoom,
+  kickUser,
+  settleGame,
 } from "../service";
 import { Token } from "../service/User";
 import Room, { Game, RoomID } from "../service/Room";
@@ -168,6 +170,12 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
       break;
     case ActionType.ADD_BOT:
       addBotToRoom(data.roomid);
+      break;
+    case ActionType.KICK_USER:
+      kickUser(token, data.userId);
+      break;
+    case ActionType.SETTLE_GAME:
+      settleGame(token);
       break;
   }
   if (data.action !== ActionType.LEAVE) {

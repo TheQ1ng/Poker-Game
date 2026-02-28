@@ -80,6 +80,9 @@ export const connect2server =
           if (data.leave) {
             dispatch(clearRoomID(""));
             dispatch(clearCreateRoomID(""));
+            if (data.message) {
+              message.error(data.message);
+            }
           }
           if (data.logs) {
             dispatch(addLogs(data.logs));
@@ -89,6 +92,13 @@ export const connect2server =
           }
           if (data.selectSettleTimes === 0) {
             dispatch(setSelectSettleTimes(false));
+          }
+          
+          // 处理用户被踢事件
+          if (data.type === "game" && data.action === "userKicked") {
+            // 可以在这里添加通知，告知其他用户有用户被踢
+            message.info(`有用户被移出房间`);
+            // 房间状态会通过publish2all自动更新
           }
 
           console.log(data);
@@ -196,5 +206,18 @@ export function ws_addBot(roomid: string) {
   send2server({
     action: ActionType.ADD_BOT,
     roomid,
+  });
+}
+
+export function ws_kickUser(userId: string) {
+  send2server({
+    action: ActionType.KICK_USER,
+    userId,
+  });
+}
+
+export function ws_settleGame() {
+  send2server({
+    action: ActionType.SETTLE_GAME,
   });
 }

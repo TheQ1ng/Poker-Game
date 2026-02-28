@@ -1,5 +1,5 @@
-import { Avatar, Popover, Tooltip } from "antd";
-import { ApiOutlined, CoffeeOutlined } from "@ant-design/icons";
+import { Avatar, Popover, Tooltip, Button, Popconfirm } from "antd";
+import { ApiOutlined, CoffeeOutlined, UserDeleteOutlined, CloseOutlined } from "@ant-design/icons";
 import { shallowEqual, useSelector } from "react-redux";
 import { RootState } from "../../app/store";
 import { CountDown } from "./CountDown";
@@ -10,6 +10,7 @@ import { soundManager } from "../../utils/soundManager";
 import { BeautifulPokerCard } from "../../components/BeautifulPokerCard";
 import { useEffect } from "react";
 import { selectSelf } from "./roomSlice";
+import { ws_kickUser } from "../../app/websocket";
 
 // 头像图片映射
 const avatarImages: { [key: string]: string } = {
@@ -88,9 +89,13 @@ export function User({ id }: { id: string }) {
     }
   }, [user?.isAllIn]);
   return (
-    <div className="user flex-column flex-center">
+    <div className={`user flex-column flex-center ${user?.isFoled ? "folded" : ""}`}>
       <div
         className={`userinfo flex-column flex-center ${!inGame ? "fold" : ""}`}
+        style={{
+          opacity: user ? (user.isOffline || !user.isReady || user.isFoled) ? 0.5 : 1 : 0.5,
+          transition: 'opacity 0.3s ease'
+        }}
       >
         <Popover
           content={
@@ -101,7 +106,7 @@ export function User({ id }: { id: string }) {
           trigger="click"
           visible={user?.isWinner && user?.profits >= 0}
         >
-        <div className={`avatar-container ${user?.isAllIn ? 'allinFire' : ''}`} style={{ transform: isSelf ? 'scale(1)' : 'scale(0.8)' }}>
+        <div className={`avatar-container ${user?.isAllIn ? 'allinFire' : ''}`} style={{ transform: isSelf ? 'scale(1)' : 'scale(0.8)', position: 'relative' }}>
         {avatar && avatarImages[avatar] ? (
           <img 
             src={avatarImages[avatar]} 
@@ -126,9 +131,53 @@ export function User({ id }: { id: string }) {
             }}
           />
         )}
+        {/* 弃牌蒙层 */}
+        {user?.isFoled && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(128, 128, 128, 0.6)',
+            pointerEvents: 'none',
+          }} />
+        )}
+        {/* 全押蒙层 */}
+        {user?.isAllIn && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255, 0, 0, 0.6)',
+            pointerEvents: 'none',
+          }} />
+        )}
         </div>
         </Popover>
-        <div style={{ color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>{nickname}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
+          {nickname}
+          {self?.isRoomOwner && !isSelf && (
+            <Popconfirm
+              title="确认踢出该玩家吗？"
+              onConfirm={() => ws_kickUser(id)}
+              okText="确定"
+              cancelText="取消"
+            >
+              <Tooltip title="踢出房间">
+                <Button
+                  size="small"
+                  icon={<UserDeleteOutlined />}
+                  style={{ marginLeft: 5 }}
+                />
+              </Tooltip>
+            </Popconfirm>
+          )}
+        </div>
         <div className="stack">
           <span className="coins">$</span>
           {stack}
@@ -164,6 +213,12 @@ export function User({ id }: { id: string }) {
             {user.actionName}
           </span>
         )}
+        {/* 持久化显示弃牌标签 */}
+        {user?.isFoled && !user?.actionName && (
+          <span className="user-action-indicator fold">
+            弃牌
+          </span>
+        )}
         {bet > 0 ? (
           <span>
             <span className="coins">$</span>
@@ -178,12 +233,14 @@ export function User({ id }: { id: string }) {
           <div 
             className="handstype" 
             style={{ 
-              textShadow: '1px 1px 2px rgba(0,0,0,0.8)',
               ...(user?.handsType && handTypeRanks[user.handsType] >= 4 ? { 
                 color: '#ffd700',
                 textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
                 animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
-              } : { color: 'white' })
+              } : { 
+                color: 'white',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+              })
             }}
           >
             {user?.handsType}
@@ -206,6 +263,10 @@ export function User({ id }: { id: string }) {
         ) : !user?.isReady ? (
           <Tooltip title="挂起">
             <CoffeeOutlined />
+          </Tooltip>
+        ) : user?.isFoled ? (
+          <Tooltip title="弃牌">
+            <CloseOutlined />
           </Tooltip>
         ) : null}
       </div>
