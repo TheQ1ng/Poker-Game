@@ -14,7 +14,7 @@ export const gameHistory = createSlice({
   initialState,
   reducers: {
     addLogs(state, action: PayloadAction<string[]>) {
-      state.logs = [...state.logs, ...action.payload];
+      state.logs = [...state.logs, ...action.payload].slice(-200);
     },
   },
 });

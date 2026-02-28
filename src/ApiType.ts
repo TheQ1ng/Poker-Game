@@ -47,6 +47,8 @@ export interface SimpleUser {
   isInCurrentGame: boolean;
   isSpectator: boolean;
   actionEndTime: number;
+  /** 当前行动轮开始时间（ms），用于前端圆圈总时长；加时时不改，故总时长会变长 */
+  actionStartTime?: number;
   actionName: string;
   hands: (Card | null)[];
   handsType: string;
@@ -57,6 +59,8 @@ export interface SimpleUser {
 
   stack: number;
   bet: number;
+  /** 本手牌已使用 +30s 次数（0～3） */
+  addTimeUsed?: number;
 }
 
 export interface SimpleRoom {
@@ -103,4 +107,7 @@ export enum ActionType {
   ADD_BOT = "ADD_BOT",
   KICK_USER = "KICK_USER",
   SETTLE_GAME = "SETTLE_GAME",
+  REQUEST_SEE_HAND = "REQUEST_SEE_HAND",
+  RESPOND_SEE_HAND = "RESPOND_SEE_HAND",
+  EXTEND_ACTION_TIME = "EXTEND_ACTION_TIME",
 }

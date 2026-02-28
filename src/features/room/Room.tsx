@@ -17,7 +17,7 @@ import {
   InfoCircleOutlined,
   DollarOutlined,
 } from "@ant-design/icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { User } from "./User";
 import { Owner } from "./Owner";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
@@ -29,6 +29,7 @@ import {
   selectRoom,
   getSelectSettleStatus,
   setSelectSettleTimes,
+  selectServerTimeOffset,
 } from "./roomSlice";
 import {
   ws_pauseGame,
@@ -41,6 +42,7 @@ import {
   ws_addBot,
   ws_kickUser,
   ws_settleGame,
+  ws_extendActionTime,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -57,10 +59,12 @@ function Room() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('history');
+  const [, setTick] = useState(0);
   const roomid = useAppSelector(selectRoomID);
   const users = useAppSelector(selectUsers) || [];
   const room = useAppSelector(selectRoom);
   const self = useAppSelector(selectSelf);
+  const serverTimeOffset = useAppSelector(selectServerTimeOffset);
   const game = useAppSelector(selectGame);
   const selectSettleStatus = useAppSelector(getSelectSettleStatus);
   const isSettling = game?.isSettling || false;
@@ -68,6 +72,87 @@ function Room() {
     ((game?.nextGameTime || Date.now()) - Date.now()) / 1000
   );
   const cards: PokerCard[] = [...(game?.boardCards || [])];
+
+  const showdownPlayers = useMemo(() => {
+    const list = room?.users?.filter((u) => u.shouldShowHand) || [];
+    const order = (p: string) => (p === "SB" ? 0 : p === "BB" ? 1 : p === "D" ? 3 : 2);
+    return [...list].sort((a, b) => order(a.position || "") - order(b.position || ""));
+  }, [room?.users]);
+  const showdownOrder = useMemo(() => showdownPlayers.map((u) => u.id), [showdownPlayers]);
+  const totalShowdown = showdownPlayers.length;
+  const [settleRevealStep, setSettleRevealStep] = useState(0);
+  const settleAnimatingRef = useRef(false);
+  useEffect(() => {
+    if (!isSettling) {
+      settleAnimatingRef.current = false;
+      setSettleRevealStep(0);
+      return;
+    }
+    if (totalShowdown === 0) return;
+    if (settleAnimatingRef.current) return; // 结算动画进行中，不因 room 更新而重启
+    settleAnimatingRef.current = true;
+    setSettleRevealStep(0);
+    const n = totalShowdown;
+    const maxStep = 2 * n + 1;
+    const HOLE_AND_MAX5_MS = 2500;  // 每玩家：两张牌 2.5s，五张牌 2.5s
+    const WINNER_PHASE_MS = 3500;   // 选出胜者 3.5s
+    let timeoutId: ReturnType<typeof setTimeout>;
+    const scheduleNext = (s: number) => {
+      if (s >= maxStep) return;
+      const delay = s === 2 * n ? WINNER_PHASE_MS : HOLE_AND_MAX5_MS;
+      timeoutId = setTimeout(() => {
+        const next = s + 1;
+        setSettleRevealStep(next);
+        if (next < maxStep) scheduleNext(next);
+      }, delay);
+    };
+    scheduleNext(0);
+    return () => clearTimeout(timeoutId);
+  }, [isSettling, totalShowdown]);
+  const prevSettleStepRef = useRef(-1);
+  useEffect(() => {
+    if (!isSettling || totalShowdown === 0) return;
+    const step = settleRevealStep;
+    const prev = prevSettleStepRef.current;
+    prevSettleStepRef.current = step;
+    if (step === 2 * totalShowdown && prev < 2 * totalShowdown) {
+      const winner = room?.users?.find((u) => u.isWinner);
+      if (winner?.handsType && "speechSynthesis" in window) {
+        const u = new SpeechSynthesisUtterance("Winner! " + winner.handsType);
+        u.lang = "zh-CN";
+        window.speechSynthesis.speak(u);
+      }
+      return;
+    }
+    if (step > 0 && step % 2 === 1) {
+      const playerIndex = (step - 1) / 2;
+      const u = showdownPlayers[playerIndex];
+      if (u?.handsType && "speechSynthesis" in window) {
+        const utterance = new SpeechSynthesisUtterance(u.handsType);
+        utterance.lang = "zh-CN";
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  }, [isSettling, totalShowdown, settleRevealStep, showdownPlayers, room?.users]);
+
+  const actingUserId = game?.acting;
+  const actingUser = room?.users?.find((u) => u.id === actingUserId);
+  const serverNow = Date.now() + serverTimeOffset;
+  const actionTimeLeft = actingUser
+    ? Math.max(0, Math.floor(((actingUser.actionEndTime || 0) - serverNow) / 1000))
+    : 0;
+  const actionStart = actingUser?.actionStartTime ?? (actingUser?.actionEndTime ?? 0) - 30000;
+  const actionTotalSeconds = actingUser
+    ? Math.max(1, Math.floor(((actingUser.actionEndTime || 0) - actionStart) / 1000))
+    : 30;
+  const isMyTurnToAct = !!actingUserId && self?.id === actingUserId;
+  const addTimeRemaining = isMyTurnToAct ? Math.max(0, 3 - (self?.addTimeUsed ?? 0)) : 0;
+
+  useEffect(() => {
+    if (!actingUserId || isSettling) return;
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [actingUserId, isSettling]);
 
   function setSettleTimes(times: number) {
     ws_settleTimes(times);
@@ -177,6 +262,99 @@ function Room() {
         }}
       >
         <Spectators />
+        {/* 右上角：行动倒计时（圆圈引线燃烧样式）+ 当前玩家 +30s 按钮 */}
+        {!isSettling && actingUserId && (
+          <div
+            style={{
+              position: "absolute",
+              top: 14,
+              right: 14,
+              zIndex: 50,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <div
+              className="action-countdown-circle"
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: "50%",
+                background: "linear-gradient(145deg, #1a252f 0%, #0d1117 100%)",
+                border: "3px solid rgba(255, 140, 0, 0.6)",
+                boxShadow: "0 0 20px rgba(255, 140, 0, 0.4), inset 0 0 15px rgba(0,0,0,0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              <svg
+                width={52}
+                height={52}
+                style={{ position: "absolute", transform: "rotate(-90deg)" }}
+                viewBox="0 0 52 52"
+              >
+                <circle
+                  cx={26}
+                  cy={26}
+                  r={22}
+                  fill="none"
+                  stroke="rgba(80, 60, 40, 0.5)"
+                  strokeWidth={4}
+                />
+                <circle
+                  cx={26}
+                  cy={26}
+                  r={22}
+                  fill="none"
+                  stroke="url(#actionCountdownGradient)"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 22}
+                  strokeDashoffset={2 * Math.PI * 22 * (1 - actionTimeLeft / actionTotalSeconds)}
+                />
+                <defs>
+                  <linearGradient id="actionCountdownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ff8c00" />
+                    <stop offset="100%" stopColor="#ff4500" />
+                  </linearGradient>
+                </defs>
+              </svg>
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 1,
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  color: actionTimeLeft <= 5 ? "#ff6b6b" : "#ffd700",
+                  textShadow: "0 0 8px rgba(255, 215, 0, 0.6)",
+                }}
+              >
+                {actionTimeLeft}
+              </span>
+            </div>
+            {isMyTurnToAct && addTimeRemaining > 0 && (
+              <Button
+                type="primary"
+                size="small"
+                onClick={ws_extendActionTime}
+                style={{
+                  fontSize: 12,
+                  height: 28,
+                  paddingLeft: 10,
+                  paddingRight: 10,
+                  background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
+                  border: "1px solid rgba(201, 162, 39, 0.5)",
+                }}
+              >
+                +30s ({addTimeRemaining})
+              </Button>
+            )}
+          </div>
+        )}
         <div
           style={{
             display: "flex",
@@ -324,7 +502,14 @@ function Room() {
             {/* 左侧玩家（1个） */}
             <div className="flex1 flex-column flex-center" style={{ maxWidth: '150px' }}>
               {users.length > 0 && (
-                <User id={`${users[0]}`} key={users[0]} />
+                <User
+                  id={`${users[0]}`}
+                  key={users[0]}
+                  settleRevealStep={settleRevealStep}
+                  showdownOrder={showdownOrder}
+                  totalShowdown={totalShowdown}
+                  isActingUser={actingUserId === users[0]}
+                />
               )}
             </div>
             
@@ -333,7 +518,14 @@ function Room() {
               {/* 上方玩家（对面，数量比两边多） */}
               <div className="flex1 flex-row" style={{ justifyContent: 'space-around', padding: '0 20px' }}>
                 {users.slice(1, users.length - 1).map((id) => (
-                  <User id={`${id}`} key={id} />
+                  <User
+                    id={`${id}`}
+                    key={id}
+                    settleRevealStep={settleRevealStep}
+                    showdownOrder={showdownOrder}
+                    totalShowdown={totalShowdown}
+                    isActingUser={actingUserId === id}
+                  />
                 ))}
               </div>
               
@@ -341,7 +533,7 @@ function Room() {
               <div className="flex2 flex-column flex-center">
                 <div style={{ width: 100 }}>
                   {isSettling ? (
-                    <CountDown time={nextGameTime} total={10} />
+                    <CountDown time={nextGameTime} total={13} />
                   ) : (
                     <div>&nbsp;</div>
                   )}
@@ -388,7 +580,14 @@ function Room() {
             {/* 右侧玩家（1个） */}
             <div className="flex1 flex-column flex-center" style={{ maxWidth: '150px' }}>
               {users.length > 1 && (
-                <User id={`${users[users.length - 1]}`} key={users[users.length - 1]} />
+                <User
+                  id={`${users[users.length - 1]}`}
+                  key={users[users.length - 1]}
+                  settleRevealStep={settleRevealStep}
+                  showdownOrder={showdownOrder}
+                  totalShowdown={totalShowdown}
+                  isActingUser={actingUserId === users[users.length - 1]}
+                />
               )}
             </div>
           </div>
@@ -433,7 +632,12 @@ function Room() {
             </div>
           ) : null}
           <div className="flex1">
-            <Owner zoom={zoom} />
+            <Owner
+              zoom={zoom}
+              settleRevealStep={settleRevealStep}
+              showdownOrder={showdownOrder}
+              totalShowdown={totalShowdown}
+            />
           </div>
         </div>
       </div>

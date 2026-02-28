@@ -21,12 +21,14 @@ export function Poker({
   showHand = false,
   animation = "none",
   isSelected = true,
+  size = "medium",
 }: {
   card: PokerCard | null;
   index?: number;
   showHand?: boolean;
   animation?: "deal" | "flip" | "none";
   isSelected?: boolean;
+  size?: "small" | "medium" | "large";
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const cardProps = convertToCardProps(card);
@@ -51,7 +53,7 @@ export function Poker({
       <BeautifulPokerCard
         suit={cardProps.suit}
         num={cardProps.num as any}
-        size="medium"
+        size={size}
         showBack={!card}
         animation={showHand && card ? "flip" : animation}
         className={!card ? "poker-card-back" : ""}

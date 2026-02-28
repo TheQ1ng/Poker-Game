@@ -5,14 +5,35 @@ import {
   SimpleSelf,
   SimpleUser,
   SimpleUserHands,
+  Card,
 } from "../../ApiType";
 import { RootState } from "../../app/store";
+
+export interface SeeHandRequestPayload {
+  requestId: string;
+  fromUserId: string;
+  fromName: string;
+  chips: number;
+}
+
+export interface RevealedHandPayload {
+  targetUserId: string;
+  hands: Card[];
+  handsType: string;
+  maxCards: Card[];
+}
 
 export interface RoomState {
   room: SimpleRoom | null;
   game: SimpleGame | null;
   self: SimpleSelf | null;
   selectSettleTimes: boolean;
+  /** 客户端与服务器时间差（ms），用于倒计时同步：serverNow ≈ Date.now() + serverTimeOffset */
+  serverTimeOffset: number;
+  /** 有人请求看我的手牌（仅我作为被请求者时），支持多人同时申请 */
+  pendingSeeHandRequests: SeeHandRequestPayload[];
+  /** 我花筹码后对方同意，仅我可见的手牌 */
+  revealedHandsForMe: Record<string, RevealedHandPayload>;
 }
 
 const initialState: RoomState = {
@@ -20,6 +41,9 @@ const initialState: RoomState = {
   game: null,
   self: null,
   selectSettleTimes: false,
+  serverTimeOffset: 0,
+  pendingSeeHandRequests: [],
+  revealedHandsForMe: {},
 };
 
 export const roomSlice = createSlice({
@@ -63,6 +87,22 @@ export const roomSlice = createSlice({
     setSelectSettleTimes(state, action: PayloadAction<boolean>) {
       state.selectSettleTimes = action.payload;
     },
+    setServerTimeOffset(state, action: PayloadAction<number>) {
+      state.serverTimeOffset = action.payload;
+    },
+    setSeeHandRequests(state, action: PayloadAction<SeeHandRequestPayload[]>) {
+      state.pendingSeeHandRequests = action.payload;
+    },
+    setRevealedHandForMe(state, action: PayloadAction<RevealedHandPayload>) {
+      const { targetUserId } = action.payload;
+      state.revealedHandsForMe[targetUserId] = action.payload;
+    },
+    clearSeeHandRequest(state) {
+      state.pendingSeeHandRequests = [];
+    },
+    clearRevealedHandsForMe(state) {
+      state.revealedHandsForMe = {};
+    },
   },
   extraReducers: (builder) => {},
 });
@@ -74,8 +114,14 @@ export const {
   setUser,
   setHands,
   setSelectSettleTimes,
+  setServerTimeOffset,
+  setSeeHandRequests,
+  setRevealedHandForMe,
+  clearSeeHandRequest,
+  clearRevealedHandsForMe,
 } = roomSlice.actions;
 export const selectRoomID = (state: RootState) => state.room.room?.roomid;
+export const selectServerTimeOffset = (state: RootState) => state.room.serverTimeOffset;
 export const selectUsers = (state: RootState) => {
   const { room, self } = state.room;
   if (!room || !self) return [];
@@ -105,5 +151,11 @@ export const selectSelf = (state: RootState) => {
 export const getSelectSettleStatus = (state: RootState) => {
   return state.room.selectSettleTimes;
 };
+
+export const selectPendingSeeHandRequests = (state: RootState) =>
+  state.room.pendingSeeHandRequests;
+
+export const selectRevealedHandsForMe = (state: RootState) =>
+  state.room.revealedHandsForMe;
 
 export default roomSlice.reducer;

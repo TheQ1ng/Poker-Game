@@ -12,6 +12,11 @@ import {
   setSelectSettleTimes,
   setSelf,
   setUser,
+  setSeeHandRequests,
+  setRevealedHandForMe,
+  clearSeeHandRequest,
+  clearRevealedHandsForMe,
+  setServerTimeOffset,
 } from "../features/room/roomSlice";
 import { AppThunk } from "./store";
 
@@ -58,12 +63,23 @@ export const connect2server =
           const data = JSON.parse(msg.data);
           if (data.code == -1) {
             message.error(data.error);
+            // 看牌请求已过期或无效时清空弹窗，避免点确认/拒绝后弹窗不消失
+            if (typeof data.error === "string" && (data.error.includes("过期") || data.error.includes("无效"))) {
+              dispatch(clearSeeHandRequest());
+            }
           }
           if (data.room) {
             dispatch(setRoom(data.room));
           }
           if (data.game) {
             dispatch(setGame(data.game));
+            if (!data.game.isSettling) {
+              dispatch(clearRevealedHandsForMe());
+              dispatch(clearSeeHandRequest());
+            }
+          }
+          if (data.serverTime != null) {
+            dispatch(setServerTimeOffset(data.serverTime - Date.now()));
           }
           if (data.self) {
             dispatch(setSelf(data.self));
@@ -80,6 +96,8 @@ export const connect2server =
           if (data.leave) {
             dispatch(clearRoomID(""));
             dispatch(clearCreateRoomID(""));
+            dispatch(clearRevealedHandsForMe());
+            dispatch(clearSeeHandRequest());
             if (data.message) {
               message.error(data.message);
             }
@@ -101,7 +119,15 @@ export const connect2server =
             // 房间状态会通过publish2all自动更新
           }
 
-
+          if (data.seeHandRequests) {
+            dispatch(setSeeHandRequests(data.seeHandRequests));
+          }
+          if (data.revealedHand) {
+            dispatch(setRevealedHandForMe(data.revealedHand));
+          }
+          if (data.seeHandDeclined) {
+            message.info("对方拒绝了看牌请求");
+          }
 
           console.log(data);
         } catch (e) {
@@ -221,5 +247,27 @@ export function ws_kickUser(userId: string) {
 export function ws_settleGame() {
   send2server({
     action: ActionType.SETTLE_GAME,
+  });
+}
+
+export function ws_requestSeeHand(targetUserId: string, chips: number) {
+  send2server({
+    action: ActionType.REQUEST_SEE_HAND,
+    targetUserId,
+    chips,
+  });
+}
+
+export function ws_respondSeeHand(requestId: string, accept: boolean) {
+  send2server({
+    action: ActionType.RESPOND_SEE_HAND,
+    requestId,
+    accept,
+  });
+}
+
+export function ws_extendActionTime() {
+  send2server({
+    action: ActionType.EXTEND_ACTION_TIME,
   });
 }

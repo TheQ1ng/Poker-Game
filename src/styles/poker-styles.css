@@ -195,6 +195,21 @@
   animation: communityCardDeal 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
+/* 结算时赢家最大五张牌：放大 + 微弱金光 */
+.settle-winner-cards {
+  transform: scale(1.15);
+  transition: transform 0.4s ease-out;
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.5), 0 0 48px rgba(255, 200, 100, 0.25);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.settle-winner-type {
+  color: #ffd700 !important;
+  text-shadow: 0 0 15px rgba(255, 215, 0, 0.9) !important;
+  animation: handTypeGlow 1.5s ease-in-out infinite alternate;
+}
+
 /* 牌型高亮效果 */
 .hand-type-highlight {
   color: #ffd700 !important;
@@ -280,6 +295,16 @@
   }
   50% {
     box-shadow: 0 0 25px rgba(255, 68, 68, 0.8);
+  }
+}
+
+/* 加注计算器内 AllIn 核弹按钮呼吸光效 */
+@keyframes allin-glow {
+  0%, 100% {
+    box-shadow: 0 0 16px rgba(255, 50, 50, 0.5), 0 0 32px rgba(255, 0, 0, 0.25), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(255, 80, 80, 0.8), 0 0 48px rgba(255, 30, 30, 0.5), inset 0 1px 0 rgba(255,255,255,0.4);
   }
 }
 
@@ -468,6 +493,22 @@
 
 .chips-collecting {
   animation: chipsCollect 0.5s ease-in forwards;
+}
+
+/* 金币飞向胜利者头像（聚宝盆） */
+@keyframes coinsFlyToCenter {
+  from {
+    transform: translate(var(--start-x, 50px), var(--start-y, 0));
+    opacity: 0.95;
+  }
+  to {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+}
+
+.coin-fly {
+  pointer-events: none;
 }
 
 /* 胜负结果显示 */
@@ -849,4 +890,10 @@
   animation: foldCard 1s ease-in-out forwards;
 }
 
+/* 加注计算器弹层：12 个按钮等大 */
+.raise-calc-popover .ant-btn {
+  min-width: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
 

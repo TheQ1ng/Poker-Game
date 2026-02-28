@@ -1,16 +1,17 @@
-import { Avatar, Popover, Tooltip, Button, Popconfirm } from "antd";
-import { ApiOutlined, CoffeeOutlined, UserDeleteOutlined, CloseOutlined } from "@ant-design/icons";
+import { Tooltip, Button, Popconfirm, InputNumber, Popover } from "antd";
+import { ApiOutlined, CoffeeOutlined, CloseOutlined, EyeOutlined, CheckOutlined } from "@ant-design/icons";
 import { shallowEqual, useSelector } from "react-redux";
 import { RootState } from "../../app/store";
-import { CountDown } from "./CountDown";
 import { Poker } from "./Poker";
+import { RollingNumber } from "../../components/RollingNumber";
 import { AllIn, BigBlind, Dealer, SmallBlind } from "./Symbol";
 import { card2html } from "../gamehistory/GameHistory";
 import { soundManager } from "../../utils/soundManager";
 import { BeautifulPokerCard } from "../../components/BeautifulPokerCard";
-import { useEffect } from "react";
-import { selectSelf } from "./roomSlice";
-import { ws_kickUser } from "../../app/websocket";
+import { useEffect, useState } from "react";
+import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe } from "./roomSlice";
+import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
+import { ws_kickUser, ws_requestSeeHand, ws_respondSeeHand } from "../../app/websocket";
 
 // 头像图片映射
 const avatarImages: { [key: string]: string } = {
@@ -28,6 +29,18 @@ const avatarImages: { [key: string]: string } = {
 // 获取所有头像键值
 const avatarKeys = Object.keys(avatarImages);
 
+// 靴子图标（踢出房间）- 使用 emoji 保证兼容性
+function BootIcon() {
+  return <span style={{ fontSize: "1em", lineHeight: 1 }} role="img" aria-label="踢出">🥾</span>;
+}
+
+/** 聚宝盆金币数量：盈利≤100 为 14 枚，≥1000 为 50 枚，中间线性；动画同速率循环 */
+function coinCountFromProfits(profits: number): number {
+  if (profits <= 100) return 14;
+  if (profits >= 1000) return 50;
+  return Math.round(14 + (50 - 14) * (profits - 100) / (1000 - 100));
+}
+
 // 为机器人生成随机头像
 function getRandomAvatarForBot(userId: string): string {
   // 使用用户ID作为种子，确保同一机器人始终使用相同的头像
@@ -39,7 +52,19 @@ function getRandomAvatarForBot(userId: string): string {
   return avatarKeys[randomIndex];
 }
 
-export function User({ id }: { id: string }) {
+export function User({
+  id,
+  settleRevealStep = 0,
+  showdownOrder = [],
+  totalShowdown = 0,
+  isActingUser = false,
+}: {
+  id: string;
+  settleRevealStep?: number;
+  showdownOrder?: string[];
+  totalShowdown?: number;
+  isActingUser?: boolean;
+}) {
   const user = useSelector((state: RootState) => {
     const users = state.room.room?.users;
     if (!users) return null;
@@ -47,7 +72,15 @@ export function User({ id }: { id: string }) {
     return users[index];
   }, shallowEqual);
   const self = useSelector(selectSelf, shallowEqual);
+  const room = useSelector(selectRoom, shallowEqual);
+  const chipsRecordState = useSelector(selectChipsRecord, shallowEqual);
+  const game = useSelector(selectGame, shallowEqual);
+  const pendingSeeHandRequests = useSelector(selectPendingSeeHandRequests, shallowEqual);
+  const revealedHandsForMe = useSelector(selectRevealedHandsForMe, shallowEqual);
   const isSelf = self?.id === id;
+  const [seeHandChips, setSeeHandChips] = useState<number>(10);
+  const [seeHandPopOpen, setSeeHandPopOpen] = useState<Record<string, boolean>>({});
+  const requestFromThisUser = pendingSeeHandRequests?.find((r) => r.fromUserId === id);
   const name = user?.name || "";
   const nickname = user?.nickname || name;
   const avatar = user?.avatar || "";
@@ -55,7 +88,13 @@ export function User({ id }: { id: string }) {
   const bet = user?.bet || 0;
   const isActing = user?.isActing || false;
   const actionEndTime = user?.actionEndTime || Date.now();
+  const revealedForMe = revealedHandsForMe[id];
   const showHands = user?.hands && (user?.hands[0] || user?.hands[1]);
+  const displayHands = user?.shouldShowHand ? user : revealedForMe;
+  const showHandsArea = showHands || (revealedForMe && revealedForMe.hands?.length);
+  const handsToShow = user?.shouldShowHand ? user?.hands : revealedForMe?.hands;
+  const handsTypeToShow = user?.shouldShowHand ? user?.handsType : revealedForMe?.handsType;
+  const shouldShowCards = user?.shouldShowHand || !!revealedForMe;
   const position = user?.position;
   const posComp =
     position == "SB" ? (
@@ -67,6 +106,28 @@ export function User({ id }: { id: string }) {
     ) : null;
   const inGame = user?.isInCurrentGame && !user?.isFoled;
   const isSettling = useSelector((state: RootState) => state.room.game?.isSettling || false, shallowEqual);
+
+  const myShowdownIndex = totalShowdown > 0 ? showdownOrder.indexOf(id) : -1;
+  const showHolePhase = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && settleRevealStep === myShowdownIndex * 2;
+  const showMax5Phase = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && settleRevealStep >= myShowdownIndex * 2 + 1 && settleRevealStep < 2 * totalShowdown;
+  const winnerPhase = isSettling && totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
+  const settleDone = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
+  const showAsWinner = (winnerPhase || settleDone) && !!user?.isWinner;
+  const hideCardsInSettle = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && !showHolePhase && !showMax5Phase && !showAsWinner;
+  const usePhasedSettle = isSettling && totalShowdown > 0;
+
+  const chipsRecord = room?.roomid && chipsRecordState?.roomid === room.roomid
+    ? chipsRecordState.chipsRecords.find((r) => r.id === id)
+    : undefined;
+  const netProfit = chipsRecord != null ? chipsRecord.chips - chipsRecord.buyIn : undefined;
+  const stackBarStyle =
+    netProfit === undefined
+      ? { background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)" as const }
+      : netProfit > 0
+        ? { background: "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)" as const }
+        : netProfit < 0
+          ? { background: "linear-gradient(135deg, #27ae60 0%, #1e8449 100%)" as const }
+          : { background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)" as const };
 
   // 牌型等级，用于判断是否需要高亮
   const handTypeRanks: { [key: string]: number } = {
@@ -89,19 +150,47 @@ export function User({ id }: { id: string }) {
     }
   }, [user?.isAllIn]);
 
-  // 处理牌型语音播报
+  // 处理牌型语音播报（非分阶段结算时，避免与 Room 的结算语音重复）
   useEffect(() => {
-    if (user?.shouldShowHand && user?.handsType) {
-      // 语音播报牌型
-      if ('speechSynthesis' in window) {
-        const speech = new SpeechSynthesisUtterance(user.handsType);
-        speech.lang = 'zh-CN';
-        window.speechSynthesis.speak(speech);
-      }
+    if (!user?.shouldShowHand || !user?.handsType) return;
+    const isPhased = totalShowdown > 0;
+    if (isPhased) return;
+    if ("speechSynthesis" in window) {
+      const speech = new SpeechSynthesisUtterance(user.handsType);
+      speech.lang = "zh-CN";
+      window.speechSynthesis.speak(speech);
     }
-  }, [user?.shouldShowHand, user?.handsType]);
+  }, [user?.shouldShowHand, user?.handsType, totalShowdown]);
+
+  useEffect(() => {
+    if (game?.bb != null && seeHandChips > (self?.stack ?? 0)) {
+      setSeeHandChips(Math.min(10, Math.max(1, self?.stack ?? 1)));
+    }
+  }, [game?.bb, self?.stack]);
+
+  // 新一局开始后关闭所有看牌相关弹窗，避免干扰
+  useEffect(() => {
+    if (!isSettling) setSeeHandPopOpen({});
+  }, [isSettling]);
+
   return (
     <div className={`user flex-column flex-center ${user?.isFoled ? "folded" : ""}`}>
+      {/* 当前行动玩家面前：行动中标识 */}
+      {isActingUser && !isSettling && (
+        <div style={{
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: '#ffd700',
+          textShadow: '0 0 8px rgba(255,215,0,0.8)',
+          marginBottom: 4,
+          padding: '2px 10px',
+          borderRadius: 10,
+          background: 'rgba(0,0,0,0.6)',
+          border: '1px solid rgba(255,215,0,0.5)',
+        }}>
+          行动中
+        </div>
+      )}
       <div
         className={`userinfo flex-column flex-center ${!inGame ? "fold" : ""}`}
         style={{
@@ -109,17 +198,8 @@ export function User({ id }: { id: string }) {
           transition: 'opacity 0.3s ease'
         }}
       >
-        <Popover
-          content={
-            <div style={{ padding: '10px' }}>
-              <strong style={{ color: '#FF6F00' }}>+$${user?.profits}</strong>
-            </div>
-          }
-          trigger="click"
-          visible={user?.isWinner && user?.profits >= 0}
-          style={{ zIndex: 1000 }}
-        >
-        <div className="avatar-container" style={{ transform: isSelf ? 'scale(1)' : 'scale(0.8)', position: 'relative' }}>
+        <div style={{ position: 'relative', display: 'inline-block', overflow: 'visible' }}>
+        <div className="avatar-container" style={{ transform: 'scale(0.8)', position: 'relative' }}>
         {avatar && avatarImages[avatar] ? (
           <img 
             src={avatarImages[avatar]} 
@@ -132,7 +212,6 @@ export function User({ id }: { id: string }) {
             }}
           />
         ) : (
-          // 为机器人分配随机头像
           <img 
             src={avatarImages[getRandomAvatarForBot(id)]} 
             alt="机器人头像" 
@@ -170,8 +249,8 @@ export function User({ id }: { id: string }) {
             pointerEvents: 'none',
           }} />
         )}
-        {/* 赢家头像高亮 */}
-        {user?.isWinner && (
+        {/* 赢家头像高亮 - 分阶段结算时等展示完后再显示 */}
+        {user?.isWinner && (!usePhasedSettle || settleDone) && (
           <div style={{
             position: 'absolute',
             top: -5,
@@ -185,8 +264,8 @@ export function User({ id }: { id: string }) {
             pointerEvents: 'none',
           }} />
         )}
-        {/* 牌型显示 */}
-        {user?.shouldShowHand && user?.handsType && (
+        {/* 牌型显示（非分阶段时在头像下显示） */}
+        {user?.shouldShowHand && user?.handsType && !usePhasedSettle && (
           <div style={{
             position: 'absolute',
             top: '100%',
@@ -207,9 +286,131 @@ export function User({ id }: { id: string }) {
             {user.handsType}
           </div>
         )}
+        {/* 赢家：金币飞向头像 - 分阶段结算时等展示完后再触发 */}
+        {user?.isWinner && user?.profits != null && user.profits >= 0 && (!usePhasedSettle || settleDone) && (() => {
+          const coinCount = coinCountFromProfits(user.profits);
+          const flyDuration = 1.1;
+          const delayStep = flyDuration / coinCount;
+          return (
+          <div className="winner-coins-fly" style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            width: 0,
+            height: 0,
+            pointerEvents: 'none',
+            zIndex: 4,
+          }}>
+            {Array.from({ length: coinCount }).map((_, i) => {
+              const angle = (i / coinCount) * 2 * Math.PI;
+              const r = 52;
+              const x = Math.cos(angle) * r;
+              const y = Math.sin(angle) * r;
+              return (
+                <span
+                  key={i}
+                  className="coin-fly"
+                  style={{
+                    ['--start-x' as string]: `${x}px`,
+                    ['--start-y' as string]: `${y}px`,
+                    position: 'absolute',
+                    left: 0,
+                    top: 0,
+                    width: 14,
+                    height: 14,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #ffd700 0%, #b8860b 100%)',
+                    boxShadow: '0 0 6px rgba(255,215,0,0.8)',
+                    fontSize: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#333',
+                    fontWeight: 'bold',
+                    animation: `coinsFlyToCenter ${flyDuration}s ease-in infinite`,
+                    animationDelay: `${i * delayStep}s`,
+                  }}
+                >
+                  $
+                </span>
+              );
+            })}
+          </div>
+          );
+        })()}
+        {/* 被请求者看到：申请人头上的对话框，点上移；勾/叉；文案为「我想支付X筹码查看你的手牌」 */}
+        {requestFromThisUser && (
+          <div style={{
+            position: 'absolute',
+            top: '-42px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: 4,
+            padding: '8px 12px',
+            backgroundColor: 'rgba(0, 0, 0, 0.88)',
+            borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.3)',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
+            zIndex: 20,
+            minWidth: 160,
+            textAlign: 'center',
+          }}>
+            <div style={{ color: '#eee', fontSize: 12, marginBottom: 8 }}>
+              我想支付 {requestFromThisUser.chips} 筹码查看你的手牌
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <Tooltip title="同意">
+                <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => ws_respondSeeHand(requestFromThisUser!.requestId, true)} />
+              </Tooltip>
+              <Tooltip title="拒绝">
+                <Button size="small" danger icon={<CloseOutlined />} onClick={() => ws_respondSeeHand(requestFromThisUser!.requestId, false)} />
+              </Tooltip>
+            </div>
+          </div>
+        )}
         </div>
-        </Popover>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
+          {/* 结算阶段：眼睛按钮贴昵称左侧 */}
+          {!isSelf && isSettling && !user?.shouldShowHand && user?.hasCards && self && (
+            <Popover
+              visible={!!seeHandPopOpen[id]}
+              onVisibleChange={(open: boolean) => setSeeHandPopOpen((prev) => ({ ...prev, [id]: open }))}
+              trigger="click"
+              placement="top"
+              content={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                  <InputNumber
+                    min={1}
+                    max={Math.max(1, self.stack ?? 0)}
+                    value={seeHandChips}
+                    onChange={(v) => setSeeHandChips(v ?? 1)}
+                    style={{ width: 80 }}
+                    size="small"
+                  />
+                  <Button
+                    type="primary"
+                    size="small"
+                    icon={<CheckOutlined />}
+                    onClick={() => {
+                      ws_requestSeeHand(id, seeHandChips);
+                      setSeeHandPopOpen((prev) => ({ ...prev, [id]: false }));
+                    }}
+                    disabled={(self.stack ?? 0) < seeHandChips}
+                  />
+                </div>
+              }
+            >
+              <Tooltip title="申请看牌">
+                <Button
+                  type="primary"
+                  size="small"
+                  icon={<EyeOutlined />}
+                  style={{ background: '#1890ff', borderColor: '#1890ff', flexShrink: 0 }}
+                />
+              </Tooltip>
+            </Popover>
+          )}
           {nickname}
           {self?.isRoomOwner && !isSelf && (
             <Popconfirm
@@ -221,23 +422,28 @@ export function User({ id }: { id: string }) {
               <Tooltip title="踢出房间">
                 <Button
                   size="small"
-                  icon={<UserDeleteOutlined />}
-                  style={{ marginLeft: 5 }}
+                  icon={<BootIcon />}
+                  style={{ flexShrink: 0 }}
                 />
               </Tooltip>
             </Popconfirm>
           )}
         </div>
-        <div className="stack">
+        <div className="stack" style={{
+          ...stackBarStyle,
+          borderRadius: "20px",
+          padding: "2px 10px",
+          fontSize: "12px",
+          fontWeight: "bold",
+          color: "#333",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+        }}>
           <span className="coins">$</span>
-          {stack}
+          <RollingNumber value={stack} style={{ fontSize: "inherit", fontWeight: "inherit" }} />
         </div>
       </div>
       {isActing ? (
-        <CountDown
-          time={Math.floor((actionEndTime - Date.now()) / 1000)}
-          now={Date.now()}
-        />
+        <div>&nbsp;</div>
       ) : (
         <div>&nbsp;</div>
       )}
@@ -270,37 +476,64 @@ export function User({ id }: { id: string }) {
           </span>
         )}
         {bet > 0 ? (
-          <span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
             <span className="coins">$</span>
-            {bet}
+            <RollingNumber value={bet} style={{ fontSize: 'inherit', fontWeight: 'bold' }} />
           </span>
         ) : (
           <div>&nbsp;</div>
         )}
       </div>
-      {showHands ? (
-        <div className="card-box ">
-          <div 
-            className="handstype" 
-            style={{ 
-              ...(user?.handsType && handTypeRanks[user.handsType] >= 4 ? { 
+      {usePhasedSettle ? (
+        (showHolePhase || showMax5Phase || showAsWinner) ? (
+          <div className={`card-box card-box-stacked ${showHolePhase ? "card-box-stacked-2" : ""} ${(showMax5Phase || showAsWinner) ? "card-box-stacked-5" : ""} ${showAsWinner ? "settle-winner-cards" : ""}`}>
+            {(showMax5Phase || showAsWinner) && (
+              <div
+                className={`handstype ${showAsWinner ? "settle-winner-type" : ""}`}
+                style={{
+                  ...(handTypeRanks[handsTypeToShow || ""] >= 4 ? { color: "#ffd700", textShadow: "0 0 15px rgba(255, 215, 0, 0.8)", animation: "handTypeGlow 1.5s ease-in-out infinite alternate" } : { color: "white", textShadow: "1px 1px 2px rgba(0,0,0,0.8)" }),
+                }}
+              >
+                {handsTypeToShow}
+              </div>
+            )}
+            {(showHolePhase ? (handsToShow || []) : (user?.maxCards || []).slice(0, 5)).map((card, i) => (
+              <Poker
+                card={card}
+                key={card ? `${card.num}${card.suit}-${i}` : i}
+                index={i}
+                isSelected={true}
+                showHand={!!card}
+                size="small"
+              />
+            ))}
+          </div>
+        ) : null
+      ) : showHandsArea ? (
+        <div className="card-box card-box-stacked">
+          <div
+            className="handstype"
+            style={{
+              ...(handsTypeToShow && handTypeRanks[handsTypeToShow] >= 4 ? {
                 color: '#ffd700',
                 textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
                 animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
-              } : { 
+              } : {
                 color: 'white',
                 textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
               })
             }}
           >
-            {user?.handsType}
+            {handsTypeToShow}
           </div>
-          {user?.hands.map((card, i) => (
+          {(handsToShow || []).map((card, i) => (
             <Poker
               card={card}
               key={`${card ? `${card.num}${card.suit}` : i}`}
+              index={i}
               isSelected={true}
-              showHand={user?.shouldShowHand}
+              showHand={shouldShowCards}
+              size="small"
             />
           ))}
         </div>

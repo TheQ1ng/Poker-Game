@@ -22,6 +22,9 @@ import {
   addBotToRoom,
   kickUser,
   settleGame,
+  userRequestSeeHand,
+  userRespondSeeHand,
+  userExtendActionTime,
 } from "../service";
 import { Token } from "../service/User";
 import Room, { Game, RoomID } from "../service/Room";
@@ -177,6 +180,15 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
     case ActionType.SETTLE_GAME:
       settleGame(token);
       break;
+    case ActionType.REQUEST_SEE_HAND:
+      userRequestSeeHand(token, data.targetUserId, data.chips);
+      return;
+    case ActionType.RESPOND_SEE_HAND:
+      userRespondSeeHand(token, data.requestId, data.accept);
+      return;
+    case ActionType.EXTEND_ACTION_TIME:
+      userExtendActionTime(token);
+      return;
   }
   if (data.action !== ActionType.LEAVE) {
     publish(token, data, ws);
@@ -264,6 +276,7 @@ function getSimpleUser(token: Token): SimpleUser {
     isInCurrentGame: user.isInCurrentGame,
     isSpectator: user.isSpectator,
     actionEndTime: user.actionEndTime,
+    actionStartTime: user.actionStartTime ?? user.actionEndTime - 30000,
     actionName: user.actionName,
     hands: user.shouldShowHand ? user.hands : [null, null],
     maxCards: user.shouldShowHand ? user.maxCards : [],
@@ -274,6 +287,7 @@ function getSimpleUser(token: Token): SimpleUser {
 
     stack: user.stack - sum(user.bets),
     bet: room.game ? user.bets[room.game.round] : 0,
+    addTimeUsed: user.addTimeUsed ?? 0,
   };
 }
 
@@ -312,6 +326,7 @@ export function publish(token: Token, data: ActionBase, ws: PokerWebSocket) {
       send2all(room.id, {
         game: simpleGame,
         room: simpleRoom,
+        serverTime: Date.now(),
       });
       break;
     case ActionType.READY:
@@ -323,11 +338,13 @@ export function publish(token: Token, data: ActionBase, ws: PokerWebSocket) {
     case ActionType.LEAVE:
       send2all(room.id, {
         game: simpleGame,
+        serverTime: Date.now(),
       });
       break;
     case ActionType.PAUSE_GAME:
       send2all(room.id, {
         room: simpleRoom,
+        serverTime: Date.now(),
       });
       break;
   }
@@ -341,6 +358,7 @@ export function publish2all(roomid: RoomID) {
     game: simpleGame,
     room: simpleRoom,
     chips: getSimpleChipsRecords(room),
+    serverTime: Date.now(),
   });
 }
 

@@ -122,6 +122,10 @@ export class Game {
       if (user.isReady && user.stack >= this.smallBlind * 2) {
         this.bigBlindUser = bbToken;
         this.start();
+        // 新一局开始：清空看牌申请并通知所有客户端，避免过期弹窗残留
+        const room = roomMap[this.roomid];
+        room.pendingSeeHandRequests = [];
+        send2all(this.roomid, { seeHandRequests: [] });
         return;
       }
     }
@@ -147,6 +151,7 @@ export class Game {
       user.maxCards = [];
       user.profits = 0;
       user.settleTimes = 0;
+      user.addTimeUsed = 0;
     });
     let balance = 0;
     roomMap[this.roomid].chipsRecords.forEach(cr => {
@@ -216,11 +221,15 @@ export class Game {
       throw "not your action now";
     }
     const preRoundBets = sum([...user.bets].slice(0, this.round));
-    const availableStack = user.stack - preRoundBets;
+    const availableStack = Math.floor(user.stack - preRoundBets);
     // console.log(`round ${this.round}:`, user.token, user.stack, availableStack);
     if (chips > availableStack) {
       console.error("BET:", user.name, chips, "not enough", userMap[token]);
       throw "not enough chips";
+    }
+    // 全下时强制按 availableStack 计算，确保下注为剩余筹码的全部，避免剩一块
+    if (chips >= availableStack - 1 && availableStack > 0) {
+      chips = availableStack;
     }
     const preBets = this.maxPreBet();
     if (chips < preBets && chips < availableStack) {
@@ -452,7 +461,14 @@ export class Game {
 
     this.isSettling = true;
 
-    const delay = 8000; // after 8s, start next game
+    const room = roomMap[this.roomid];
+    const hasPendingSeeHand = room.pendingSeeHandRequests && room.pendingSeeHandRequests.length > 0;
+    const showdownCount = this.sortedUsers.filter((t) => userMap[t].shouldShowHand).length;
+    // 前端分阶段展示：每玩家 2*2.5s（两张+五张）+ 胜者阶段 3.5s；胜者动画播完后再倒计时才开下一局
+    const settleAnimationMs = Math.ceil(showdownCount * 5000 + 3500);
+    // 摊牌人数>=2：倒计时 = 人数*8秒；盖牌胜利（无人或仅1人摊牌）固定 8 秒
+    const countdownAfterWinnerMs = showdownCount >= 2 ? showdownCount * 8000 : 8000;
+    const delay = settleAnimationMs + countdownAfterWinnerMs + (hasPendingSeeHand ? 5000 : 0);
     this.nextGameTime = Date.now() + delay;
     publish2all(this.roomid);
     
@@ -637,13 +653,32 @@ export class Game {
   setActingUser(token: Token, delay = 30000) {
     const user = userMap[token];
     user.isActing = true;
-    user.actionEndTime = Date.now() + delay; // 30 s
+    const now = Date.now();
+    user.actionStartTime = now;
+    user.actionEndTime = now + delay; // 30 s
     console.log("setActingUser", user.name);
     clearTimeout(this.actingUserTimer);
     this.actingUserTimer = delayTry(() => {
       this.fold(token); // auto fold
       publish2all(this.roomid);
     }, delay);
+  }
+  /** 当前行动玩家使用 +30s，每手牌最多 3 次 */
+  extendActionTime(token: Token): boolean {
+    const user = userMap[token];
+    if (!user.isActing) return false;
+    if (user.addTimeUsed >= 3) return false;
+    user.addTimeUsed += 1;
+    const extra = 30000;
+    user.actionEndTime += extra;
+    const remaining = user.actionEndTime - Date.now();
+    if (remaining <= 0) return true;
+    clearTimeout(this.actingUserTimer);
+    this.actingUserTimer = delayTry(() => {
+      this.fold(token);
+      publish2all(this.roomid);
+    }, remaining);
+    return true;
   }
   userSetSettleTimes(token: Token, times: number) {
     if (!this.multiSettleStart || userMap[token].settleTimes > 0 || times < 1) {
@@ -704,6 +739,13 @@ class Room {
   reBuyLimit: number = 1;
   game: Game = new Game("", "", 0, 1);
   chipsRecords: ChipsRecord[] = [];
+  /** 结算阶段：多人可同时请求看同一人的手牌，等待被请求者逐条同意/拒绝 */
+  pendingSeeHandRequests: {
+    requestId: string;
+    requesterToken: Token;
+    targetToken: Token;
+    chips: number;
+  }[] = [];
 
   constructor(id: string, sb: number, buyIn: number, reBuyLimit: number = 1) {
     if (sb === 0 || buyIn === 0) {
@@ -729,6 +771,8 @@ class Room {
       throw "至少需要两名玩家准备";
     }
     this.isGaming = true;
+    this.pendingSeeHandRequests = [];
+    send2all(this.id, { seeHandRequests: [] });
 
     // already in game
     if (this.game && !this.game.isSettling) {

@@ -2,6 +2,7 @@ import User, { Token } from "./User";
 import Room, { RoomID } from "./Room";
 import { PokerWebSocket, publishLog2all, send2all, send2user, publish2all } from "../api/ws";
 import { getUser, saveUser, getUserProfile, initDatabase } from "./database";
+import { v4 as uuidv4 } from "uuid";
 
 type UserMap = {
   [token: string]: User;
@@ -154,6 +155,18 @@ export function userFold(token: Token) {
   return roomMap[roomid].game.fold(token);
 }
 
+export function userExtendActionTime(token: Token) {
+  const roomid = userMap[token].roomid;
+  if (!isInRoom(token, roomid)) {
+    throw "invalid room";
+  }
+  const ok = roomMap[roomid].game.extendActionTime(token);
+  if (!ok) {
+    throw "无法加时（非行动者或本手牌已用满 3 次）";
+  }
+  publish2all(roomid);
+}
+
 export function userReBuy(token: Token) {
   const roomid = userMap[token].roomid;
 
@@ -232,6 +245,136 @@ export function userShowHands(token: Token, index: number) {
     });
     publishLog2all(roomid, [`${user.name}亮牌${card}`]);
   }
+}
+
+/** 结算阶段：请求花筹码看某人的手牌，对方同意后扣申请者筹码、给展示者筹码并仅对申请者展示手牌 */
+export function userRequestSeeHand(token: Token, targetUserId: string, chips: number) {
+  const user = userMap[token];
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+  const game = room.game;
+
+  if (!isInRoom(token, roomid)) {
+    throw "invalid room";
+  }
+  if (!game.isSettling) {
+    throw "仅在本局结算阶段可请求看牌";
+  }
+  if (chips < 1) {
+    throw "筹码数量至少为 1";
+  }
+  const requesterStack = user.stack - user.bets.reduce((a, b) => a + b, 0);
+  if (requesterStack < chips) {
+    throw "筹码不足";
+  }
+  const targetToken = room.users.find((t) => userMap[t].chipsRecordID === targetUserId) as Token | undefined;
+  if (!targetToken) {
+    throw "对方不在房间";
+  }
+  const targetUser = userMap[targetToken];
+  if (targetUser.shouldShowHand) {
+    throw "对方已亮牌，无需请求";
+  }
+  if (targetUser.hands.length < 2) {
+    throw "对方没有手牌可看";
+  }
+  const alreadyRequested = room.pendingSeeHandRequests.some(
+    (r) => r.requesterToken === token && r.targetToken === targetToken
+  );
+  if (alreadyRequested) {
+    throw "你已向对方发起过看牌请求，请等待对方处理";
+  }
+
+  const requestId = uuidv4();
+  room.pendingSeeHandRequests.push({
+    requestId,
+    requesterToken: token,
+    targetToken,
+    chips,
+  });
+  const fromName = user.nickname || user.name;
+  const listForTarget = room.pendingSeeHandRequests
+    .filter((r) => r.targetToken === targetToken)
+    .map((r) => ({
+      requestId: r.requestId,
+      fromUserId: userMap[r.requesterToken].chipsRecordID,
+      fromName: userMap[r.requesterToken].nickname || userMap[r.requesterToken].name,
+      chips: r.chips,
+    }));
+  send2user(targetToken, { seeHandRequests: listForTarget });
+}
+
+/** 结算阶段：被请求者同意或拒绝展示手牌（可逐条处理多人请求） */
+export function userRespondSeeHand(token: Token, requestId: string, accept: boolean) {
+  const user = userMap[token];
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+
+  if (!isInRoom(token, roomid)) {
+    throw "invalid room";
+  }
+  const idx = room.pendingSeeHandRequests.findIndex(
+    (r) => r.targetToken === token && r.requestId === requestId
+  );
+  if (idx === -1) {
+    throw "无效或已过期的看牌请求";
+  }
+  const pending = room.pendingSeeHandRequests[idx];
+  room.pendingSeeHandRequests.splice(idx, 1);
+
+  if (!accept) {
+    send2user(pending.requesterToken, { seeHandDeclined: true });
+    sendSeeHandRequestsToTarget(room, token);
+    return;
+  }
+
+  const requester = userMap[pending.requesterToken];
+  const targetUser = userMap[pending.targetToken];
+  const chips = pending.chips;
+
+  const requesterStack = requester.stack - requester.bets.reduce((a, b) => a + b, 0);
+  if (requesterStack < chips) {
+    send2user(pending.requesterToken, { seeHandDeclined: true });
+    sendSeeHandRequestsToTarget(room, token);
+    return;
+  }
+
+  requester.stack -= chips;
+  targetUser.stack += chips;
+  room.chipsRecords.forEach((cr) => {
+    if (cr.id === requester.chipsRecordID) {
+      cr.chips = requester.stack;
+    }
+    if (cr.id === targetUser.chipsRecordID) {
+      cr.chips = targetUser.stack;
+    }
+  });
+
+  send2user(pending.requesterToken, {
+    revealedHand: {
+      targetUserId: targetUser.chipsRecordID,
+      hands: targetUser.hands,
+      handsType: targetUser.handsType,
+      maxCards: targetUser.maxCards || [],
+    },
+  });
+  publishLog2all(roomid, [
+    `${requester.nickname || requester.name} 支付 $${chips} 查看了 ${targetUser.nickname || targetUser.name} 的手牌`,
+  ]);
+  publish2all(roomid);
+  sendSeeHandRequestsToTarget(room, token);
+}
+
+function sendSeeHandRequestsToTarget(room: Room, targetToken: Token) {
+  const list = room.pendingSeeHandRequests
+    .filter((r) => r.targetToken === targetToken)
+    .map((r) => ({
+      requestId: r.requestId,
+      fromUserId: userMap[r.requesterToken].chipsRecordID,
+      fromName: userMap[r.requesterToken].nickname || userMap[r.requesterToken].name,
+      chips: r.chips,
+    }));
+  send2user(targetToken, { seeHandRequests: list });
 }
 
 export function userSetSettleTimes(token: Token, times: number) {

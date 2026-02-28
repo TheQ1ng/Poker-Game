@@ -21,6 +21,8 @@ class User {
   isReady: boolean = false; // in room and ready for game. hang up or disconnection will change it to false
   isActing: boolean = false; // in game, can action now
   actionEndTime: number = new Date().getTime();
+  /** 当前行动轮开始时间（用于前端圆圈总时长，加时不改） */
+  actionStartTime: number = new Date().getTime();
   isFolded: boolean = false; // in game, already fold
   isAllIn: boolean = false;
   isWinner: boolean = false;
@@ -38,6 +40,8 @@ class User {
   shouldShowHand: boolean = false;
   autoLeaveTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
   settleTimes: number = 0;
+  /** 本手牌已使用「+30s」次数，每手牌最多 3 次 */
+  addTimeUsed: number = 0;
 
   constructor(token: Token, name: string, avatar: string) {
     this.token = token;

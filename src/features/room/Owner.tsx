@@ -1,11 +1,8 @@
 import {
   Avatar,
   Button,
-  Slider,
-  InputNumber,
-  Tooltip,
   Popover,
-  Checkbox,
+  Tooltip,
   Switch,
 } from "antd";
 import { useEffect, useRef, useState } from "react";
@@ -18,9 +15,10 @@ import {
 } from "../../app/websocket";
 import { CountDown } from "./CountDown";
 import { Poker } from "./Poker";
+import { RollingNumber } from "../../components/RollingNumber";
 import { BigBlind, Dealer, SmallBlind } from "./Symbol";
 import { selectGame, selectRoom, selectSelf } from "./roomSlice";
-import { card2html } from "../gamehistory/GameHistory";
+import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
 
 // 牌型等级，用于判断是否需要高亮
 const handTypeRanks: { [key: string]: number } = {
@@ -64,15 +62,47 @@ const avatarImages: { [key: string]: string } = {
   "playerIcon (8).png": require("../../assets/playerIcon (8).png"),
 };
 
-export function Owner({ zoom }: { zoom: number }) {
+/** 聚宝盆金币数量：盈利≤100 为 14 枚，≥1000 为 50 枚，中间线性；动画同速率循环 */
+function coinCountFromProfits(profits: number): number {
+  if (profits <= 100) return 14;
+  if (profits >= 1000) return 50;
+  return Math.round(14 + (50 - 14) * (profits - 100) / (1000 - 100));
+}
+
+export function Owner({
+  zoom,
+  settleRevealStep = 0,
+  showdownOrder = [],
+  totalShowdown = 0,
+}: {
+  zoom: number;
+  settleRevealStep?: number;
+  showdownOrder?: string[];
+  totalShowdown?: number;
+}) {
   const hintSoundRef = useRef<HTMLAudioElement>(null);
   const dealCardSoundRef = useRef<HTMLAudioElement>(null);
 
   const self = useAppSelector(selectSelf);
   const game = useAppSelector(selectGame);
   const room = useAppSelector(selectRoom);
+  const chipsRecordState = useAppSelector(selectChipsRecord);
 
   const selfAsUser = room?.users.find((u) => u.id == self?.id);
+
+  const chipsRecordSelf =
+    room?.roomid && chipsRecordState?.roomid === room.roomid && self?.id
+      ? chipsRecordState.chipsRecords.find((r) => r.id === self.id)
+      : undefined;
+  const netProfitSelf = chipsRecordSelf != null ? chipsRecordSelf.chips - chipsRecordSelf.buyIn : undefined;
+  const stackBarStyleSelf =
+    netProfitSelf === undefined
+      ? { background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)" as const }
+      : netProfitSelf > 0
+        ? { background: "linear-gradient(135deg, #e74c3c 0%, #c0392b 100%)" as const }
+        : netProfitSelf < 0
+          ? { background: "linear-gradient(135deg, #27ae60 0%, #1e8449 100%)" as const }
+          : { background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)" as const };
 
   const preBet = game?.preBet || 0;
   const raiseBet = game?.raiseBet || 0;
@@ -81,6 +111,15 @@ export function Owner({ zoom }: { zoom: number }) {
   const bb = game?.bb || 0;
   const reBuyLimit = game?.reBuyLimit || 1;
   const isSettling = game?.isSettling || false;
+
+  const myShowdownIndex = totalShowdown > 0 && self?.id ? showdownOrder.indexOf(self.id) : -1;
+  const showHolePhase = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && settleRevealStep === myShowdownIndex * 2;
+  const showMax5Phase = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && settleRevealStep >= myShowdownIndex * 2 + 1 && settleRevealStep < 2 * totalShowdown;
+  const winnerPhase = isSettling && totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
+  const settleDone = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
+  const showAsWinner = (winnerPhase || settleDone) && !!self?.isWinner;
+  const usePhasedSettle = isSettling && totalShowdown > 0;
+  const showPhasedCards = usePhasedSettle && (showHolePhase || showMax5Phase || showAsWinner);
 
   const name = self?.name || "";
   // 获取昵称，如果没有则使用用户名
@@ -122,9 +161,15 @@ export function Owner({ zoom }: { zoom: number }) {
     stack / (game?.userCount || 1)
   );
 
-  const [raise, setRaise] = useState(0);
+  const [calcInput, setCalcInput] = useState("");
+  const [calcVisible, setCalcVisible] = useState(false);
   const [now, setNow] = useState(0);
   const [autoCheck, setAutoCheck] = useState(false);
+
+  const stackRef = useRef(0);
+  stackRef.current = self?.stack ?? 0;
+
+  const raise = Math.min(maxRaise, Math.max(0, parseInt(calcInput, 10) || 0));
 
   useEffect(() => {
     if (hintSoundRef.current && isActing) {
@@ -144,7 +189,8 @@ export function Owner({ zoom }: { zoom: number }) {
   }, [isActing]);
 
   useEffect(() => {
-    setRaise(0);
+    setCalcInput("");
+    setCalcVisible(false);
     setAutoCheck(false);
   }, [game?.boardCards.length, game?.isSettling]);
 
@@ -155,43 +201,131 @@ export function Owner({ zoom }: { zoom: number }) {
     }
   }, [game?.boardCards.length, room?.isGaming]);
 
-  // 当玩家获胜时，播报牌型
+  // 当玩家获胜时，播报牌型（分阶段结算时由 Room 统一播报 Winner + 牌型，此处不重复）
   useEffect(() => {
-    if (self?.isWinner && self?.handsType) {
+    if (self?.isWinner && self?.handsType && totalShowdown === 0) {
       speakHandType(self.handsType);
     }
-  }, [self?.isWinner, self?.handsType]);
+  }, [self?.isWinner, self?.handsType, totalShowdown]);
+
+  const btnStyle = {
+    width: '100%',
+    height: '100%',
+    minWidth: 0,
+    padding: 0,
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+    background: 'linear-gradient(180deg, #2d5a3d 0%, #1a3d28 100%)',
+    border: '1px solid rgba(201, 162, 39, 0.4)',
+    color: '#ffd700',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+  const btnStyleDel = {
+    ...btnStyle,
+    color: 'rgba(255,255,255,0.9)',
+    background: 'linear-gradient(180deg, #3d2d1a 0%, #2d2010 100%)',
+  };
+  const btnStyleConfirm = {
+    ...btnStyle,
+    background: 'linear-gradient(180deg, #1e5c3e 0%, #164d30 100%)',
+    color: '#b8e6c8',
+  };
 
   return (
-    <div className="flex-row flex-center" style={{ height: "100%" }}>
+    <div className="owner-seat flex-row flex-center" style={{ height: "100%" }}>
       <audio src={hintsound} autoPlay={false} ref={hintSoundRef} />
       <audio src={dealcardsound} autoPlay={false} ref={dealCardSoundRef} />
-      <div className="flex3 flex flex-center">
+      <div className="flex3 flex flex-center" style={{ position: 'relative' }}>
+        {isActing && !isSettling && (
+          <div style={{
+            position: 'absolute',
+            bottom: '100%',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            marginBottom: 6,
+            fontSize: 12,
+            fontWeight: 'bold',
+            color: '#ffd700',
+            textShadow: '0 0 8px rgba(255,215,0,0.8)',
+            padding: '2px 10px',
+            borderRadius: 10,
+            background: 'rgba(0,0,0,0.6)',
+            border: '1px solid rgba(255,215,0,0.5)',
+          }}>
+            行动中
+          </div>
+        )}
         <div className={`owner ${!inGame ? "fold" : ""}`}>
-          <Popover
-            content={
-              <div style={{ width: '200px', height: '200px', textAlign: 'center' }}>
-                {avatar && avatarImages[avatar] ? (
-                  <img 
-                    src={avatarImages[avatar]} 
-                    alt="头像" 
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      borderRadius: "50%",
-                    }}
-                  />
-                ) : (
-                  <div dangerouslySetInnerHTML={{
-                    __html: `${card2html(self?.maxCards || [])} <strong style="color: #FF6F00">+$${(self?.profits || 0).toLocaleString()}</strong>`
-                  }} />
-                )}
+          <div style={{ position: 'relative', display: 'inline-block', width: 64, height: 64, overflow: 'visible' }}>
+            {/* 赢家时与其他人一致：头像周围发光；分阶段结算时等展示完后再显示 */}
+            {self?.isWinner && (!usePhasedSettle || settleDone) && (
+              <div style={{
+                position: 'absolute',
+                top: -5,
+                left: -5,
+                right: -5,
+                bottom: -5,
+                borderRadius: '50%',
+                border: '3px solid #ffd700',
+                boxShadow: '0 0 20px rgba(255, 215, 0, 0.8)',
+                animation: 'winnerGlow 2s ease-in-out infinite alternate',
+                pointerEvents: 'none',
+              }} />
+            )}
+            {/* 金币飞向头像聚宝盆效果 - 分阶段结算时等展示完后再触发 */}
+            {self?.isWinner && self?.profits != null && self.profits >= 0 && (!usePhasedSettle || settleDone) && (() => {
+              const coinCount = coinCountFromProfits(self.profits);
+              const flyDuration = 1.1;
+              const delayStep = flyDuration / coinCount;
+              return (
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: 0,
+                height: 0,
+                pointerEvents: 'none',
+                zIndex: 4,
+              }}>
+                {Array.from({ length: coinCount }).map((_, i) => {
+                  const angle = (i / coinCount) * 2 * Math.PI;
+                  const r = 52;
+                  const x = Math.cos(angle) * r;
+                  const y = Math.sin(angle) * r;
+                  return (
+                    <span
+                      key={i}
+                      className="coin-fly"
+                      style={{
+                        ['--start-x' as string]: `${x}px`,
+                        ['--start-y' as string]: `${y}px`,
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #ffd700 0%, #b8860b 100%)',
+                        boxShadow: '0 0 6px rgba(255,215,0,0.8)',
+                        fontSize: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#333',
+                        fontWeight: 'bold',
+                        animation: `coinsFlyToCenter ${flyDuration}s ease-in infinite`,
+                        animationDelay: `${i * delayStep}s`,
+                      }}
+                    >
+                      $
+                    </span>
+                  );
+                })}
               </div>
-            }
-            trigger="click"
-            visible={self?.isWinner && self.profits >= 0}
-          >
+              );
+            })()}
             {avatar && avatarImages[avatar] ? (
               <img 
                 src={avatarImages[avatar]} 
@@ -201,6 +335,9 @@ export function Owner({ zoom }: { zoom: number }) {
                   height: "100%",
                   objectFit: "cover",
                   borderRadius: "50%",
+                  position: 'relative',
+                  zIndex: 1,
+                  display: 'block',
                 }}
               />
             ) : (
@@ -209,12 +346,19 @@ export function Owner({ zoom }: { zoom: number }) {
                 boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
                 fontSize: "20px",
                 color: "white",
+                position: 'relative',
+                zIndex: 1,
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}>{name.length > 0 ? name[0] : ""}</Avatar>
             )}
-          </Popover>
+          </div>
           <div style={{ color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>{nickname}</div>
           <div className="stack" style={{
-            background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)",
+            ...stackBarStyleSelf,
             borderRadius: "20px",
             padding: "2px 10px",
             fontSize: "12px",
@@ -223,7 +367,7 @@ export function Owner({ zoom }: { zoom: number }) {
             boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
           }}>
             <span className="coins">$</span>
-            {stack}
+            <RollingNumber value={stack} style={{ fontSize: "12px", fontWeight: "bold" }} />
           </div>
           {stack + bet < reBuyLimit * bb &&
           (game?.isSettling || !self?.isInCurrentGame || self.isFoled) ? (
@@ -255,36 +399,63 @@ export function Owner({ zoom }: { zoom: number }) {
               marginLeft: "8px",
             }}>
               <span className="coins">$</span>
-              {bet}
+              <RollingNumber value={bet} style={{ fontWeight: "bold" }} />
             </span>
           )}
         </div>
         <div className="flex1 flex-row flex-center">
-          <Poker
-            card={self?.hands[0] || null}
-            index={0}
-            showHand={isSettling && !selfAsUser?.hands[0]}
-            isSelected={!isSettling || (self?.hands[0] && self?.maxCards ? self.maxCards.includes(self.hands[0]) : false)}
-          />
-          <Poker
-            card={self?.hands[1] || null}
-            index={1}
-            showHand={isSettling && !selfAsUser?.hands[1]}
-            isSelected={!isSettling || (self?.hands[1] && self?.maxCards ? self.maxCards.includes(self.hands[1]) : false)}
-          />
-          <div 
-            style={{ 
-              fontWeight: 'bold', 
-              marginLeft: '10px',
-              ...(self?.handsType && handTypeRanks[self.handsType] >= 4 ? { 
-                color: '#ffd700',
-                textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
-                animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
-              } : { color: 'white' })
-            }}
-          >
-            {self?.handsType}
-          </div>
+          {showPhasedCards ? (
+            <div className={`card-box card-box-stacked ${showHolePhase ? "card-box-stacked-2" : ""} ${(showMax5Phase || showAsWinner) ? "card-box-stacked-5" : ""} ${showAsWinner ? "settle-winner-cards" : ""}`}>
+              {(showMax5Phase || showAsWinner) && (
+                <div
+                  className={`handstype ${showAsWinner ? "settle-winner-type" : ""}`}
+                  style={{
+                    ...(self?.handsType && handTypeRanks[self.handsType] >= 4 ? { color: "#ffd700", textShadow: "0 0 15px rgba(255, 215, 0, 0.8)", animation: "handTypeGlow 1.5s ease-in-out infinite alternate" } : { color: "white", textShadow: "1px 1px 2px rgba(0,0,0,0.8)" }),
+                  }}
+                >
+                  {self?.handsType}
+                </div>
+              )}
+              {(showHolePhase ? [self?.hands?.[0] ?? null, self?.hands?.[1] ?? null] : (self?.maxCards || []).slice(0, 5)).map((card, i) => (
+                <Poker
+                  card={card}
+                  key={card ? `${card.num}${card.suit}-${i}` : i}
+                  index={i}
+                  showHand={!!card}
+                  isSelected={true}
+                  size="medium"
+                />
+              ))}
+            </div>
+          ) : (
+            <>
+              <Poker
+                card={self?.hands[0] || null}
+                index={0}
+                showHand={isSettling && !selfAsUser?.hands[0]}
+                isSelected={!isSettling || (self?.hands[0] && self?.maxCards ? self.maxCards.includes(self.hands[0]) : false)}
+              />
+              <Poker
+                card={self?.hands[1] || null}
+                index={1}
+                showHand={isSettling && !selfAsUser?.hands[1]}
+                isSelected={!isSettling || (self?.hands[1] && self?.maxCards ? self.maxCards.includes(self.hands[1]) : false)}
+              />
+              <div 
+                style={{ 
+                  fontWeight: 'bold', 
+                  marginLeft: '10px',
+                  ...(self?.handsType && handTypeRanks[self.handsType] >= 4 ? { 
+                    color: '#ffd700',
+                    textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
+                    animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
+                  } : { color: 'white' })
+                }}
+              >
+                {self?.handsType}
+              </div>
+            </>
+          )}
         </div>
         <div className="flex flex-row flex-center">
           {isActing ? (
@@ -366,78 +537,121 @@ export function Owner({ zoom }: { zoom: number }) {
                     AllIn ${minRaise}
                   </Button>
                 ) : (
-                  <Button
-                    type="primary"
-                    size="large"
-                    disabled={raise < minRaise}
-                    onClick={() => ws_userBet(raise + bet)}
+                  <Popover
+                    content={
+                      <div className="raise-calc-popover" style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 48px)',
+                        gridTemplateRows: 'auto repeat(3, 48px) 40px 44px',
+                        gap: 6,
+                        width: 222,
+                        background: 'linear-gradient(145deg, #1a3d28 0%, #0f2518 100%)',
+                        padding: 12,
+                        borderRadius: 12,
+                        border: '2px solid rgba(201, 162, 39, 0.5)',
+                        boxShadow: '0 6px 24px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,215,0,0.08)',
+                      }}>
+                        <div style={{
+                          gridColumn: '1 / -1',
+                          textAlign: 'right',
+                          padding: '10px 12px',
+                          marginBottom: 4,
+                          background: 'rgba(0,0,0,0.5)',
+                          borderRadius: 8,
+                          color: '#ffd700',
+                          fontSize: 20,
+                          fontWeight: 'bold',
+                          minHeight: 38,
+                          border: '1px solid rgba(255, 215, 0, 0.25)',
+                        }}>
+                          ${calcInput || '0'}
+                        </div>
+                        {[1, 2, 3].map((n) => (
+                          <Button
+                            key={n}
+                            type="primary"
+                            size="small"
+                            onClick={() => setCalcInput((s) => s + String(n))}
+                            style={btnStyle}
+                          >
+                            {n}
+                          </Button>
+                        ))}
+                        <Button type="default" size="small" onClick={() => setCalcInput((s) => s.slice(0, -1))} style={btnStyleDel}>
+                          删除
+                        </Button>
+                        {[4, 5, 6].map((n) => (
+                          <Button key={n} type="primary" size="small" onClick={() => setCalcInput((s) => s + String(n))} style={btnStyle}>
+                            {n}
+                          </Button>
+                        ))}
+                        <Button type="primary" size="small" onClick={() => setCalcInput((s) => s + "0")} style={btnStyle}>
+                          0
+                        </Button>
+                        {[7, 8, 9].map((n) => (
+                          <Button key={n} type="primary" size="small" onClick={() => setCalcInput((s) => s + String(n))} style={btnStyle}>
+                            {n}
+                          </Button>
+                        ))}
+                        <Button
+                          type="primary"
+                          size="small"
+                          disabled={raise < minRaise}
+                          onClick={() => { ws_userBet(raise + bet); setCalcVisible(false); }}
+                          style={btnStyleConfirm}
+                        >
+                          确认
+                        </Button>
+                        <Button
+                          type="default"
+                          size="small"
+                          onClick={() => setCalcVisible(false)}
+                          style={{ gridColumn: '1 / -1', height: 36, borderColor: 'rgba(201, 162, 39, 0.4)', color: 'rgba(255,255,255,0.9)' }}
+                        >
+                          退出
+                        </Button>
+                        <Button
+                          type="primary"
+                          size="middle"
+                          danger
+                          onClick={() => {
+                            const allInChips = Math.floor(stackRef.current);
+                            ws_userBet(allInChips);
+                            setCalcVisible(false);
+                          }}
+                          style={{
+                            gridColumn: '1 / -1',
+                            height: 44,
+                            fontWeight: 'bold',
+                            fontSize: 15,
+                            letterSpacing: 2,
+                            background: 'linear-gradient(180deg, #ff4444 0%, #cc0000 50%, #990000 100%)',
+                            border: '2px solid rgba(255, 200, 200, 0.8)',
+                            boxShadow: '0 0 20px rgba(255, 50, 50, 0.6), inset 0 1px 0 rgba(255,255,255,0.3)',
+                            animation: 'allin-glow 1.5s ease-in-out infinite alternate',
+                          }}
+                        >
+                          💥 All In ${Math.floor(stack)}
+                        </Button>
+                      </div>
+                    }
+                    title={<span style={{ color: '#d4af37', fontSize: 13 }}>加注 · 最小 ${minRaise} 最大 ${maxRaise}</span>}
+                    trigger="click"
+                    visible={calcVisible}
+                    onVisibleChange={setCalcVisible}
+                    placement="top"
+                    overlayInnerStyle={{ background: 'transparent', padding: 0 }}
                   >
-                    加注 ${raise}
-                  </Button>
+                    <Button
+                      type="primary"
+                      size="large"
+                      onClick={() => setCalcVisible(true)}
+                    >
+                      加注
+                    </Button>
+                  </Popover>
                 )
               ) : null}
-            </div>
-            {canRaise ? (
-              <div className="flex1 flex flex-row flex-center">
-                {useBB ? (
-                  <>
-                    <Button onClick={() => setRaise(bb * 2)}>2BB</Button>
-                    <Button onClick={() => setRaise(Math.floor(bb * 2.5))}>
-                      2.5BB
-                    </Button>
-                    <Button onClick={() => setRaise(bb * 3)}>3BB</Button>
-                    <Button onClick={() => setRaise(bb * 4)}>4BB</Button>
-                  </>
-                ) : (
-                  <>
-                    {has1_3 ? (
-                      <Button onClick={() => setRaise(Math.ceil(pots / 3))}>
-                        1/3
-                      </Button>
-                    ) : null}
-                    {has1_2 ? (
-                      <Button onClick={() => setRaise(Math.ceil(pots / 2))}>
-                        1/2
-                      </Button>
-                    ) : null}
-                    {has2_3 ? (
-                      <Button
-                        onClick={() => setRaise(Math.ceil((pots * 2) / 3))}
-                      >
-                        2/3
-                      </Button>
-                    ) : null}
-                    {has3_4 ? (
-                      <Button
-                        onClick={() => setRaise(Math.ceil((pots * 3) / 4))}
-                      >
-                        3/4
-                      </Button>
-                    ) : null}
-                    {has1_1 ? (
-                      <Button onClick={() => setRaise(Math.ceil(pots))}>
-                        1Pots
-                      </Button>
-                    ) : null}
-                  </>
-                )}
-                <InputNumber
-                  min={minRaise}
-                  max={maxRaise}
-                  value={raise}
-                  onChange={(v) => setRaise(v!)}
-                />
-              </div>
-            ) : null}
-
-            <div className="flex1 flex flex-row flex-center">
-              <span className="coins">$</span>
-              <Slider
-                min={minRaise}
-                max={maxRaise}
-                onChange={setRaise}
-                style={{ width: 200 }}
-              />
             </div>
           </>
         ) : null}
