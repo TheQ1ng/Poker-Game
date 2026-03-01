@@ -14,6 +14,8 @@ export interface TableData {
 
 export function ChipsRecord() {
   const roomChipsRecords = useAppSelector(selectChipsRecord);
+  
+  // 只使用真实数据
   const data: TableData[] = roomChipsRecords.chipsRecords.map((cr) => ({
     id: cr.id,
     name: cr.nickname || cr.name,
@@ -21,6 +23,7 @@ export function ChipsRecord() {
     buyIn: cr.buyIn,
     profit: cr.chips - cr.buyIn,
   }));
+  
   const columns: ColumnsType<any> = [
     {
       title: "玩家",
@@ -28,31 +31,32 @@ export function ChipsRecord() {
       key: "name",
     },
     {
-      title: "筹码",
+      title: "欢乐豆",
       dataIndex: "chips",
       key: "chips",
       sorter: (a: TableData, b: TableData) => a.chips - b.chips,
     },
     {
-      title: "买入",
+      title: "初始",
       dataIndex: "buyIn",
       key: "buyIn",
       sorter: (a: TableData, b: TableData) => a.buyIn - b.buyIn,
     },
     {
-      title: "盈亏",
+      title: "积分",
       dataIndex: "profit",
       key: "profit",
       sorter: (a: TableData, b: TableData) => a.profit - b.profit,
     },
   ];
   return (
-    <div className="chips-record-table">
+    <div className="chips-record-table" style={{ height: "100%" }}>
       <Table
         rowKey={"id"}
         columns={columns}
         dataSource={data}
         pagination={false}
+        scroll={{ y: '100%', x: '100%' }}
       />
     </div>
   );

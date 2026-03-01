@@ -60,6 +60,7 @@ function Room() {
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [activeTab, setActiveTab] = useState('history');
   const [, setTick] = useState(0);
+  const [disclaimerModalVisible, setDisclaimerModalVisible] = useState(false);
   const roomid = useAppSelector(selectRoomID);
   const users = useAppSelector(selectUsers) || [];
   const room = useAppSelector(selectRoom);
@@ -217,7 +218,7 @@ function Room() {
           left: 0,
           top: 0,
           bottom: 0,
-          width: sidebarVisible ? 500 : 0,
+          width: sidebarVisible ? 600 : 0,
           backgroundColor: "#1a1a1a",
           borderRight: "2px solid rgba(201, 162, 39, 0.5)",
           boxShadow: "0 0 20px rgba(0,0,0,0.5)",
@@ -228,18 +229,50 @@ function Room() {
       >
         <div style={{ padding: 20, height: "100%", display: "flex", flexDirection: "column" }}>
           <h2 style={{ color: "#fff", marginBottom: 20 }}>游戏信息</h2>
-          <Tabs activeKey={activeTab} onChange={setActiveTab} tabPosition="left" style={{ flex: 1 }}>
-              <Tabs.TabPane tab={<span style={{ color: activeTab === 'history' ? '#d4af37' : '#fff' }}><HistoryOutlined /> 战况</span>} key="history">
-                <div style={{ height: "100%", padding: 10, overflow: "auto" }}>
-                  <GameHistory />
-                </div>
-              </Tabs.TabPane>
-              <Tabs.TabPane tab={<span style={{ color: activeTab === 'chips' ? '#d4af37' : '#fff' }}><DollarOutlined /> 积分</span>} key="chips">
-                <div style={{ height: "100%", padding: 10, overflow: "auto" }}>
-                  <ChipsRecord />
-                </div>
-              </Tabs.TabPane>
-          </Tabs>
+          
+          {/* 切换按钮 */}
+          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+            <Button
+              type={activeTab === 'history' ? 'primary' : 'default'}
+              onClick={() => setActiveTab('history')}
+              icon={<HistoryOutlined />}
+              style={{
+                flex: 1,
+                background: activeTab === 'history' ? "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)" : "rgba(255,255,255,0.1)",
+                border: "2px solid rgba(201, 162, 39, 0.5)",
+                color: "#fff",
+              }}
+            >
+              战况
+            </Button>
+            <Button
+              type={activeTab === 'chips' ? 'primary' : 'default'}
+              onClick={() => setActiveTab('chips')}
+              icon={<DollarOutlined />}
+              style={{
+                flex: 1,
+                background: activeTab === 'chips' ? "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)" : "rgba(255,255,255,0.1)",
+                border: "2px solid rgba(201, 162, 39, 0.5)",
+                color: "#fff",
+              }}
+            >
+              积分
+            </Button>
+          </div>
+          
+          {/* 内容区域 */}
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            {activeTab === 'history' && (
+              <div style={{ height: "100%", overflow: "auto" }}>
+                <GameHistory />
+              </div>
+            )}
+            {activeTab === 'chips' && (
+              <div style={{ height: "100%", overflow: "auto" }}>
+                <ChipsRecord />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -251,7 +284,7 @@ function Room() {
         className="sidebar-btn"
         style={{
           position: "absolute",
-          left: sidebarVisible ? 510 : 10,
+          left: sidebarVisible ? 610 : 10,
           top: "10px",
           zIndex: 100,
           borderRadius: "30px",
@@ -259,6 +292,25 @@ function Room() {
           background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
           border: "2px solid rgba(201, 162, 39, 0.5)",
           transition: "left 0.3s ease-in-out",
+        }}
+      >
+      </Button>
+
+      {/* 免责声明按钮 */}
+      <Button
+        type="default"
+        icon={<InfoCircleOutlined />}
+        onClick={() => setDisclaimerModalVisible(true)}
+        style={{
+          position: "absolute",
+          right: "10px",
+          top: "10px",
+          zIndex: 100,
+          borderRadius: "30px",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+          background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
+          border: "2px solid rgba(201, 162, 39, 0.5)",
+          color: "#fff",
         }}
       >
       </Button>
@@ -495,7 +547,7 @@ function Room() {
             ) : null}
 
             <Popconfirm
-              title="如果在游戏中，将会自动弃牌。确认离开？"
+              title="如果在游戏中，将会自动放弃。确认离开？"
               okText="确定离开"
               cancelText="留下"
               onConfirm={() => ws_userLeave()}
@@ -573,26 +625,48 @@ function Room() {
                       );
                     })}
                 </div>
-                <div className="pots" style={{
-                  background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)",
-                  borderRadius: "20px",
-                  padding: "10px 20px",
-                  border: "2px solid rgba(255, 215, 0, 0.3)",
+                <div style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  width: "100%",
+                  maxWidth: "400px",
                   marginBottom: "20px",
                 }}>
-                  <span style={{
-                    fontSize: "12px",
-                    color: "rgba(255, 255, 255, 0.7)",
-                    textTransform: "uppercase",
-                    letterSpacing: "2px",
-                    marginRight: "10px",
-                  }}>底池</span>
-                  <span style={{
-                    fontSize: "24px",
-                    fontWeight: "bold",
-                    color: "#ffd700",
-                    textShadow: "0 0 10px rgba(255, 215, 0, 0.5)",
-                  }}>${game?.pots || 0}</span>
+                  {/* 左侧总积分区域 */}
+                  <div className="pots" style={{
+                    background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)",
+                    borderRadius: "20px",
+                    padding: "10px 20px",
+                    border: "2px solid rgba(255, 215, 0, 0.3)",
+                  }}>
+                    <span style={{
+                      fontSize: "12px",
+                      color: "rgba(255, 255, 255, 0.7)",
+                      textTransform: "uppercase",
+                      letterSpacing: "2px",
+                      marginRight: "10px",
+                    }}>总积分</span>
+                    <span style={{
+                      fontSize: "24px",
+                      fontWeight: "bold",
+                      color: "#ffd700",
+                      textShadow: "0 0 10px rgba(255, 215, 0, 0.5)",
+                    }}>🌟{game?.pots || 0}</span>
+                  </div>
+                  
+                  {/* 右侧免责声明内容 */}
+                  <div style={{
+                    textAlign: "right",
+                    maxWidth: "150px",
+                    fontSize: "10px",
+                    color: "#fff",
+                    lineHeight: 1.4,
+                  }}>
+                    <p>健康游戏，适度娱乐</p>
+                    <p>本项目仅供朋友间训练</p>
+                    <p>请勿用于商业用途</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -665,6 +739,36 @@ function Room() {
           </div>
         </div>
       </div>
+
+      {/* 免责声明Modal */}
+      <Modal
+        title={<span style={{ color: "#c9a227" }}>免责声明</span>}
+        visible={disclaimerModalVisible}
+        onCancel={() => setDisclaimerModalVisible(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setDisclaimerModalVisible(false)}>
+            我知道了
+          </Button>
+        ]}
+        style={{
+          borderRadius: "10px",
+          backgroundColor: "#1a1a1a",
+          color: "#fff",
+        }}
+        bodyStyle={{
+          backgroundColor: "#1a1a1a",
+          color: "#fff",
+        }}
+      >
+        <div style={{ lineHeight: 1.6 }}>
+          <p>健康游戏，适度娱乐</p>
+          <p>本项目仅供朋友间训练提高思考能力，请勿用于任何商业用途</p>
+          <p>游戏中的积分仅用于训练目的，不代表真实货币价值</p>
+          <p>请合理安排游戏时间，避免过度沉迷</p>
+          <p>本游戏不含任何赌博元素，请勿将游戏内容与实际赌博行为联系</p>
+          <p>如有任何问题或建议，请联系开发者</p>
+        </div>
+      </Modal>
     </div>
   );
 }

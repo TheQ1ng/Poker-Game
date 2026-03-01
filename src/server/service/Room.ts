@@ -227,7 +227,7 @@ export class Game {
       console.error("BET:", user.name, chips, "not enough", userMap[token]);
       throw "not enough chips";
     }
-    // 全下时强制按 availableStack 计算，确保下注为剩余筹码的全部，避免剩一块
+    // 全下时强制按 availableStack 计算，确保加🌟为剩余欢乐豆的全部，避免剩一块
     if (chips >= availableStack - 1 && availableStack > 0) {
       chips = availableStack;
     }
@@ -267,23 +267,23 @@ export class Game {
     const delta = chips - user.bets[this.round];
     if (chips == availableStack) {
       log += `AllIn $${chips}`;
-      user.actionName = "AllIn";
+      user.actionName = "冲";
     } else {
       if (delta == 0) {
         log += `Check`;
-        user.actionName = "Check";
+        user.actionName = "跟";
       } else {
         if (chips > preBets) {
           if (preBets == 0) {
             log += `Bet $${chips}`;
-            user.actionName = "Bet";
+            user.actionName = "下";
           } else {
             log += `Raise to $${chips}`;
-            user.actionName = "Raise";
+            user.actionName = "加";
           }
         } else {
           log += `Call $${chips}`;
-          user.actionName = "Call";
+          user.actionName = "跟";
         }
       }
     }
@@ -308,7 +308,7 @@ export class Game {
     console.log(`USER Fold: ${user.name}`.green, prettify(user.hands));
     publishLog2all(this.roomid, [`${user.nickname || user.name} Fold`]);
     user.isFolded = true;
-    user.actionName = "Fold";
+    user.actionName = "放弃";
     this.setActed(token);
     if (!this.decreaseActiveUserToSettle()) {
       this.nextActUser(token);
@@ -876,7 +876,7 @@ class Room {
         cr.chips += this.buyIn;
       }
     });
-    // 重新买入后自动设置为准备状态
+    // 重新初始后自动设置为准备状态
     user.isReady = true;
   }
 }

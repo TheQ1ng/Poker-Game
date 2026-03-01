@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 德州扑克游戏 - 服务器端一键部署脚本
+# 欢乐积分王训练系统游戏 - 服务器端一键部署脚本
 # 如果服务器上已有代码，在服务器上直接运行此脚本即可完成部署
 
 set -e
@@ -14,7 +14,7 @@ NC='\033[0m'
 APP_PORT="8086"
 PROJECT_DIR="/home/theq1ng/poker"
 
-echo -e "${GREEN}=== 德州扑克服务器端部署脚本 ===${NC}"
+echo -e "${GREEN}=== 欢乐积分王训练系统服务器端部署脚本 ===${NC}"
 
 # 检查 Node.js
 check_nodejs() {

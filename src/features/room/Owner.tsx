@@ -6,7 +6,7 @@ import {
   Switch,
   Input,
 } from "antd";
-import { SendOutlined } from "@ant-design/icons";
+import { SendOutlined, SmileOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
@@ -23,6 +23,28 @@ import { RollingNumber } from "../../components/RollingNumber";
 import { BigBlind, Dealer, SmallBlind } from "./Symbol";
 import { selectGame, selectRoom, selectSelf, selectRoomChatBubbles, clearRoomChatBubble } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
+
+// 预设快捷消息
+const quickMessages = [
+  "窝腰烟牌",
+  "gay窝擦屁鞋",
+  "666",
+  "快点啊，我等到花都谢了",
+  "对A无脑冲",
+  "我中顺了",
+  "我中花了",
+  "福禄浩死打不打的过同花"
+];
+
+// 表情列表
+const emojis = [
+  "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣",
+  "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰",
+  "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜",
+  "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏"
+];
+
+
 
 // 牌型等级，用于判断是否需要高亮
 const handTypeRanks: { [key: string]: number } = {
@@ -97,6 +119,8 @@ export function Owner({
   const chipsRecordState = useAppSelector(selectChipsRecord);
   const roomChatBubbles = useAppSelector(selectRoomChatBubbles);
   const [chatInput, setChatInput] = useState("");
+  const [quickChatVisible, setQuickChatVisible] = useState(false);
+  const [emojiVisible, setEmojiVisible] = useState(false);
   const dispatch = useAppDispatch();
   useEffect(() => {
     if (!self?.id || !roomChatBubbles[self.id]) return;
@@ -397,13 +421,13 @@ export function Owner({
             color: "#333",
             boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
           }}>
-            <span className="coins">$</span>
+            <span className="coins">🌟</span>
             <RollingNumber value={stack} style={{ fontSize: "12px", fontWeight: "bold" }} />
           </div>
           {stack + bet < reBuyLimit * bb &&
           (game?.isSettling || !self?.isInCurrentGame || self.isFoled) ? (
             <Button type="primary" onClick={() => ws_userRebuy()}>
-              再次买入
+              再次初始
             </Button>
           ) : null}
           {(() => {
@@ -440,39 +464,150 @@ export function Owner({
             ) : null;
           })()}
           {/* 聊天输入：最多 15 字 */}
-          <div className="owner-chat-input-wrap">
-            <Input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value.slice(0, 15))}
-              placeholder="说点什么..."
-              maxLength={15}
-              size="small"
-              onPressEnter={() => {
-                const t = chatInput.trim();
-                if (t) { ws_sendMessage(t); setChatInput(""); }
+          <div className="owner-chat-input-wrap" style={{ display: 'flex', alignItems: 'center' }}>
+            <Popover
+              content={
+                <div style={{ padding: '12px', width: '600px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '10px' }}>
+                    {emojis.map((emoji, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          fontSize: '16px',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          padding: '4px',
+                          borderRadius: '8px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#e0e0e0';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                        onClick={() => {
+                          ws_sendMessage(emoji);
+                          setEmojiVisible(false);
+                        }}
+                      >
+                        {emoji}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              }
+              trigger="click"
+              visible={emojiVisible}
+              onVisibleChange={setEmojiVisible}
+              placement="bottom"
+              overlayStyle={{
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                border: 'none',
+                padding: 0
               }}
-              style={{ width: 120, borderRadius: 14 }}
-            />
+            >
+              <Button
+                size="small"
+                icon={<SmileOutlined />}
+                style={{
+                  borderRadius: '50%',
+                  width: 20,
+                  height: 20,
+                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
+                  border: '1px solid rgba(255,255,255,0.3)',
+                  boxShadow: '0 1px 4px rgba(255, 152, 0, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 6,
+                  transition: 'all 0.3s ease'
+                }}
+              />
+            </Popover>
+            <Popover
+              content={
+                <div style={{ padding: '8px', width: '160px' }}>
+                  {quickMessages.map((message, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: '6px 10px',
+                        borderRadius: '12px',
+                        cursor: 'pointer',
+                        marginBottom: '4px',
+                        backgroundColor: '#f0f0f0',
+                        textAlign: 'center',
+                        fontSize: '12px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = '#e0e0e0';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = '#f0f0f0';
+                      }}
+                      onClick={() => {
+                        ws_sendMessage(message);
+                        setQuickChatVisible(false);
+                      }}
+                    >
+                      {message}
+                    </div>
+                  ))}
+                </div>
+              }
+              trigger="click"
+              visible={quickChatVisible}
+              onVisibleChange={setQuickChatVisible}
+              placement="bottom"
+              overlayStyle={{
+                borderRadius: '12px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                border: 'none',
+                padding: 0
+              }}
+            >
+              <Input
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value.slice(0, 50))}
+                placeholder="说点什么..."
+                maxLength={50}
+                size="small"
+                onPressEnter={() => {
+                  const t = chatInput.trim();
+                  if (t) { 
+                    ws_sendMessage(t); 
+                    setChatInput(""); 
+                  }
+                }}
+                onClick={() => setQuickChatVisible(true)}
+                style={{ width: 180, borderRadius: 14 }}
+              />
+            </Popover>
             <Button
               type="primary"
               size="small"
               icon={<SendOutlined />}
               onClick={() => {
                 const t = chatInput.trim();
-                if (t) { ws_sendMessage(t); setChatInput(""); }
+                if (t) { 
+                  ws_sendMessage(t); 
+                  setChatInput(""); 
+                }
               }}
               style={{
                 borderRadius: '50%',
-                width: 32,
-                height: 32,
-                padding: 0,
+                width: 20,
+                height: 20,
                 background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-                border: '2px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 2px 8px rgba(76, 175, 80, 0.4)',
+                border: '1px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 1px 4px rgba(76, 175, 80, 0.4)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                marginLeft: 8,
+                marginLeft: 6,
                 transition: 'all 0.3s ease'
               }}
               className="chat-send-btn"
@@ -490,7 +625,7 @@ export function Owner({
               padding: "2px 8px",
               marginLeft: "8px",
             }}>
-              <span className="coins">$</span>
+              <span className="coins">🌟</span>
               <RollingNumber value={bet} style={{ fontWeight: "bold" }} />
             </span>
           )}
@@ -556,7 +691,7 @@ export function Owner({
         </div>
         <div className="flex flex-row flex-center">
           {isActing ? (
-            <Tooltip title={`点击加时，需支付其他玩家各$${overtimeCost}`}>
+            <Tooltip title={`点击加时，需支付其他玩家各🌟${overtimeCost}`}>
               <Button
                 type="text"
                 style={{ width: 300 }}
@@ -587,14 +722,14 @@ export function Owner({
               onChange={() => setAutoCheck(!autoCheck)}
               style={{ marginRight: '8px' }}
             />
-            自动过牌或弃牌
+            自动过或放弃
           </div>
         ) : null}
         {isActing ? (
           <>
             <div className="flex1 flex flex-row flex-center main-btn">
               <Button type="primary" size="large" onClick={ws_userFold}>
-                弃牌
+                放弃
               </Button>
               {canCheck ? (
                 <Button
@@ -602,7 +737,7 @@ export function Owner({
                   size="large"
                   onClick={() => ws_userBet(bet)}
                 >
-                  过牌
+                  过
                 </Button>
               ) : null}
               {canCall ? (
@@ -611,7 +746,7 @@ export function Owner({
                   size="large"
                   onClick={() => ws_userBet(chips2call + bet)}
                 >
-                  跟注 ${chips2call}
+                  跟🌟 ${chips2call}
                 </Button>
               ) : null}
               {shouldAllIn ? (
@@ -621,7 +756,7 @@ export function Owner({
                   danger
                   onClick={() => ws_userBet(chips2call + bet)}
                 >
-                  AllIn ${chips2call}
+                  全跟 ${chips2call}
                 </Button>
               ) : canRaise ? (
                 onlyRaiseAllIn ? (
@@ -631,7 +766,7 @@ export function Owner({
                     danger
                     onClick={() => ws_userBet(minRaise + bet)}
                   >
-                    AllIn ${minRaise}
+                    全跟 ${minRaise}
                   </Button>
                 ) : (
                   <Popover
@@ -728,11 +863,11 @@ export function Owner({
                             animation: 'allin-glow 1.5s ease-in-out infinite alternate',
                           }}
                         >
-                          💥 All In ${Math.floor(stack)}
+                          💥 全跟 🌟{Math.floor(stack)}
                         </Button>
                       </div>
                     }
-                    title={<span style={{ color: '#d4af37', fontSize: 13 }}>加注 · 最小 ${minRaise} 最大 ${maxRaise}</span>}
+                    title={<span style={{ color: '#d4af37', fontSize: 13 }}>加🌟 · 最小 ${minRaise} 最大 ${maxRaise}</span>}
                     trigger="click"
                     visible={calcVisible}
                     onVisibleChange={setCalcVisible}
@@ -744,7 +879,7 @@ export function Owner({
                       size="large"
                       onClick={() => setCalcVisible(true)}
                     >
-                      加注
+                      加🌟
                     </Button>
                   </Popover>
                 )

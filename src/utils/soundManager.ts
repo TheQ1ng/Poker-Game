@@ -4,12 +4,12 @@
 type SoundType = 
   | 'deal'        // 发牌
   | 'flip'        // 翻牌
-  | 'chipStack'   // 筹码堆叠
-  | 'chipBet'     // 下注
+  | 'chipStack'   // 欢乐豆堆叠
+  | 'chipBet'     // 加🌟
   | 'allin'       // 全下
-  | 'fold'        // 弃牌
+  | 'fold'        // 放弃
   | 'check'       // 让牌
-  | 'call'        // 跟注
+  | 'call'        // 跟🌟
   | 'raise'       // 加注
   | 'win'         // 获胜
   | 'lose'        // 失败
@@ -106,7 +106,7 @@ class SoundManager {
     this.sounds.set('flip', buffer);
   }
   
-  // 生成筹码堆叠音效 - 低沉的"咚咚"声
+  // 生成欢乐豆堆叠音效 - 低沉的"咚咚"声
   private async generateChipStackSound() {
     if (!this.audioContext) return;
     
@@ -127,7 +127,7 @@ class SoundManager {
     this.sounds.set('chipStack', buffer);
   }
   
-  // 生成下注音效
+  // 生成加🌟音效
   private async generateChipBetSound() {
     if (!this.audioContext) return;
     
@@ -169,7 +169,7 @@ class SoundManager {
     this.sounds.set('allin', buffer);
   }
   
-  // 生成弃牌音效
+  // 生成放弃音效
   private async generateFoldSound() {
     if (!this.audioContext) return;
     
@@ -209,7 +209,7 @@ class SoundManager {
     this.sounds.set('check', buffer);
   }
   
-  // 生成跟注音效
+  // 生成跟🌟音效
   private async generateCallSound() {
     if (!this.audioContext) return;
     

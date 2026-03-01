@@ -33,19 +33,19 @@ export function RecentGameRecords() {
       key: "name",
     },
     {
-      title: "筹码",
+      title: "欢乐豆",
       dataIndex: "chips",
       key: "chips",
       sorter: (a: TableData, b: TableData) => a.chips - b.chips,
     },
     {
-      title: "买入",
+      title: "初始",
       dataIndex: "buyIn",
       key: "buyIn",
       sorter: (a: TableData, b: TableData) => a.buyIn - b.buyIn,
     },
     {
-      title: "盈亏",
+      title: "积分",
       dataIndex: "profit",
       key: "profit",
       sorter: (a: TableData, b: TableData) => a.profit - b.profit,

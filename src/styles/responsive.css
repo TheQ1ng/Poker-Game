@@ -1,4 +1,4 @@
-/* 德州扑克 - 移动端响应式适配样式 */
+/* 欢乐积分王训练系统 - 移动端响应式适配样式 */
 
 /* ==================== 基础响应式设置 ==================== */
 
@@ -177,7 +177,7 @@
     font-size: 9px !important;
   }
 
-  /* 手机端 mini-cards 与筹码数并排显示 */
+  /* 手机端 mini-cards 与欢乐豆数并排显示 */
   .userinfo {
     position: relative;
   }
@@ -235,7 +235,7 @@
     bottom: 20px !important;
   }
 
-  /* 底池信息 */
+  /* 总积分信息 */
   .pots {
     padding: 5px 10px !important;
     margin-bottom: 10px !important;
@@ -554,7 +554,7 @@
     width: 120px !important;
   }
 
-  /* 自动弃牌开关 */
+  /* 自动放弃开关 */
   .user-actions .ant-switch {
     transform: scale(0.8);
   }

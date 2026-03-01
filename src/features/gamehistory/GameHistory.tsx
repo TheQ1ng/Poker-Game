@@ -73,10 +73,10 @@ function groupLogsByFlow(logs: string[]): LogBlock[] {
       pushCurrent();
       const phase = streetMatch[1];
       const phaseNames: Record<string, string> = {
-        PreFlop: "翻前",
-        Flop: "翻牌",
-        Turn: "转牌",
-        River: "河牌",
+        第一轮: "第一轮",
+        第二轮: "第二轮",
+        第三轮: "第三轮",
+        第四轮: "第四轮",
       };
       current = { type: "street", title: phaseNames[phase] || phase, lines: [line] };
       continue;

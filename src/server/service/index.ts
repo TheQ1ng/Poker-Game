@@ -255,7 +255,7 @@ export function userShowHands(token: Token, index: number) {
   }
 }
 
-/** 结算阶段：请求花筹码看某人的手牌，对方同意后扣申请者筹码、给展示者筹码并仅对申请者展示手牌 */
+/** 结算阶段：请求花欢乐豆看某人的手牌，对方同意后扣申请者欢乐豆、给展示者欢乐豆并仅对申请者展示手牌 */
 export function userRequestSeeHand(token: Token, targetUserId: string, chips: number) {
   const user = userMap[token];
   const roomid = user.roomid;
@@ -269,11 +269,11 @@ export function userRequestSeeHand(token: Token, targetUserId: string, chips: nu
     throw "仅在本局结算阶段可请求看牌";
   }
   if (chips < 1) {
-    throw "筹码数量至少为 1";
+    throw "欢乐豆数量至少为 1";
   }
   const requesterStack = user.stack - user.bets.reduce((a, b) => a + b, 0);
   if (requesterStack < chips) {
-    throw "筹码不足";
+    throw "欢乐豆不足";
   }
   const targetToken = room.users.find((t) => userMap[t].chipsRecordID === targetUserId) as Token | undefined;
   if (!targetToken) {
@@ -283,7 +283,7 @@ export function userRequestSeeHand(token: Token, targetUserId: string, chips: nu
   if (targetUser.shouldShowHand) {
     throw "对方已亮牌，无需请求";
   }
-  // 即使目标用户已弃牌，也允许申请看牌
+  // 即使目标用户已放弃，也允许申请看牌
   if (targetUser.hands.length < 2) {
     throw "对方没有手牌可看";
   }
@@ -399,7 +399,7 @@ export function userSetSettleTimes(token: Token, times: number) {
 export function userSendMessage(token: Token, message: string) {
   const user = userMap[token];
   const roomid = user.roomid;
-  const trimmed = (message || "").trim().slice(0, 15);
+  const trimmed = (message || "").trim().slice(0, 50);
   if (!trimmed) return;
   const payload = {
     roomChat: {
@@ -511,21 +511,21 @@ export function startBotActions() {
         const availableStack = self.stack - bet;
         const totalBet = Math.min(self.stack, preBet);
         
-        // 清除原有的自动弃牌计时器
+        // 清除原有的自动放弃计时器
         clearTimeout(game.actingUserTimer);
         
         if (availableStack > 0 && totalBet > bet) {
-          // 跟注
+          // 跟🌟
           game.bet(actingUser, totalBet);
-          console.log(`机器人 ${self.name} 跟注 ${totalBet - bet}`);
+          console.log(`机器人 ${self.name} 跟🌟 ${totalBet - bet}`);
         } else if (preBet === bet) {
-          // 过牌
+          // 过
           game.bet(actingUser, bet);
-          console.log(`机器人 ${self.name} 过牌`);
+          console.log(`机器人 ${self.name} 过`);
         } else {
-          // 弃牌
+          // 放弃
           game.fold(actingUser);
-          console.log(`机器人 ${self.name} 弃牌`);
+          console.log(`机器人 ${self.name} 放弃`);
         }
         
         // 广播游戏状态

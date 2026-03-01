@@ -21,7 +21,7 @@ const Loading: React.FC = () => {
   return (
     <div className="loading-container">
       <div className="loading-content">
-        <div className="loading-title">德州扑克</div>
+        <div className="loading-title">欢乐积分王训练系统</div>
         <div className="loading-subtitle">正在加载游戏资源...</div>
         <div className="loading-progress-container">
           <div 
@@ -30,6 +30,11 @@ const Loading: React.FC = () => {
           ></div>
         </div>
         <div className="loading-progress-text">{Math.round(progress)}%</div>
+        <div className="loading-disclaimer">
+          <p>健康游戏，适度娱乐</p>
+          <p>本项目仅供朋友间训练提高思考能力</p>
+          <p>请勿用于任何商业用途</p>
+        </div>
       </div>
     </div>
   );

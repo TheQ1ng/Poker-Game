@@ -32,7 +32,7 @@ export interface RoomState {
   serverTimeOffset: number;
   /** 有人请求看我的手牌（仅我作为被请求者时），支持多人同时申请 */
   pendingSeeHandRequests: SeeHandRequestPayload[];
-  /** 我花筹码后对方同意，仅我可见的手牌 */
+  /** 我花欢乐豆后对方同意，仅我可见的手牌 */
   revealedHandsForMe: Record<string, RevealedHandPayload>;
   /** 房间内玩家头顶气泡：userId -> { text, at }，用于聊天展示 */
   roomChatBubbles: Record<string, { text: string; at: number }>;

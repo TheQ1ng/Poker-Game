@@ -28,6 +28,14 @@ const avatarImages: { [key: string]: string } = {
   "playerIcon (8).png": require("../../assets/playerIcon (8).png"),
 };
 
+const actionNameToClass: { [key: string]: string } = {
+  "冲": "allin",
+  "跟": "call",
+  "下": "bet",
+  "加": "raise",
+  "放弃": "fold",
+};
+
 // 获取所有头像键值
 const avatarKeys = Object.keys(avatarImages);
 
@@ -93,7 +101,7 @@ export function User({
   }, [id, roomChatBubbles[id]?.at, dispatch]);
   const [seeHandChips, setSeeHandChips] = useState<number>(game?.bb ? game.bb * 5 : 10);
   
-  // 当大盲值变化时，更新看牌筹码为 5 个大盲
+  // 当大哥值变化时，更新看牌欢乐豆为 5 个大哥
   useEffect(() => {
     if (game?.bb) {
       setSeeHandChips(game.bb * 5);
@@ -243,7 +251,7 @@ export function User({
             }}
           />
         )}
-        {/* 弃牌蒙层 */}
+        {/* 放弃蒙层 */}
         {user?.isFoled && (
           <div style={{
             position: 'absolute',
@@ -358,7 +366,7 @@ export function User({
           </div>
           );
         })()}
-        {/* 被请求者看到：申请人头上的对话框，点上移；勾/叉；文案为「我想支付X筹码查看你的手牌」 */}
+        {/* 被请求者看到：申请人头上的对话框，点上移；勾/叉；文案为「我想支付X欢乐豆查看你的手牌」 */}
         {requestFromThisUser && (
           <div className="see-hand-request-box" style={{
             position: 'absolute',
@@ -376,7 +384,7 @@ export function User({
             textAlign: 'center',
           }}>
             <div style={{ color: '#eee', fontSize: 12, marginBottom: 8 }}>
-              我想支付 {requestFromThisUser.chips} 筹码查看你的手牌
+              我想支付 {requestFromThisUser.chips} 欢乐豆查看你的手牌
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <Tooltip title="同意">
@@ -503,7 +511,7 @@ export function User({
           color: "#333",
           boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
         }}>
-          <span className="coins">$</span>
+          <span className="coins">🌟</span>
           <RollingNumber value={stack} style={{ fontSize: "inherit", fontWeight: "inherit" }} />
         </div>
       </div>
@@ -529,20 +537,20 @@ export function User({
             />
           </div>
         )} */}
-        {user?.actionName && user.actionName.toLowerCase() !== 'allin' && (
-          <span className={`user-action-indicator ${user.actionName.toLowerCase()}`}>
+        {user?.actionName && actionNameToClass[user.actionName] !== 'allin' && (
+          <span className={`user-action-indicator ${actionNameToClass[user.actionName] || ''}`}>
             {user.actionName}
           </span>
         )}
-        {/* 持久化显示弃牌标签 */}
+        {/* 持久化显示放弃标签 */}
         {user?.isFoled && !user?.actionName && (
           <span className="user-action-indicator fold">
-            弃牌
+            放弃
           </span>
         )}
         {bet > 0 ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-            <span className="coins">$</span>
+            <span className="coins">🌟</span>
             <RollingNumber value={bet} style={{ fontSize: 'inherit', fontWeight: 'bold' }} />
           </span>
         ) : (
@@ -609,15 +617,51 @@ export function User({
       <div className="status">
         {user?.isOffline ? (
           <Tooltip title="掉线">
-            <ApiOutlined />
+            <div style={{
+              background: "#ff4757",
+              color: "white",
+              borderRadius: "50%",
+              width: "24px",
+              height: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(255, 71, 87, 0.5)",
+            }}>
+              <ApiOutlined style={{ fontSize: "14px" }} />
+            </div>
           </Tooltip>
         ) : !user?.isReady ? (
           <Tooltip title="挂起">
-            <CoffeeOutlined />
+            <div style={{
+              background: "#ffa502",
+              color: "white",
+              borderRadius: "50%",
+              width: "24px",
+              height: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(255, 165, 2, 0.5)",
+            }}>
+              <CoffeeOutlined style={{ fontSize: "14px" }} />
+            </div>
           </Tooltip>
         ) : user?.isFoled ? (
-          <Tooltip title="弃牌">
-            <CloseOutlined />
+          <Tooltip title="放弃">
+            <div style={{
+              background: "#747d8c",
+              color: "white",
+              borderRadius: "50%",
+              width: "24px",
+              height: "24px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 8px rgba(116, 125, 140, 0.5)",
+            }}>
+              <CloseOutlined style={{ fontSize: "14px" }} />
+            </div>
           </Tooltip>
         ) : null}
       </div>

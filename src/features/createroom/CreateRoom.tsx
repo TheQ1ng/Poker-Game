@@ -226,7 +226,7 @@ function CreateRoom() {
     <div className="poker-home-container">
       {/* 顶部用户信息栏 */}
       <div className="poker-home-header">
-        <div className="poker-table-logo">♠️ Texas Hold'em</div>
+        <div className="poker-table-logo">🌟 欢乐积分王</div>
         <Dropdown
           overlay={userMenu}
           trigger={['click']}
@@ -250,7 +250,7 @@ function CreateRoom() {
             <Tabs.TabPane tab={<span><PlusOutlined /> 创建</span>} key="create">
               <Card className="home-card create-room-card">
                 <div className="poker-form-group">
-                  <span className="label">小盲</span>
+                  <span className="label">小弟</span>
                   <InputNumber
                     min={1}
                     value={smallBlind}
@@ -258,7 +258,7 @@ function CreateRoom() {
                     className="poker-input blind-input"
                   />
                   <span className="divider">/</span>
-                  <span className="label">大盲</span>
+                  <span className="label">大哥</span>
                   <InputNumber
                     disabled={true}
                     min={1}
@@ -267,7 +267,7 @@ function CreateRoom() {
                   />
                 </div>
                 <div className="poker-form-group">
-                  <span className="label">买入</span>
+                  <span className="label">初始</span>
                   <InputNumber
                     min={1}
                     value={buyIn}
@@ -283,7 +283,7 @@ function CreateRoom() {
                     onChange={(v) => setReBuyLimit(v!)}
                     className="poker-input rebuy-input"
                   />
-                  <span className="label-text">大盲允许重买</span>
+                  <span className="label-text">大哥允许重买</span>
                 </div>
                 <div className="poker-form-group">
                   <Button
@@ -324,7 +324,7 @@ function CreateRoom() {
                       <div key={room.id} className="room-item">
                         <div className="room-info">
                           <span className="room-id">房间号: {room.id}</span>
-                          <span className="room-blind">盲注: {room.smallBlind}/{room.smallBlind * 2}</span>
+                          <span className="room-blind">积分: {room.smallBlind}/{room.smallBlind * 2}</span>
                           <span className="room-players">
                             玩家: {room.playerCount}/{room.maxPlayers}
                           </span>

@@ -1,5 +1,5 @@
 /* ========================================
-   德州扑克美化样式 - 牌桌、动画、特效
+   欢乐积分王训练系统美化样式 - 牌桌、动画、特效
    ======================================== */
 
 /* ----------------------------------------
@@ -238,7 +238,7 @@
   border-color: #ff4444;
 }
 
-/* 筹码推出去的动画 */
+/* 欢乐豆推出去的动画 */
 @keyframes chipsPush {
   0% {
     transform: scale(1);
@@ -341,7 +341,7 @@
   white-space: nowrap;
 }
 
-/* 玩家筹码显示 */
+/* 玩家欢乐豆显示 */
 .user-stack {
   background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
   border-radius: 20px;
@@ -352,7 +352,7 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* 玩家下注区域 */
+/* 玩家加🌟区域 */
 .user-bet-area {
   position: absolute;
   top: -10px;
@@ -407,8 +407,13 @@
   color: white;
 }
 
+.user-action-indicator.bet {
+  background: #9c27b0;
+  color: white;
+}
+
 /* ----------------------------------------
-   4. 底池区域美化
+   4. 总积分区域美化
    ---------------------------------------- */
 
 .pots-container {
@@ -476,7 +481,7 @@
   }
 }
 
-/* 筹码收集动画 */
+/* 欢乐豆收集动画 */
 @keyframes chipsCollect {
   0% {
     transform: scale(1);
@@ -710,7 +715,7 @@
 }
 
 /* ========================================
-   德州扑克风格按钮
+   欢乐积分王训练系统风格按钮
    ======================================== */
 
 /* 主按钮区域 - 扑克风格 */
@@ -727,7 +732,7 @@
   box-shadow: 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
-/* 弃牌按钮 - 红色 */
+/* 放弃按钮 - 红色 */
 .main-btn .ant-btn-primary:nth-child(1) {
   background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);
   border-color: #922b21;
@@ -740,7 +745,7 @@
   box-shadow: 0 6px 12px rgba(231, 76, 60, 0.4);
 }
 
-/* 过牌按钮 - 蓝色 */
+/* 过按钮 - 蓝色 */
 .main-btn .ant-btn-primary:nth-child(2),
 .main-btn .ant-btn-primary:not([danger]):not(:nth-child(1)) {
   background: linear-gradient(180deg, #3498db 0%, #2980b9 100%);
@@ -754,7 +759,7 @@
   box-shadow: 0 6px 12px rgba(52, 152, 219, 0.4);
 }
 
-/* 跟注按钮 - 绿色 */
+/* 跟🌟按钮 - 绿色 */
 .main-btn .ant-btn-primary[disabled]:not([danger]) {
   background: linear-gradient(180deg, #7f8c8d 0%, #626567 100%);
   border-color: #424949;
@@ -807,7 +812,7 @@
   text-align: center;
 }
 
-/* 筹码滑动条 */
+/* 欢乐豆滑动条 */
 .owner .ant-slider-rail {
   background: #34495e;
 }
@@ -843,7 +848,7 @@
   color: white;
 }
 
-/* 自动过牌开关 */
+/* 自动过开关 */
 .owner .ant-switch {
   background: #7f8c8d;
 }
@@ -870,7 +875,7 @@
   gap: 2px;
 }
 
-/* 弃牌动画 */
+/* 放弃动画 */
 @keyframes foldCard {
   0% {
     transform: rotate(0deg) scale(1);

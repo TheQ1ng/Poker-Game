@@ -139,6 +139,20 @@ export const connect2server =
           }
           if (data.roomChat) {
             dispatch(setRoomChatBubble({ userId: data.roomChat.userId, text: data.roomChat.message }));
+            // 语音播报消息，让所有玩家都能听到（表情消息不播报）
+            if ('speechSynthesis' in window) {
+              // 检查是否为表情消息（只包含表情符号）
+              const message = data.roomChat.message;
+              const isEmojiOnly = /^\p{Extended_Pictographic}+$/u.test(message);
+              if (!isEmojiOnly) {
+                const utterance = new SpeechSynthesisUtterance(message);
+                utterance.lang = 'zh-CN';
+                utterance.volume = 1;
+                utterance.rate = 1;
+                utterance.pitch = 1;
+                speechSynthesis.speak(utterance);
+              }
+            }
           }
 
           console.log(data);
