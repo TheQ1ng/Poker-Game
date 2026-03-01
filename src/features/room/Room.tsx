@@ -82,6 +82,22 @@ function Room() {
   const totalShowdown = showdownPlayers.length;
   const [settleRevealStep, setSettleRevealStep] = useState(0);
   const settleAnimatingRef = useRef(false);
+  /** 读条等待阶段（胜者展示结束后的 8/13 秒）：用于 SB/BB/D 滑动到下一家 */
+  const isSettlingCountdown = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
+  const nextPositionUserIds = useMemo(() => {
+    if (!isSettlingCountdown || !room?.users?.length) return { SB: null, BB: null, D: null };
+    const orderedIds = users as string[];
+    const n = orderedIds.length;
+    if (n === 0) return { SB: null, BB: null, D: null };
+    const getNext = (role: "SB" | "BB" | "D"): string | null => {
+      const current = room.users.find((u) => u.position === role);
+      if (!current) return null;
+      const idx = orderedIds.indexOf(current.id);
+      if (idx === -1) return null;
+      return orderedIds[(idx + 1) % n];
+    };
+    return { SB: getNext("SB"), BB: getNext("BB"), D: getNext("D") };
+  }, [isSettlingCountdown, room?.users, users]);
   useEffect(() => {
     if (!isSettling) {
       settleAnimatingRef.current = false;
@@ -509,6 +525,8 @@ function Room() {
                   showdownOrder={showdownOrder}
                   totalShowdown={totalShowdown}
                   isActingUser={actingUserId === users[0]}
+                  isSettlingCountdown={isSettlingCountdown}
+                  nextPositionUserIds={nextPositionUserIds}
                 />
               )}
             </div>
@@ -525,6 +543,8 @@ function Room() {
                     showdownOrder={showdownOrder}
                     totalShowdown={totalShowdown}
                     isActingUser={actingUserId === id}
+                    isSettlingCountdown={isSettlingCountdown}
+                    nextPositionUserIds={nextPositionUserIds}
                   />
                 ))}
               </div>
@@ -587,6 +607,8 @@ function Room() {
                   showdownOrder={showdownOrder}
                   totalShowdown={totalShowdown}
                   isActingUser={actingUserId === users[users.length - 1]}
+                  isSettlingCountdown={isSettlingCountdown}
+                  nextPositionUserIds={nextPositionUserIds}
                 />
               )}
             </div>
@@ -637,6 +659,8 @@ function Room() {
               settleRevealStep={settleRevealStep}
               showdownOrder={showdownOrder}
               totalShowdown={totalShowdown}
+              isSettlingCountdown={isSettlingCountdown}
+              nextPositionUserIds={nextPositionUserIds}
             />
           </div>
         </div>

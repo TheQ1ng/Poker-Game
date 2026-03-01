@@ -1,6 +1,6 @@
-import { Tooltip, Button, Popconfirm, InputNumber, Popover } from "antd";
+import { Tooltip, Button, Popconfirm, InputNumber, Popover, Input } from "antd";
 import { ApiOutlined, CoffeeOutlined, CloseOutlined, EyeOutlined, CheckOutlined } from "@ant-design/icons";
-import { shallowEqual, useSelector } from "react-redux";
+import { shallowEqual, useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../app/store";
 import { Poker } from "./Poker";
 import { RollingNumber } from "../../components/RollingNumber";
@@ -9,9 +9,11 @@ import { card2html } from "../gamehistory/GameHistory";
 import { soundManager } from "../../utils/soundManager";
 import { BeautifulPokerCard } from "../../components/BeautifulPokerCard";
 import { useEffect, useState } from "react";
-import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe } from "./roomSlice";
+import type { ReactNode } from "react";
+import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe, selectRoomChatBubbles } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
-import { ws_kickUser, ws_requestSeeHand, ws_respondSeeHand } from "../../app/websocket";
+import { ws_kickUser, ws_requestSeeHand, ws_respondSeeHand, ws_sendMessage } from "../../app/websocket";
+import { clearRoomChatBubble } from "./roomSlice";
 
 // 头像图片映射
 const avatarImages: { [key: string]: string } = {
@@ -58,12 +60,16 @@ export function User({
   showdownOrder = [],
   totalShowdown = 0,
   isActingUser = false,
+  isSettlingCountdown = false,
+  nextPositionUserIds = { SB: null, BB: null, D: null },
 }: {
   id: string;
   settleRevealStep?: number;
   showdownOrder?: string[];
   totalShowdown?: number;
   isActingUser?: boolean;
+  isSettlingCountdown?: boolean;
+  nextPositionUserIds?: { SB: string | null; BB: string | null; D: string | null };
 }) {
   const user = useSelector((state: RootState) => {
     const users = state.room.room?.users;
@@ -77,7 +83,14 @@ export function User({
   const game = useSelector(selectGame, shallowEqual);
   const pendingSeeHandRequests = useSelector(selectPendingSeeHandRequests, shallowEqual);
   const revealedHandsForMe = useSelector(selectRevealedHandsForMe, shallowEqual);
+  const roomChatBubbles = useSelector(selectRoomChatBubbles, shallowEqual);
   const isSelf = self?.id === id;
+  const dispatch = useDispatch();
+  useEffect(() => {
+    if (!roomChatBubbles[id]) return;
+    const t = setTimeout(() => dispatch(clearRoomChatBubble(id)), 5000);
+    return () => clearTimeout(t);
+  }, [id, roomChatBubbles[id]?.at, dispatch]);
   const [seeHandChips, setSeeHandChips] = useState<number>(10);
   const [seeHandPopOpen, setSeeHandPopOpen] = useState<Record<string, boolean>>({});
   const requestFromThisUser = pendingSeeHandRequests?.find((r) => r.fromUserId === id);
@@ -340,7 +353,7 @@ export function User({
         })()}
         {/* 被请求者看到：申请人头上的对话框，点上移；勾/叉；文案为「我想支付X筹码查看你的手牌」 */}
         {requestFromThisUser && (
-          <div style={{
+          <div className="see-hand-request-box" style={{
             position: 'absolute',
             top: '-42px',
             left: '50%',
@@ -368,6 +381,22 @@ export function User({
             </div>
           </div>
         )}
+        {/* 聊天气泡：头顶显示最近一条消息，5 秒后自动消失 */}
+        {roomChatBubbles[id] && (
+          <div className="room-chat-bubble" style={{
+            position: 'absolute',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: '100%',
+            marginBottom: 6,
+            maxWidth: 140,
+          }}>
+            <div className="room-chat-bubble-inner">
+              {roomChatBubbles[id].text}
+            </div>
+            <div className="room-chat-bubble-tail" />
+          </div>
+        )}
         </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
@@ -378,6 +407,8 @@ export function User({
               onVisibleChange={(open: boolean) => setSeeHandPopOpen((prev) => ({ ...prev, [id]: open }))}
               trigger="click"
               placement="top"
+              getPopupContainer={() => document.body}
+              zIndex={10050}
               content={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                   <InputNumber
@@ -554,7 +585,29 @@ export function User({
           </Tooltip>
         ) : null}
       </div>
-      {position != "" ? <div className="position">{posComp}</div> : null}
+      {(() => {
+        if (isSettlingCountdown) {
+          const el: ReactNode[] = [];
+          (["SB", "BB", "D"] as const).forEach((role) => {
+            const isCurrent = position === role && nextPositionUserIds[role] !== id;
+            const isNext = nextPositionUserIds[role] === id;
+            if (isCurrent)
+              el.push(
+                <div key={`out-${role}`} className="position position-badge-slide-out">
+                  {role === "SB" ? <SmallBlind /> : role === "BB" ? <BigBlind /> : <Dealer />}
+                </div>
+              );
+            if (isNext)
+              el.push(
+                <div key={`in-${role}`} className="position position-badge-slide-in">
+                  {role === "SB" ? <SmallBlind /> : role === "BB" ? <BigBlind /> : <Dealer />}
+                </div>
+              );
+          });
+          return el.length > 0 ? el : null;
+        }
+        return position != "" ? <div className="position">{posComp}</div> : null;
+      })()}
       <div className="allin">{user?.isAllIn ? <AllIn /> : null}</div>
     </div>
   );

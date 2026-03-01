@@ -144,6 +144,36 @@ body {
   height: 30px;
 }
 
+/* 读条等待时 SB/BB/D 标记滑动到下一家 */
+.user .position-badge-slide-out,
+.user .position-badge-slide-in,
+.owner .position-badge-slide-out,
+.owner .position-badge-slide-in,
+.owner-seat .position-badge-slide-out,
+.owner-seat .position-badge-slide-in {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+}
+.position-badge-slide-out {
+  animation: position-slide-out 0.55s ease-out forwards;
+}
+.position-badge-slide-in {
+  animation: position-slide-in 0.55s ease-out forwards;
+}
+.position-badge-slide-out img,
+.position-badge-slide-in img {
+  height: 30px;
+}
+@keyframes position-slide-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(52px); opacity: 0; }
+}
+@keyframes position-slide-in {
+  from { transform: translateX(-52px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
 .userinfo {
   border-radius: 2px;
   background-color: transparent;
@@ -372,4 +402,66 @@ body {
   top: 60px;
   left: 0px;
   z-index: 100;
+}
+
+/* 申请看牌弹窗：不受蒙版遮挡，始终最前 */
+.see-hand-request-box {
+  z-index: 10050 !important;
+  position: absolute;
+}
+/* 聊天气泡：与整体深色扑克风格一致，根据内容自适应 */
+.room-chat-bubble {
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.room-chat-bubble-inner {
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2d4a2a 0%, #1a2f18 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  color: #e8e8e8;
+  font-size: 12px;
+  line-height: 1.35;
+  word-break: break-all;
+  max-width: 140px;
+  text-align: center;
+}
+.room-chat-bubble-tail {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #2d4a2a;
+  margin-top: -1px;
+}
+/* 自己座位下方的聊天输入 */
+.owner-chat-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.owner-chat-input-wrap .ant-input {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+.owner-chat-input-wrap .ant-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+.owner-chat-input-wrap .ant-input:focus,
+.owner-chat-input-wrap .ant-input:hover {
+  border-color: rgba(255, 215, 0, 0.5);
+  background: rgba(0, 0, 0, 0.45);
+}
+.owner-chat-input-wrap .ant-btn-primary {
+  background: linear-gradient(135deg, #2d6a2a 0%, #1e4d1c 100%);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+.owner-chat-input-wrap .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #3a7a37 0%, #2a5d28 100%);
+  border-color: rgba(255, 255, 255, 0.3);
 }

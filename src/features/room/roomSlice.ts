@@ -34,6 +34,8 @@ export interface RoomState {
   pendingSeeHandRequests: SeeHandRequestPayload[];
   /** 我花筹码后对方同意，仅我可见的手牌 */
   revealedHandsForMe: Record<string, RevealedHandPayload>;
+  /** 房间内玩家头顶气泡：userId -> { text, at }，用于聊天展示 */
+  roomChatBubbles: Record<string, { text: string; at: number }>;
 }
 
 const initialState: RoomState = {
@@ -44,6 +46,7 @@ const initialState: RoomState = {
   serverTimeOffset: 0,
   pendingSeeHandRequests: [],
   revealedHandsForMe: {},
+  roomChatBubbles: {},
 };
 
 export const roomSlice = createSlice({
@@ -103,6 +106,13 @@ export const roomSlice = createSlice({
     clearRevealedHandsForMe(state) {
       state.revealedHandsForMe = {};
     },
+    setRoomChatBubble(state, action: PayloadAction<{ userId: string; text: string }>) {
+      const { userId, text } = action.payload;
+      state.roomChatBubbles[userId] = { text, at: Date.now() };
+    },
+    clearRoomChatBubble(state, action: PayloadAction<string>) {
+      delete state.roomChatBubbles[action.payload];
+    },
   },
   extraReducers: (builder) => {},
 });
@@ -119,6 +129,8 @@ export const {
   setRevealedHandForMe,
   clearSeeHandRequest,
   clearRevealedHandsForMe,
+  setRoomChatBubble,
+  clearRoomChatBubble,
 } = roomSlice.actions;
 export const selectRoomID = (state: RootState) => state.room.room?.roomid;
 export const selectServerTimeOffset = (state: RootState) => state.room.serverTimeOffset;
@@ -157,5 +169,8 @@ export const selectPendingSeeHandRequests = (state: RootState) =>
 
 export const selectRevealedHandsForMe = (state: RootState) =>
   state.room.revealedHandsForMe;
+
+export const selectRoomChatBubbles = (state: RootState) =>
+  state.room.roomChatBubbles;
 
 export default roomSlice.reducer;

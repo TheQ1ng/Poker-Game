@@ -388,14 +388,24 @@ export function userSetSettleTimes(token: Token, times: number) {
 }
 
 export function userSendMessage(token: Token, message: string) {
-  const roomid = userMap[token].roomid;
-  publishLog2all(roomid, [`<strong>${userMap[token].name}</strong>: 
-      ${message
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/ /g, "&nbsp;")
-    }`]);
+  const user = userMap[token];
+  const roomid = user.roomid;
+  const trimmed = (message || "").trim().slice(0, 15);
+  if (!trimmed) return;
+  const payload = {
+    roomChat: {
+      userId: user.chipsRecordID,
+      nickname: user.nickname || user.name,
+      message: trimmed,
+    },
+  };
+  send2all(roomid, payload);
+  publishLog2all(roomid, [`<strong>${user.name}</strong>: ${trimmed
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/ /g, "&nbsp;")
+  }`]);
 }
 
 // ========================================

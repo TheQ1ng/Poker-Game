@@ -4,20 +4,24 @@ import {
   Popover,
   Tooltip,
   Switch,
+  Input,
 } from "antd";
+import { SendOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
-import { useAppSelector } from "../../app/hooks";
+import type { ReactNode } from "react";
+import { useAppSelector, useAppDispatch } from "../../app/hooks";
 import {
   ws_overtime,
   ws_userBet,
   ws_userFold,
   ws_userRebuy,
+  ws_sendMessage,
 } from "../../app/websocket";
 import { CountDown } from "./CountDown";
 import { Poker } from "./Poker";
 import { RollingNumber } from "../../components/RollingNumber";
 import { BigBlind, Dealer, SmallBlind } from "./Symbol";
-import { selectGame, selectRoom, selectSelf } from "./roomSlice";
+import { selectGame, selectRoom, selectSelf, selectRoomChatBubbles, clearRoomChatBubble } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
 
 // 牌型等级，用于判断是否需要高亮
@@ -74,11 +78,15 @@ export function Owner({
   settleRevealStep = 0,
   showdownOrder = [],
   totalShowdown = 0,
+  isSettlingCountdown = false,
+  nextPositionUserIds = { SB: null, BB: null, D: null },
 }: {
   zoom: number;
   settleRevealStep?: number;
   showdownOrder?: string[];
   totalShowdown?: number;
+  isSettlingCountdown?: boolean;
+  nextPositionUserIds?: { SB: string | null; BB: string | null; D: string | null };
 }) {
   const hintSoundRef = useRef<HTMLAudioElement>(null);
   const dealCardSoundRef = useRef<HTMLAudioElement>(null);
@@ -87,6 +95,14 @@ export function Owner({
   const game = useAppSelector(selectGame);
   const room = useAppSelector(selectRoom);
   const chipsRecordState = useAppSelector(selectChipsRecord);
+  const roomChatBubbles = useAppSelector(selectRoomChatBubbles);
+  const [chatInput, setChatInput] = useState("");
+  const dispatch = useAppDispatch();
+  useEffect(() => {
+    if (!self?.id || !roomChatBubbles[self.id]) return;
+    const t = setTimeout(() => dispatch(clearRoomChatBubble(self.id)), 5000);
+    return () => clearTimeout(t);
+  }, [self?.id, roomChatBubbles[self?.id || ""]?.at, dispatch]);
 
   const selfAsUser = room?.users.find((u) => u.id == self?.id);
 
@@ -355,6 +371,22 @@ export function Owner({
                 justifyContent: 'center',
               }}>{name.length > 0 ? name[0] : ""}</Avatar>
             )}
+            {/* 自己头顶聊天气泡 */}
+            {self?.id && roomChatBubbles[self.id] && (
+              <div className="room-chat-bubble" style={{
+                position: 'absolute',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                bottom: '100%',
+                marginBottom: 6,
+                maxWidth: 140,
+              }}>
+                <div className="room-chat-bubble-inner">
+                  {roomChatBubbles[self.id].text}
+                </div>
+                <div className="room-chat-bubble-tail" />
+              </div>
+            )}
           </div>
           <div style={{ color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>{nickname}</div>
           <div className="stack" style={{
@@ -375,17 +407,64 @@ export function Owner({
               再次买入
             </Button>
           ) : null}
-          {position != "" ? (
-            <div className="position">
-              {position == "SB" ? (
-                <SmallBlind />
-              ) : position == "BB" ? (
-                <BigBlind />
-              ) : position == "D" ? (
-                <Dealer />
-              ) : null}
-            </div>
-          ) : null}
+          {(() => {
+            if (isSettlingCountdown && self?.id) {
+              const el: ReactNode[] = [];
+              (["SB", "BB", "D"] as const).forEach((role) => {
+                const isCurrent = position === role && nextPositionUserIds[role] !== self.id;
+                const isNext = nextPositionUserIds[role] === self.id;
+                if (isCurrent)
+                  el.push(
+                    <div key={`out-${role}`} className="position position-badge-slide-out">
+                      {role === "SB" ? <SmallBlind /> : role === "BB" ? <BigBlind /> : <Dealer />}
+                    </div>
+                  );
+                if (isNext)
+                  el.push(
+                    <div key={`in-${role}`} className="position position-badge-slide-in">
+                      {role === "SB" ? <SmallBlind /> : role === "BB" ? <BigBlind /> : <Dealer />}
+                    </div>
+                  );
+              });
+              return el.length > 0 ? el : null;
+            }
+            return position != "" ? (
+              <div className="position">
+                {position == "SB" ? (
+                  <SmallBlind />
+                ) : position == "BB" ? (
+                  <BigBlind />
+                ) : position == "D" ? (
+                  <Dealer />
+                ) : null}
+              </div>
+            ) : null;
+          })()}
+          {/* 聊天输入：最多 15 字 */}
+          <div className="owner-chat-input-wrap">
+            <Input
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value.slice(0, 15))}
+              placeholder="说点什么..."
+              maxLength={15}
+              size="small"
+              onPressEnter={() => {
+                const t = chatInput.trim();
+                if (t) { ws_sendMessage(t); setChatInput(""); }
+              }}
+              style={{ width: 120, borderRadius: 14 }}
+            />
+            <Button
+              type="primary"
+              size="small"
+              icon={<SendOutlined />}
+              onClick={() => {
+                const t = chatInput.trim();
+                if (t) { ws_sendMessage(t); setChatInput(""); }
+              }}
+              style={{ borderRadius: '50%', width: 28, height: 28, padding: 0 }}
+            />
+          </div>
         </div>
       </div>
       <div className="flex3 flex flex-column" style={{ height: "100%" }}>

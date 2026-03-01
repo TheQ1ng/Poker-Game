@@ -17,6 +17,7 @@ import {
   clearSeeHandRequest,
   clearRevealedHandsForMe,
   setServerTimeOffset,
+  setRoomChatBubble,
 } from "../features/room/roomSlice";
 import { AppThunk } from "./store";
 
@@ -127,6 +128,9 @@ export const connect2server =
           }
           if (data.seeHandDeclined) {
             message.info("对方拒绝了看牌请求");
+          }
+          if (data.roomChat) {
+            dispatch(setRoomChatBubble({ userId: data.roomChat.userId, text: data.roomChat.message }));
           }
 
           console.log(data);

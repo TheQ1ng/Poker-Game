@@ -74,6 +74,15 @@ export const createRoomSlice = createSlice({
           message.error(rsp.error);
         }
       })
+      .addCase(createRoomAsync.rejected, (state, action) => {
+        state.createRoomStatus = "idle";
+        const err = action.error?.message || "";
+        if (err.includes("fetch") || err.includes("Failed") || err.includes("Network")) {
+          message.error("无法连接服务器，请确认后端已启动（端口 8086）");
+        } else {
+          message.error("创建房间失败：" + (action.error?.message || "未知错误"));
+        }
+      })
       .addCase(joinRoomAsync.pending, (state) => {
         state.joinRoomStatus = "loading";
       })
@@ -84,6 +93,15 @@ export const createRoomSlice = createSlice({
           state.roomid = rsp.data;
         } else {
           message.error(rsp.error);
+        }
+      })
+      .addCase(joinRoomAsync.rejected, (state, action) => {
+        state.joinRoomStatus = "idle";
+        const err = action.error?.message || "";
+        if (err.includes("fetch") || err.includes("Failed") || err.includes("Network")) {
+          message.error("无法连接服务器，请确认后端已启动（端口 8086）");
+        } else {
+          message.error("加入房间失败：" + (action.error?.message || "未知错误"));
         }
       })
       .addCase(fetchRoomsAsync.pending, (state) => {
