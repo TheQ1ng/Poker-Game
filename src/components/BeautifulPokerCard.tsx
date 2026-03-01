@@ -127,11 +127,8 @@ export const BeautifulPokerCard: React.FC<PokerCardProps> = ({
     animation: 'dealCard 0.5s ease-out',
   } : {};
   
-  // 未选中的卡片样式
-  const unselectedStyle = !isSelected ? {
-    opacity: 0.4,
-    filter: 'grayscale(0.8)',
-  } : {};
+  // 未选中的卡片样式 - 现在不应用任何样式，保持牌面正常显示
+  const unselectedStyle = {};
 
   return (
     <div 
@@ -159,7 +156,7 @@ export const BeautifulPokerCard: React.FC<PokerCardProps> = ({
           </linearGradient>
         </defs>
         
-        <rect x="1" y="1" width="48" height="68" rx="4" ry="4" fill="url(#cardBg)" filter="url(#cardShadow)"/>
+        <rect x="1" y="1" width="48" height="68" rx="4" ry="4" fill="url(#cardBg)" filter={isSelected ? "url(#cardShadow)" : "none"}/>
         
         {/* 左右上角数字和花色 */}
         <text x="4" y="12" fill={color} fontSize={fontSize * 0.75} fontWeight="bold" fontFamily="Arial">{displayNum}</text>

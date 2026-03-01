@@ -22,6 +22,7 @@ export function Poker({
   animation = "none",
   isSelected = true,
   size = "medium",
+  showShowHandButton = true,
 }: {
   card: PokerCard | null;
   index?: number;
@@ -29,6 +30,7 @@ export function Poker({
   animation?: "deal" | "flip" | "none";
   isSelected?: boolean;
   size?: "small" | "medium" | "large";
+  showShowHandButton?: boolean;
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
   const cardProps = convertToCardProps(card);
@@ -59,7 +61,7 @@ export function Poker({
         className={!card ? "poker-card-back" : ""}
         isSelected={isSelected}
       />
-      {card && showHand ? (
+      {card && showHand && showShowHandButton ? (
         <Button
           type="primary"
           size="small"

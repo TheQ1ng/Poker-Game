@@ -426,8 +426,8 @@ body {
   font-size: 12px;
   line-height: 1.35;
   word-break: break-all;
-  max-width: 140px;
-  text-align: center;
+  width: 160px;
+  text-align: left;
 }
 .room-chat-bubble-tail {
   width: 0;
@@ -457,11 +457,4 @@ body {
   border-color: rgba(255, 215, 0, 0.5);
   background: rgba(0, 0, 0, 0.45);
 }
-.owner-chat-input-wrap .ant-btn-primary {
-  background: linear-gradient(135deg, #2d6a2a 0%, #1e4d1c 100%);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-.owner-chat-input-wrap .ant-btn-primary:hover {
-  background: linear-gradient(135deg, #3a7a37 0%, #2a5d28 100%);
-  border-color: rgba(255, 255, 255, 0.3);
-}
+

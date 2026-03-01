@@ -91,7 +91,14 @@ export function User({
     const t = setTimeout(() => dispatch(clearRoomChatBubble(id)), 5000);
     return () => clearTimeout(t);
   }, [id, roomChatBubbles[id]?.at, dispatch]);
-  const [seeHandChips, setSeeHandChips] = useState<number>(10);
+  const [seeHandChips, setSeeHandChips] = useState<number>(game?.bb ? game.bb * 5 : 10);
+  
+  // 当大盲值变化时，更新看牌筹码为 5 个大盲
+  useEffect(() => {
+    if (game?.bb) {
+      setSeeHandChips(game.bb * 5);
+    }
+  }, [game?.bb]);
   const [seeHandPopOpen, setSeeHandPopOpen] = useState<Record<string, boolean>>({});
   const requestFromThisUser = pendingSeeHandRequests?.find((r) => r.fromUserId === id);
   const name = user?.name || "";
@@ -389,10 +396,37 @@ export function User({
             transform: 'translateX(-50%)',
             bottom: '100%',
             marginBottom: 6,
-            maxWidth: 140,
           }}>
             <div className="room-chat-bubble-inner">
               {roomChatBubbles[id].text}
+              {/* 看牌请求的确认按钮 */}
+              {roomChatBubbles[id].text.includes('请求看牌') && pendingSeeHandRequests && pendingSeeHandRequests.length > 0 && (
+                <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'center' }}>
+                  {pendingSeeHandRequests.map((request) => (
+                    <Button
+                      key={request.requestId}
+                      type="primary"
+                      size="small"
+                      icon={<CheckOutlined />}
+                      onClick={() => {
+                        ws_respondSeeHand(request.requestId, true);
+                      }}
+                      style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                    />
+                  ))}
+                  {pendingSeeHandRequests.map((request) => (
+                    <Button
+                      key={`${request.requestId}-reject`}
+                      size="small"
+                      icon={<CloseOutlined />}
+                      onClick={() => {
+                        ws_respondSeeHand(request.requestId, false);
+                      }}
+                      style={{ background: '#f5222d', borderColor: '#f5222d' }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             <div className="room-chat-bubble-tail" />
           </div>
@@ -400,8 +434,8 @@ export function User({
         </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
-          {/* 结算阶段：眼睛按钮贴昵称左侧 */}
-          {!isSelf && isSettling && !user?.shouldShowHand && user?.hasCards && self && (
+          {/* 结算阶段：眼睛按钮贴昵称左侧，只在结算阶段可申请 */}
+          {!isSelf && isSettling && !user?.shouldShowHand && user?.hasCards && user?.isInCurrentGame && self && (
             <Popover
               visible={!!seeHandPopOpen[id]}
               onVisibleChange={(open: boolean) => setSeeHandPopOpen((prev) => ({ ...prev, [id]: open }))}
@@ -536,6 +570,7 @@ export function User({
                 isSelected={true}
                 showHand={!!card}
                 size="small"
+                showShowHandButton={false}
               />
             ))}
           </div>
@@ -562,9 +597,10 @@ export function User({
               card={card}
               key={`${card ? `${card.num}${card.suit}` : i}`}
               index={i}
-              isSelected={true}
+              isSelected={false}
               showHand={shouldShowCards}
               size="small"
+              showShowHandButton={!user?.isAllIn && !revealedForMe}
             />
           ))}
         </div>

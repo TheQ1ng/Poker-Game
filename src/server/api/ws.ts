@@ -213,6 +213,7 @@ function getSimpleChipsRecords(room: Room): SimpleRoomChipsRecords {
     chipsRecords: room.chipsRecords.map((cr) => ({
       id: cr.id,
       name: cr.name,
+      nickname: cr.nickname,
       chips: cr.chips,
       buyIn: cr.buyIn,
     })),

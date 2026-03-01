@@ -39,6 +39,14 @@ export function createUser(token: Token, name: string, avatar: string): User {
   if (!token || !name) {
     throw "should have token & name";
   }
+  // 如果用户已经存在，返回现有的用户对象
+  if (userMap[token]) {
+    // 更新用户信息
+    userMap[token].name = name;
+    userMap[token].avatar = avatar;
+    return userMap[token];
+  }
+  // 创建新用户
   const user = new User(token, name, avatar);
   userMap[token] = user;
   return user;
@@ -275,6 +283,7 @@ export function userRequestSeeHand(token: Token, targetUserId: string, chips: nu
   if (targetUser.shouldShowHand) {
     throw "对方已亮牌，无需请求";
   }
+  // 即使目标用户已弃牌，也允许申请看牌
   if (targetUser.hands.length < 2) {
     throw "对方没有手牌可看";
   }

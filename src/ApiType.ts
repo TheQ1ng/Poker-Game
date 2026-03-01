@@ -80,6 +80,7 @@ export interface SimpleUserHands extends SimpleSelf { }
 export interface SimpleChipsRecord {
   id: string;
   name: string;
+  nickname: string;
   chips: number;
   buyIn: number;
 }

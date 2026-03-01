@@ -122,6 +122,14 @@ export const connect2server =
 
           if (data.seeHandRequests) {
             dispatch(setSeeHandRequests(data.seeHandRequests));
+            // 将看牌请求显示为聊天气泡
+            if (data.seeHandRequests.length > 0) {
+              const request = data.seeHandRequests[0];
+              dispatch(setRoomChatBubble({ 
+                userId: request.fromUserId, 
+                text: `请求看牌：$${request.chips}` 
+              }));
+            }
           }
           if (data.revealedHand) {
             dispatch(setRevealedHandForMe(data.revealedHand));

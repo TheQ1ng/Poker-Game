@@ -72,7 +72,6 @@ class User {
   }
   setRoom(roomid: RoomID) {
     this.roomid = roomid;
-    this.stack = roomMap[roomid].buyIn;
     this.bets = [0, 0, 0, 0];
     this.hands = [];
 

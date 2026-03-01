@@ -229,8 +229,8 @@
 
 /* 非选中牌的阴影效果 */
 .card-not-selected {
-  filter: brightness(0.5) grayscale(0.7);
-  transform: scale(0.9);
+  
+  
   transition: all 0.3s ease;
 }
 
@@ -895,5 +895,15 @@
   min-width: 0 !important;
   width: 100% !important;
   height: 100% !important;
+}
+
+/* 聊天发送按钮样式 */
+.chat-send-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.6);
+}
+
+.chat-send-btn:active {
+  transform: scale(0.95);
 }
 

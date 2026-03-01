@@ -1,7 +1,7 @@
 import Router from "@koa/router";
 import * as jwt from "jsonwebtoken";
 import { secret } from "../config";
-import { createRoom, roomMap, userEnterRoom, userMap, getAllRooms } from "../service";
+import { createRoom, roomMap, userEnterRoom, userMap, getAllRooms, createUser } from "../service";
 import { getUserProfile, updateUserProfile, saveUser, getUser } from "../service/database";
 import User from "../service/User";
 
@@ -54,15 +54,15 @@ router.post("/register", (ctx) => {
     // 密码正确，生成token返回
     const token = jwt.sign(name + "@" + password, secret);
     if (!userMap[token]) {
-      userMap[token] = new User(token, name, existingUser.avatar);
-      userMap[token].nickname = existingUser.nickname;
+      const user = createUser(token, name, existingUser.avatar);
+      user.nickname = existingUser.nickname;
     }
     ctx.data = token;
   } else {
     // 用户不存在，创建新用户并保存到数据库
     saveUser(name, password, "", avatar || "");
     const token = jwt.sign(name + "@" + password, secret);
-    userMap[token] = new User(token, name, avatar || "");
+    createUser(token, name, avatar || "");
     ctx.data = token;
   }
 });
@@ -71,7 +71,7 @@ router.get("/currentroom", (ctx) => {
   const token = ctx.header.authorization;
   if (!token) throw "need login";
   if (!userMap[token]) {
-    userMap[token] = new User(token, ctx.user, "");
+    createUser(token, ctx.user, "");
   }
   ctx.data = userMap[token].roomid || null;
 });
@@ -80,7 +80,7 @@ router.post("/createroom", (ctx) => {
   const token = ctx.header.authorization;
   if (!token) throw "need login";
   if (!userMap[token]) {
-    userMap[token] = new User(token, ctx.user, "");
+    createUser(token, ctx.user, "");
   }
   const { sb, buyin, reBuyLimit } = ctx.request.body;
   const room = createRoom(token, sb, buyin, reBuyLimit);
@@ -91,7 +91,7 @@ router.post("/joinroom", (ctx) => {
   const token = ctx.header.authorization;
   if (!token) throw "need login";
   if (!userMap[token]) {
-    userMap[token] = new User(token, ctx.user, "");
+    createUser(token, ctx.user, "");
   }
   const { roomid } = ctx.request.body;
   userEnterRoom(token, roomid);
@@ -103,7 +103,7 @@ router.post("/updateprofile", (ctx) => {
   const token = ctx.header.authorization;
   if (!token) throw "need login";
   if (!userMap[token]) {
-    userMap[token] = new User(token, ctx.user, "");
+    createUser(token, ctx.user, "");
   }
   const { nickname, avatar } = ctx.request.body;
   const username = userMap[token].name;
@@ -128,7 +128,7 @@ router.get("/profile", (ctx) => {
   const token = ctx.header.authorization;
   if (!token) throw "need login";
   if (!userMap[token]) {
-    userMap[token] = new User(token, ctx.user, "");
+    createUser(token, ctx.user, "");
   }
   
   // 从数据库加载最新资料

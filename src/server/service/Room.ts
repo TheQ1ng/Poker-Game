@@ -724,8 +724,9 @@ export class Game {
 
 type ChipsRecord = {
   id: string; // random and unique
-  // token: Token; // user
+  token: Token; // user
   name: string;
+  nickname: string; // user nickname
   chips: number; // total chips
   buyIn: number; // total buy in
 };
@@ -810,19 +811,34 @@ class Room {
     if (this.users.findIndex((t) => t == token) == -1) {
       this.users.push(token);
 
-      const id = uuidv4();
+      // 检查是否已有相同用户名的记录（积分榜中的记录）
+      const existingRecord = this.chipsRecords.find(cr => cr.name === userMap[token].name);
+      
+      if (existingRecord) {
+        // 继承已有记录并更新token
+        userMap[token].chipsRecordID = existingRecord.id;
+        userMap[token].stack = existingRecord.chips;
+        // 更新现有记录的token和nickname为新值
+        existingRecord.token = token;
+        existingRecord.nickname = userMap[token].nickname || userMap[token].name;
+        console.log(`User ${userMap[token].name} joined with existing chips from leaderboard: ${existingRecord.chips}`);
+      } else {
+        // 创建新记录
+        const id = uuidv4();
+        userMap[token].chipsRecordID = id;
+        userMap[token].stack = this.buyIn;
 
-      userMap[token].chipsRecordID = id;
-      userMap[token].stack = this.buyIn;
-
-      const chipsRecord = {
-        id,
-        token,
-        name: userMap[token].name,
-        chips: this.buyIn,
-        buyIn: this.buyIn,
-      };
-      this.chipsRecords.push(chipsRecord);
+        const chipsRecord = {
+          id,
+          token,
+          name: userMap[token].name,
+          nickname: userMap[token].nickname || userMap[token].name,
+          chips: this.buyIn,
+          buyIn: this.buyIn,
+        };
+        this.chipsRecords.push(chipsRecord);
+        console.log(`User ${userMap[token].name} joined with initial chips: ${this.buyIn}`);
+      }
       return true;
     }
     return false;

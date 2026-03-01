@@ -379,7 +379,6 @@ export function Owner({
                 transform: 'translateX(-50%)',
                 bottom: '100%',
                 marginBottom: 6,
-                maxWidth: 140,
               }}>
                 <div className="room-chat-bubble-inner">
                   {roomChatBubbles[self.id].text}
@@ -462,7 +461,21 @@ export function Owner({
                 const t = chatInput.trim();
                 if (t) { ws_sendMessage(t); setChatInput(""); }
               }}
-              style={{ borderRadius: '50%', width: 28, height: 28, padding: 0 }}
+              style={{
+                borderRadius: '50%',
+                width: 32,
+                height: 32,
+                padding: 0,
+                background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
+                border: '2px solid rgba(255,255,255,0.3)',
+                boxShadow: '0 2px 8px rgba(76, 175, 80, 0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: 8,
+                transition: 'all 0.3s ease'
+              }}
+              className="chat-send-btn"
             />
           </div>
         </div>
@@ -503,6 +516,7 @@ export function Owner({
                   showHand={!!card}
                   isSelected={true}
                   size="medium"
+                  showShowHandButton={false}
                 />
               ))}
             </div>
@@ -512,13 +526,17 @@ export function Owner({
                 card={self?.hands[0] || null}
                 index={0}
                 showHand={isSettling && !selfAsUser?.hands[0]}
-                isSelected={!isSettling || (self?.hands[0] && self?.maxCards ? self.maxCards.includes(self.hands[0]) : false)}
+                isSelected={false}
+                size="medium"
+                showShowHandButton={!selfAsUser?.isAllIn}
               />
               <Poker
                 card={self?.hands[1] || null}
                 index={1}
                 showHand={isSettling && !selfAsUser?.hands[1]}
-                isSelected={!isSettling || (self?.hands[1] && self?.maxCards ? self.maxCards.includes(self.hands[1]) : false)}
+                isSelected={false}
+                size="medium"
+                showShowHandButton={!selfAsUser?.isAllIn}
               />
               <div 
                 style={{ 

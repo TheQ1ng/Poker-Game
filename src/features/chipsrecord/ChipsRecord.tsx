@@ -16,7 +16,7 @@ export function ChipsRecord() {
   const roomChipsRecords = useAppSelector(selectChipsRecord);
   const data: TableData[] = roomChipsRecords.chipsRecords.map((cr) => ({
     id: cr.id,
-    name: cr.name,
+    name: cr.nickname || cr.name,
     chips: cr.chips,
     buyIn: cr.buyIn,
     profit: cr.chips - cr.buyIn,
