@@ -632,7 +632,18 @@ export function User({
           </div>
         ) : null
       ) : showHandsArea ? (
-        <div className="card-box card-box-stacked">
+        <div className={`card-box card-box-stacked ${isOmahaGame ? "card-box-stacked-omaha4" : ""}`}>
+          {(isOmahaGame ? (handsToShow || []).slice(0, 4) : (handsToShow || [])).map((card, i) => (
+            <Poker
+              card={card}
+              key={`${card ? `${card.num}${card.suit}` : i}`}
+              index={i}
+              isSelected={false}
+              showHand={shouldShowCards}
+              size="small"
+              showShowHandButton={!user?.isAllIn && !revealedForMe}
+            />
+          ))}
           <div
             className="handstype"
             style={{
@@ -648,17 +659,6 @@ export function User({
           >
             {handsTypeToShow}
           </div>
-          {(handsToShow || []).map((card, i) => (
-            <Poker
-              card={card}
-              key={`${card ? `${card.num}${card.suit}` : i}`}
-              index={i}
-              isSelected={false}
-              showHand={shouldShowCards}
-              size="small"
-              showShowHandButton={!user?.isAllIn && !revealedForMe}
-            />
-          ))}
         </div>
       ) : null}
 

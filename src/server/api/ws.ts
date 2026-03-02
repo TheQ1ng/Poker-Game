@@ -359,6 +359,10 @@ export function publish(token: Token, data: ActionBase, ws: PokerWebSocket) {
 
 export function publish2all(roomid: RoomID) {
   const room = roomMap[roomid];
+  // 房间可能已在结算或解散流程中被删除，此时无需再广播
+  if (!room) {
+    return;
+  }
   const simpleGame = getSimpleGame(room.game);
   const simpleRoom = getSimpleRoom(room);
   send2all(room.id, {

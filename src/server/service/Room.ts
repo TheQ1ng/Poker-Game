@@ -656,9 +656,11 @@ export class Game {
     publishLog2all(this.roomid, [log]);
 
     if (activeUsers.length <= 1) {
+      // 所有人 all-in 或只剩一人继续时，自动发完公共牌；
+      // 将每一轮公共牌（3 + 1 + 1）的间隔从 1 秒加长到 3 秒
       delayTry(() => {
         this.nextRound();
-      }, 1000);
+      }, 3000);
     } else {
       activeUsers.forEach((t) => (userMap[t].needAction = true));
       const token = activeUsers[0];

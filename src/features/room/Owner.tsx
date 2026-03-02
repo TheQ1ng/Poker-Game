@@ -437,7 +437,7 @@ export function Owner({
           {stack + bet < reBuyLimit * bb &&
           (game?.isSettling || !self?.isInCurrentGame || self.isFoled) ? (
             <Button type="primary" onClick={() => ws_userRebuy()}>
-              再次初始
+              东山再起
             </Button>
           ) : null}
           {(() => {
@@ -833,7 +833,7 @@ export function Owner({
                       <div className="raise-calc-popover" style={{
                         display: 'grid',
                         gridTemplateColumns: 'repeat(4, 48px)',
-                        gridTemplateRows: 'auto repeat(3, 48px) 40px 44px',
+                        gridTemplateRows: 'auto repeat(3, 48px) 40px 40px 44px',
                         gap: 6,
                         width: 222,
                         background: 'linear-gradient(145deg, #1a3d28 0%, #0f2518 100%)',
@@ -893,22 +893,49 @@ export function Owner({
                         >
                           确认
                         </Button>
-                        <Button
-                          type="default"
-                          size="small"
-                          onClick={() => setCalcVisible(false)}
-                          style={{ gridColumn: '1 / -1', height: 36, borderColor: 'rgba(201, 162, 39, 0.4)', color: 'rgba(255,255,255,0.9)' }}
-                        >
-                          退出
-                        </Button>
+                        {/* 基于底池大小的快捷下注按钮：33%、50%、67%、100%（一底池） */}
+                        {[
+                          { label: "33%", factor: 1 / 3 },
+                          { label: "50%", factor: 1 / 2 },
+                          { label: "67%", factor: 2 / 3 },
+                          { label: "100%", factor: 1 },
+                        ].map((opt) => (
+                          <Button
+                            key={opt.label}
+                            type="primary"
+                            size="small"
+                            onClick={() => {
+                              const pot = pots || 0;
+                              if (pot <= 0) return;
+                              // 期望加注额 = 底池 * 百分比（33/50/67/100）
+                              const raw = Math.floor(pot * opt.factor);
+                              if (raw <= 0) return;
+                              // 不超过自己剩余筹码
+                              const available = Math.floor(stackRef.current || 0);
+                              const potBasedRaise = Math.max(1, Math.min(available, raw));
+                              setCalcInput(String(potBasedRaise));
+                            }}
+                            style={{
+                              ...btnStyle,
+                              background: 'linear-gradient(180deg, #123a5c 0%, #0b2236 100%)',
+                              border: '1px solid rgba(120, 180, 255, 0.7)',
+                              color: '#e0f3ff',
+                              fontSize: 12,
+                            }}
+                          >
+                            {opt.label}
+                          </Button>
+                        ))}
                         <Button
                           type="primary"
                           size="middle"
                           danger
                           onClick={() => {
-                            const allInChips = Math.floor(stackRef.current);
-                            ws_userBet(allInChips);
-                            setCalcVisible(false);
+                            // 计算本手牌剩余所有可用筹码：前端的 stack 已经是「未入池剩余筹码」
+                            const allInAmount = Math.floor(stackRef.current || 0);
+                            if (allInAmount > 0) {
+                              setCalcInput(String(allInAmount));
+                            }
                           }}
                           style={{
                             gridColumn: '1 / -1',

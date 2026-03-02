@@ -11,5 +11,5 @@ export function Dealer() {
 }
 
 export function AllIn() {
-  return <img src={require("../../assets/allin.png")} />;
+  return null;
 }
