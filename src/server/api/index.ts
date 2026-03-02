@@ -51,18 +51,53 @@ router.post("/register", (ctx) => {
     if (existingUser.password !== password) {
       throw new Error(`密码错误`);
     }
+    // 如果数据库里还没有头像，为其随机分配一个默认头像并持久化
+    let finalAvatar = existingUser.avatar;
+    if (!finalAvatar) {
+      const defaultAvatars = [
+        "playerIcon.png",
+        "playerIcon (1).png",
+        "playerIcon (2).png",
+        "playerIcon (3).png",
+        "playerIcon (4).png",
+        "playerIcon (5).png",
+        "playerIcon (6).png",
+        "playerIcon (7).png",
+        "playerIcon (8).png",
+      ];
+      const randomIndex = Math.floor(Math.random() * defaultAvatars.length);
+      finalAvatar = defaultAvatars[randomIndex];
+      updateUserProfile(name, existingUser.nickname || "", finalAvatar);
+    }
+
     // 密码正确，生成token返回
     const token = jwt.sign(name + "@" + password, secret);
     if (!userMap[token]) {
-      const user = createUser(token, name, existingUser.avatar);
+      const user = createUser(token, name, finalAvatar);
       user.nickname = existingUser.nickname;
     }
     ctx.data = token;
   } else {
     // 用户不存在，创建新用户并保存到数据库
-    saveUser(name, password, "", avatar || "");
+    let finalAvatar = avatar || "";
+    if (!finalAvatar) {
+      const defaultAvatars = [
+        "playerIcon.png",
+        "playerIcon (1).png",
+        "playerIcon (2).png",
+        "playerIcon (3).png",
+        "playerIcon (4).png",
+        "playerIcon (5).png",
+        "playerIcon (6).png",
+        "playerIcon (7).png",
+        "playerIcon (8).png",
+      ];
+      const randomIndex = Math.floor(Math.random() * defaultAvatars.length);
+      finalAvatar = defaultAvatars[randomIndex];
+    }
+    saveUser(name, password, "", finalAvatar);
     const token = jwt.sign(name + "@" + password, secret);
-    createUser(token, name, avatar || "");
+    createUser(token, name, finalAvatar);
     ctx.data = token;
   }
 });
@@ -139,7 +174,26 @@ router.get("/profile", (ctx) => {
     userMap[token].nickname = userProfile.nickname || "";
     userMap[token].avatar = userProfile.avatar || "";
   }
-  
+
+  // 如果用户资料里依然没有头像（例如老数据），在登录态下兜底分配一个默认头像并持久化
+  if (!userMap[token].avatar) {
+    const defaultAvatars = [
+      "playerIcon.png",
+      "playerIcon (1).png",
+      "playerIcon (2).png",
+      "playerIcon (3).png",
+      "playerIcon (4).png",
+      "playerIcon (5).png",
+      "playerIcon (6).png",
+      "playerIcon (7).png",
+      "playerIcon (8).png",
+    ];
+    const randomIndex = Math.floor(Math.random() * defaultAvatars.length);
+    const randomAvatar = defaultAvatars[randomIndex];
+    userMap[token].avatar = randomAvatar;
+    updateUserProfile(username, userMap[token].nickname || "", randomAvatar);
+  }
+
   ctx.data = {
     name: userMap[token].name,
     nickname: userMap[token].nickname,

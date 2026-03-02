@@ -39,9 +39,44 @@ const actionNameToClass: { [key: string]: string } = {
 // 获取所有头像键值
 const avatarKeys = Object.keys(avatarImages);
 
-// 靴子图标（踢出房间）- 使用 emoji 保证兼容性
+// 靴子图标（踢出房间）- 使用与顶部控制按钮统一的线性风格 SVG
 function BootIcon() {
-  return <span style={{ fontSize: "1em", lineHeight: 1 }} role="img" aria-label="踢出">🥾</span>;
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: "block" }}
+    >
+      <path
+        d="M7 4h5a2 2 0 0 1 2 2v6.5c0 .9.36 1.76 1 2.4L18 18H7V4Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7 18h12.2a.8.8 0 0 1 .78 1.01L19.5 21.5a1.6 1.6 0 0 1-1.53 1.18H7"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M11 7.5h1.7A1.8 1.8 0 0 1 14.5 9.3V13"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M8.5 6.2H11M8.5 8.4H11M8.5 10.6H11"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
 }
 
 /** 聚宝盆金币数量：盈利≤100 为 14 枚，≥1000 为 50 枚，中间线性；动画同速率循环 */
@@ -497,7 +532,19 @@ export function User({
                 <Button
                   size="small"
                   icon={<BootIcon />}
-                  style={{ flexShrink: 0 }}
+                  style={{
+                    flexShrink: 0,
+                    padding: 0,
+                    width: 24,
+                    height: 24,
+                    borderRadius: 6,
+                    background: "#1c2833",
+                    border: "1px solid #00b894",
+                    color: "#00b894",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
                 />
               </Tooltip>
             </Popconfirm>

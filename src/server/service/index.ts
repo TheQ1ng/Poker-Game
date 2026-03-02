@@ -1,7 +1,7 @@
 import User, { Token } from "./User";
 import Room, { RoomID } from "./Room";
 import { PokerWebSocket, publishLog2all, send2all, send2user, publish2all } from "../api/ws";
-import { getUser, saveUser, getUserProfile, initDatabase } from "./database";
+import { getUser, saveUser, getUserProfile, updateUserProfile, initDatabase } from "./database";
 import { v4 as uuidv4 } from "uuid";
 
 type UserMap = {
@@ -66,7 +66,7 @@ export function getAllRooms(): Array<{
     id: room.id,
     smallBlind: room.smallBlind,
     playerCount: room.users.length,
-    maxPlayers: 9, // 假设最大玩家数
+    maxPlayers: 12, // 房间最大人数上限 12 人
     ownerName:
       room.users.length > 0
         ? userMap[room.users[0]]?.name || "未知"
@@ -102,7 +102,6 @@ export function userEnterRoom(token: Token, roomid: RoomID) {
   
   // 从数据库加载用户资料（如果有）
   const username = userMap[token].name;
-  // 从数据库获取用户资料
   const userProfile = getUserProfile(username);
   if (userProfile) {
     userMap[token].nickname = userProfile.nickname || "";
@@ -112,6 +111,16 @@ export function userEnterRoom(token: Token, roomid: RoomID) {
   if (room.addUser(token)) {
     userMap[token].setRoom(roomid);
   }
+
+  // 为了保证前端拿到最新头像信息，在加入房间约 1 秒后再广播一次房间状态
+  // 这样刚被分配默认头像的玩家，其自己和其他玩家都会看到更新后的头像
+  setTimeout(() => {
+    try {
+      publish2all(roomid);
+    } catch {
+      // ignore
+    }
+  }, 1000);
 }
 
 export function userLeaveRoom(token: Token) {
@@ -266,7 +275,8 @@ export function userShowHands(token: Token, index: number) {
         hands,
       },
     });
-    publishLog2all(roomid, [`${user.name}亮牌${card}`]);
+    const displayName = user.nickname || user.name;
+    publishLog2all(roomid, [`${displayName}亮牌${card}`]);
   }
 }
 
@@ -424,7 +434,8 @@ export function userSendMessage(token: Token, message: string) {
     },
   };
   send2all(roomid, payload);
-  publishLog2all(roomid, [`<strong>${user.name}</strong>: ${trimmed
+  const displayName = user.nickname || user.name;
+  publishLog2all(roomid, [`<strong>${displayName}</strong>: ${trimmed
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -587,8 +598,27 @@ export function kickUser(token: Token, userId: string) {
   if (!targetToken) {
     throw "用户不存在";
   }
-  
-  // 从房间中移除用户
+
+  const targetUser = userMap[targetToken];
+
+  // 如果该玩家正在本局游戏中行动，先让他自动弃牌，再踢出，避免轮次卡死
+  if (
+    room.isGaming &&
+    room.game &&
+    !room.game.isSettling &&
+    targetUser &&
+    targetUser.isInCurrentGame &&
+    !targetUser.isFolded
+  ) {
+    try {
+      room.game.fold(targetToken);
+    } catch (e) {
+      // 出错也不影响后续踢出逻辑，避免房间卡死
+      console.error("kickUser auto fold failed", e);
+    }
+  }
+
+  // 从房间中移除用户（包括非本局玩家或已弃牌玩家）
   room.removeUser(targetToken);
   
   // 通知被踢的用户

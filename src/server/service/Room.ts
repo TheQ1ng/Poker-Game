@@ -483,8 +483,8 @@ export class Game {
     const showdownCount = this.sortedUsers.filter((t) => userMap[t].shouldShowHand).length;
     // 前端分阶段展示：每玩家 2*2.5s（两张+五张）+ 胜者阶段 3.5s；胜者动画播完后倒计时再开下一局
     const settleAnimationMs = Math.ceil(showdownCount * 5000 + 3500);
-    // 展示胜者后固定 3 秒；有人申请看牌时 8 秒（比原来各减 5 秒）
-    const countdownAfterWinnerMs = hasPendingSeeHand ? 8000 : 3000;
+    // 展示胜者后固定 7 秒；有人申请看牌时 12 秒
+    const countdownAfterWinnerMs = hasPendingSeeHand ? 12000 : 7000;
     const delay = settleAnimationMs + countdownAfterWinnerMs;
     this.nextGameTime = Date.now() + delay;
     publish2all(this.roomid);

@@ -106,8 +106,8 @@ function CreateRoom() {
   const dispatch = useAppDispatch();
 
   const [smallBlind, setSmallBlind] = useState(1);
-  const [buyIn, setBuyIn] = useState(200);
-  const [reBuyLimit, setReBuyLimit] = useState(10);
+  const [buyIn, setBuyIn] = useState(400);
+  const [reBuyLimit, setReBuyLimit] = useState(50);
   const [isShortDeck, setIsShortDeck] = useState(false);
   const [isOmaha, setIsOmaha] = useState(false);
   const [roomid, setRoomID] = useState("");
@@ -131,7 +131,7 @@ function CreateRoom() {
   }, [activeTab, dispatch]);
 
   useEffect(() => {
-    setBuyIn(smallBlind * 200);
+    setBuyIn(smallBlind * 400);
   }, [smallBlind]);
 
   // 页面加载时获取用户资料
@@ -285,7 +285,7 @@ function CreateRoom() {
                     onChange={(v) => setReBuyLimit(v!)}
                     className="poker-input rebuy-input"
                   />
-                  <span className="label-text">大哥允许重买</span>
+                  <span className="label-text">大哥允许东山再起</span>
                 </div>
                 <div className="poker-form-group">
                   <label style={{ display: "flex", alignItems: "center", cursor: "pointer", margin: 0 }}>

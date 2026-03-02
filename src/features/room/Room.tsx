@@ -69,8 +69,10 @@ function Room() {
   const game = useAppSelector(selectGame);
   const selectSettleStatus = useAppSelector(getSelectSettleStatus);
   const isSettling = game?.isSettling || false;
+  // 使用服务端时间偏移来计算下一局开始的剩余秒数，避免不同客户端本地时间差异
+  const serverNowForNextGame = Date.now() + serverTimeOffset;
   const nextGameTime = Math.floor(
-    ((game?.nextGameTime || Date.now()) - Date.now()) / 1000
+    ((game?.nextGameTime || serverNowForNextGame) - serverNowForNextGame) / 1000
   );
   const cards: PokerCard[] = [...(game?.boardCards || [])];
 
@@ -83,8 +85,9 @@ function Room() {
   const totalShowdown = showdownPlayers.length;
   const [settleRevealStep, setSettleRevealStep] = useState(0);
   const settleAnimatingRef = useRef(false);
-  /** 读条等待阶段（胜者展示结束后的 8/13 秒）：用于 SB/BB/D 滑动到下一家 */
-  const isSettlingCountdown = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
+  /** 读条等待阶段（胜者展示结束后的 7/12 秒）：用于 SB/BB/D 滑动到下一家；若无人摊牌（全员弃牌决出胜负），直接进入倒计时 */
+  const isSettlingCountdown =
+    isSettling && (totalShowdown === 0 || settleRevealStep > 2 * totalShowdown);
   const nextPositionUserIds = useMemo(() => {
     if (!isSettlingCountdown || !room?.users?.length) return { SB: null, BB: null, D: null };
     const orderedIds = users as string[];
@@ -165,11 +168,38 @@ function Room() {
   const isMyTurnToAct = !!actingUserId && self?.id === actingUserId;
   const addTimeRemaining = isMyTurnToAct ? Math.max(0, 3 - (self?.addTimeUsed ?? 0)) : 0;
 
+  // 结算阶段：胜者动画结束后的倒计时（用于右上角圆形读条）
+  const [settleCountdownTotal, setSettleCountdownTotal] = useState<number | null>(null);
+  useEffect(() => {
+    if (isSettlingCountdown) {
+      if (settleCountdownTotal == null && nextGameTime > 0) {
+        setSettleCountdownTotal(nextGameTime);
+      }
+    } else if (settleCountdownTotal != null) {
+      setSettleCountdownTotal(null);
+    }
+  }, [isSettlingCountdown, nextGameTime, settleCountdownTotal]);
+  const settleCountdownLeft = isSettlingCountdown ? Math.max(0, nextGameTime) : 0;
+  const settleCountdownTotalSec =
+    settleCountdownTotal != null && settleCountdownTotal > 0
+      ? settleCountdownTotal
+      : settleCountdownLeft > 0
+      ? settleCountdownLeft
+      : 1;
+
+  // 行动阶段：为了刷新右上角行动倒计时，每秒触发一次重渲染
   useEffect(() => {
     if (!actingUserId || isSettling) return;
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [actingUserId, isSettling]);
+
+  // 结算阶段：为了刷新下一局倒计时圆环，每秒触发一次重渲染
+  useEffect(() => {
+    if (!isSettling || !game?.nextGameTime) return;
+    const t = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [isSettling, game?.nextGameTime]);
 
   function setSettleTimes(times: number) {
     ws_settleTimes(times);
@@ -330,8 +360,8 @@ function Room() {
         }}
       >
         <Spectators />
-        {/* 右上角：行动倒计时（圆圈引线燃烧样式）+ 当前玩家 +30s 按钮 */}
-        {!isSettling && actingUserId && (
+        {/* 右上角：行动倒计时 / 结算后倒计时（圆圈引线燃烧样式） */}
+        {isSettlingCountdown ? (
           <div
             style={{
               position: "absolute",
@@ -351,8 +381,8 @@ function Room() {
                 height: 58,
                 borderRadius: "50%",
                 background: "linear-gradient(145deg, #1a252f 0%, #0d1117 100%)",
-                border: "3px solid rgba(255, 140, 0, 0.6)",
-                boxShadow: "0 0 20px rgba(255, 140, 0, 0.4), inset 0 0 15px rgba(0,0,0,0.5)",
+                border: "3px solid rgba(0, 191, 255, 0.7)",
+                boxShadow: "0 0 20px rgba(0, 191, 255, 0.5), inset 0 0 15px rgba(0,0,0,0.5)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -370,7 +400,7 @@ function Room() {
                   cy={26}
                   r={22}
                   fill="none"
-                  stroke="rgba(80, 60, 40, 0.5)"
+                  stroke="rgba(40, 60, 80, 0.7)"
                   strokeWidth={4}
                 />
                 <circle
@@ -378,16 +408,18 @@ function Room() {
                   cy={26}
                   r={22}
                   fill="none"
-                  stroke="url(#actionCountdownGradient)"
+                  stroke="url(#settleCountdownGradient)"
                   strokeWidth={4}
                   strokeLinecap="round"
                   strokeDasharray={2 * Math.PI * 22}
-                  strokeDashoffset={2 * Math.PI * 22 * (1 - actionTimeLeft / actionTotalSeconds)}
+                  strokeDashoffset={
+                    2 * Math.PI * 22 * (1 - settleCountdownLeft / settleCountdownTotalSec)
+                  }
                 />
                 <defs>
-                  <linearGradient id="actionCountdownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#ff8c00" />
-                    <stop offset="100%" stopColor="#ff4500" />
+                  <linearGradient id="settleCountdownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00c3ff" />
+                    <stop offset="100%" stopColor="#1affd5" />
                   </linearGradient>
                 </defs>
               </svg>
@@ -397,31 +429,123 @@ function Room() {
                   zIndex: 1,
                   fontSize: 18,
                   fontWeight: "bold",
-                  color: actionTimeLeft <= 5 ? "#ff6b6b" : "#ffd700",
-                  textShadow: "0 0 8px rgba(255, 215, 0, 0.6)",
+                  color: settleCountdownLeft <= 5 ? "#ff6b6b" : "#1affd5",
+                  textShadow: "0 0 8px rgba(0, 255, 255, 0.7)",
                 }}
               >
-                {actionTimeLeft}
+                {settleCountdownLeft}
               </span>
             </div>
-            {isMyTurnToAct && addTimeRemaining > 0 && (
-              <Button
-                type="primary"
-                size="small"
-                onClick={ws_extendActionTime}
+            <div
+              style={{
+                fontSize: 12,
+                color: "#e0f7ff",
+                textShadow: "0 0 6px rgba(0, 0, 0, 0.6)",
+                padding: "2px 8px",
+                borderRadius: 12,
+                background: "rgba(0, 0, 0, 0.55)",
+                border: "1px solid rgba(0, 191, 255, 0.5)",
+              }}
+            >
+              下一局倒计时
+            </div>
+          </div>
+        ) : (
+          !isSettling &&
+          actingUserId && (
+            <div
+              style={{
+                position: "absolute",
+                top: 14,
+                right: 14,
+                zIndex: 50,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <div
+                className="action-countdown-circle"
                 style={{
-                  fontSize: 12,
-                  height: 28,
-                  paddingLeft: 10,
-                  paddingRight: 10,
-                  background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
-                  border: "1px solid rgba(201, 162, 39, 0.5)",
+                  width: 58,
+                  height: 58,
+                  borderRadius: "50%",
+                  background: "linear-gradient(145deg, #1a252f 0%, #0d1117 100%)",
+                  border: "3px solid rgba(255, 140, 0, 0.6)",
+                  boxShadow: "0 0 20px rgba(255, 140, 0, 0.4), inset 0 0 15px rgba(0,0,0,0.5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
                 }}
               >
-                +30s ({addTimeRemaining})
-              </Button>
-            )}
-          </div>
+                <svg
+                  width={52}
+                  height={52}
+                  style={{ position: "absolute", transform: "rotate(-90deg)" }}
+                  viewBox="0 0 52 52"
+                >
+                  <circle
+                    cx={26}
+                    cy={26}
+                    r={22}
+                    fill="none"
+                    stroke="rgba(80, 60, 40, 0.5)"
+                    strokeWidth={4}
+                  />
+                  <circle
+                    cx={26}
+                    cy={26}
+                    r={22}
+                    fill="none"
+                    stroke="url(#actionCountdownGradient)"
+                    strokeWidth={4}
+                    strokeLinecap="round"
+                    strokeDasharray={2 * Math.PI * 22}
+                    strokeDashoffset={
+                      2 * Math.PI * 22 * (1 - actionTimeLeft / actionTotalSeconds)
+                    }
+                  />
+                  <defs>
+                    <linearGradient id="actionCountdownGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#ff8c00" />
+                      <stop offset="100%" stopColor="#ff4500" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <span
+                  style={{
+                    position: "relative",
+                    zIndex: 1,
+                    fontSize: 18,
+                    fontWeight: "bold",
+                    color: actionTimeLeft <= 5 ? "#ff6b6b" : "#ffd700",
+                    textShadow: "0 0 8px rgba(255, 215, 0, 0.6)",
+                  }}
+                >
+                  {actionTimeLeft}
+                </span>
+              </div>
+              {isMyTurnToAct && addTimeRemaining > 0 && (
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={ws_extendActionTime}
+                  style={{
+                    fontSize: 12,
+                    height: 28,
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
+                    border: "1px solid rgba(201, 162, 39, 0.5)",
+                  }}
+                >
+                  +30s ({addTimeRemaining})
+                </Button>
+              )}
+            </div>
+          )
         )}
         <div
           style={{
@@ -603,13 +727,7 @@ function Room() {
               
               {/* 牌桌中心 */}
               <div className="flex2 flex-column flex-center">
-                <div style={{ width: 100 }}>
-                  {isSettling ? (
-                    <CountDown time={nextGameTime} total={13} />
-                  ) : (
-                    <div>&nbsp;</div>
-                  )}
-                </div>
+                <div style={{ width: 100 }}>{/* 结算倒计时读条改为右上角圆形动画，这里留空 */}</div>
                 <div className="boards flex-row flex-center">
                   {[...cards, null, null, null, null, null]
                     .splice(0, 5)
