@@ -80,7 +80,7 @@ upload_project() {
     # 创建远程目录
     $SSH_CMD $SERVER_USER@$SERVER_IP "mkdir -p $REMOTE_DIR"
     
-    # 同步文件（排除 node_modules, build, .git）
+    # 同步文件（排除 node_modules, build, .git, 数据库文件）
     if [ ! -z "$SERVER_PASSWORD" ]; then
         rsync -avz --progress -e "sshpass -p $SERVER_PASSWORD ssh -o StrictHostKeyChecking=no" \
             --exclude 'node_modules' \
@@ -88,6 +88,10 @@ upload_project() {
             --exclude '.gitignore' \
             --exclude '*.log' \
             --exclude '.DS_Store' \
+            --exclude 'data/' \
+            --exclude 'dist/data/' \
+            --exclude '*.db' \
+            --exclude '*.db-journal' \
             ./ $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
     else
         rsync -avz --progress -e "ssh -o StrictHostKeyChecking=no" \
@@ -96,6 +100,10 @@ upload_project() {
             --exclude '.gitignore' \
             --exclude '*.log' \
             --exclude '.DS_Store' \
+            --exclude 'data/' \
+            --exclude 'dist/data/' \
+            --exclude '*.db' \
+            --exclude '*.db-journal' \
             ./ $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
     fi
     
