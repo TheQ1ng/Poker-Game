@@ -28,12 +28,16 @@ export const createRoomAsync = createAsyncThunk(
     sb,
     buyIn,
     reBuyLimit,
+    isShortDeck,
+    isOmaha,
   }: {
     sb: number;
     buyIn: number;
     reBuyLimit: number;
+    isShortDeck: boolean;
+    isOmaha: boolean;
   }) => {
-    return await createroom(sb, buyIn, reBuyLimit);
+    return await createroom(sb, buyIn, reBuyLimit, isShortDeck, isOmaha);
   }
 );
 

@@ -210,6 +210,16 @@ export function Owner({
   stackRef.current = self?.stack ?? 0;
 
   const raise = Math.min(maxRaise, Math.max(0, parseInt(calcInput, 10) || 0));
+  const isOmahaGame = !!(game?.isOmaha || room?.isOmaha);
+
+  const phasedHoleCards = isOmahaGame
+    ? [
+        self?.hands?.[0] ?? null,
+        self?.hands?.[1] ?? null,
+        self?.hands?.[2] ?? null,
+        self?.hands?.[3] ?? null,
+      ]
+    : [self?.hands?.[0] ?? null, self?.hands?.[1] ?? null];
 
   useEffect(() => {
     if (hintSoundRef.current && isActing) {
@@ -632,7 +642,17 @@ export function Owner({
         </div>
         <div className="flex1 flex-row flex-center">
           {showPhasedCards ? (
-            <div className={`card-box card-box-stacked ${showHolePhase ? "card-box-stacked-2" : ""} ${(showMax5Phase || showAsWinner) ? "card-box-stacked-5" : ""} ${showAsWinner ? "settle-winner-cards" : ""}`}>
+            <div
+              className={`card-box card-box-stacked ${
+                showHolePhase
+                  ? isOmahaGame
+                    ? "card-box-stacked-omaha4"
+                    : "card-box-stacked-2"
+                  : ""
+              } ${showMax5Phase || showAsWinner ? "card-box-stacked-5" : ""} ${
+                showAsWinner ? "settle-winner-cards" : ""
+              }`}
+            >
               {(showMax5Phase || showAsWinner) && (
                 <div
                   className={`handstype ${showAsWinner ? "settle-winner-type" : ""}`}
@@ -643,7 +663,7 @@ export function Owner({
                   {self?.handsType}
                 </div>
               )}
-              {(showHolePhase ? [self?.hands?.[0] ?? null, self?.hands?.[1] ?? null] : (self?.maxCards || []).slice(0, 5)).map((card, i) => (
+              {(showHolePhase ? phasedHoleCards : (self?.maxCards || []).slice(0, 5)).map((card, i) => (
                 <Poker
                   card={card}
                   key={card ? `${card.num}${card.suit}-${i}` : i}
@@ -657,35 +677,74 @@ export function Owner({
             </div>
           ) : (
             <>
-              <Poker
-                card={self?.hands[0] || null}
-                index={0}
-                showHand={isSettling && !selfAsUser?.hands[0]}
-                isSelected={false}
-                size="medium"
-                showShowHandButton={!selfAsUser?.isAllIn}
-              />
-              <Poker
-                card={self?.hands[1] || null}
-                index={1}
-                showHand={isSettling && !selfAsUser?.hands[1]}
-                isSelected={false}
-                size="medium"
-                showShowHandButton={!selfAsUser?.isAllIn}
-              />
-              <div 
-                style={{ 
-                  fontWeight: 'bold', 
-                  marginLeft: '10px',
-                  ...(self?.handsType && handTypeRanks[self.handsType] >= 4 ? { 
-                    color: '#ffd700',
-                    textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
-                    animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
-                  } : { color: 'white' })
-                }}
-              >
-                {self?.handsType}
-              </div>
+              {isOmahaGame ? (
+                <div style={{ display: "flex", alignItems: "center" }}>
+                  {[0, 1, 2, 3].map((i) => (
+                    <Poker
+                      key={i}
+                      card={self?.hands[i] || null}
+                      index={i}
+                      showHand={isSettling && !selfAsUser?.hands?.[i]}
+                      isSelected={false}
+                      size="medium"
+                      showShowHandButton={!selfAsUser?.isAllIn}
+                    />
+                  ))}
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      marginLeft: "10px",
+                      ...(self?.handsType && handTypeRanks[self.handsType] >= 4
+                        ? {
+                            color: "#ffd700",
+                            textShadow: "0 0 15px rgba(255, 215, 0, 0.8)",
+                            animation:
+                              "handTypeGlow 1.5s ease-in-out infinite alternate",
+                          }
+                        : { color: "white" }),
+                    }}
+                  >
+                    {self?.handsType}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <Poker
+                    card={self?.hands[0] || null}
+                    index={0}
+                    showHand={isSettling && !selfAsUser?.hands[0]}
+                    isSelected={false}
+                    size="medium"
+                    showShowHandButton={!selfAsUser?.isAllIn}
+                  />
+                  <Poker
+                    card={self?.hands[1] || null}
+                    index={1}
+                    showHand={isSettling && !selfAsUser?.hands[1]}
+                    isSelected={false}
+                    size="medium"
+                    showShowHandButton={!selfAsUser?.isAllIn}
+                  />
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      marginLeft: "10px",
+                      ...(self?.handsType &&
+                      handTypeRanks[self.handsType] >= 4
+                        ? {
+                            color: "#ffd700",
+                            textShadow:
+                              "0 0 15px rgba(255, 215, 0, 0.8)",
+                            animation:
+                              "handTypeGlow 1.5s ease-in-out infinite alternate",
+                          }
+                        : { color: "white" }),
+                    }}
+                  >
+                    {self?.handsType}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

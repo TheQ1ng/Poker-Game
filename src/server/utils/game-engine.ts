@@ -2,20 +2,24 @@ import { Card } from "../../ApiType";
 
 const colors = require("colors");
 export const NUMS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+/** 短牌只用 6～A，共 36 张；6 最小、A 最大，A6789 为最小顺子 */
+export const NUMS_SHORT = [6, 7, 8, 9, 10, 11, 12, 13, 14];
 export const SUITS = ["c", "d", "h", "s"]; // club ♣︎, diamond ♦︎, heart ♥︎, spade ♠︎
 
 export function _randomPickOne(items: any) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-export function randomHands(len = 7): Card[] {
-  const deck = new Array(NUMS.length * SUITS.length)
+/** @param len 需要牌数；@param is_short 是否短牌（仅 6～A，共 36 张） */
+export function randomHands(len = 7, is_short = false): Card[] {
+  const nums = is_short ? NUMS_SHORT : NUMS;
+  const deck = new Array(nums.length * SUITS.length)
     .fill(0)
     .map(
       (_, i) =>
       ({
-        num: NUMS[i % NUMS.length],
-        suit: SUITS[Math.floor(i / NUMS.length) % SUITS.length],
+        num: nums[i % nums.length],
+        suit: SUITS[Math.floor(i / nums.length) % SUITS.length],
       } as Card)
     );
 
@@ -120,31 +124,59 @@ export function isFlush(cards: Card[]) {
   return !!matches ? maxCards(cards, matches[0][0], 7) : [];
 }
 
-export function isStraight(cards: Card[]): Card[] {
-  // console.log(cards);
+export function isStraight(cards: Card[], is_short = false): Card[] {
   const nums = cards
     .map((c) => c.num)
-    .filter((n, i, a) => i == 0 || n != a[i - 1]);
+    .filter((n, i, a) => i === 0 || n !== a[i - 1]);
   if (nums.length < 5) return [];
+
+  if (is_short) {
+    // 短牌：仅 6～A，A6789 为最小顺子（高牌为 9）
+    const distinct = [...new Set(nums)].sort((a, b) => b - a);
+    // 普通 5 连
+    for (let i = 0; i <= distinct.length - 5; i++) {
+      const high = distinct[i]!;
+      if (high - distinct[i + 4]! === 4) {
+        const result: Card[] = [];
+        for (let n = high; n >= high - 4; n--) {
+          const c = cards.find((x) => x.num === n);
+          if (c) result.push(c);
+        }
+        if (result.length === 5) return result;
+      }
+    }
+    // 特例：A6789 最小顺子
+    const need = [14, 9, 8, 7, 6];
+    if (need.every((n) => distinct.includes(n))) {
+      const result: Card[] = [];
+      for (const n of [9, 8, 7, 6, 14]) {
+        const c = cards.find((x) => x.num === n);
+        if (c) result.push(c);
+      }
+      if (result.length === 5) return result;
+    }
+    return [];
+  }
+
   let high = 0;
   if (
     [...nums]
       .splice(0, nums.length - 4)
-      .some((n, i, a) => nums[i + 4] == n - 4 && (high = n))
+      .some((n, i) => nums[i + 4] === n - 4 && (high = n))
   ) {
     const result: Card[] = [];
     cards.forEach((c) => {
-      if (c.num == high) {
+      if (c.num === high) {
         result.push(c);
         high -= 1;
       }
     });
     return result;
   }
-  return nums[0] == 14
+  return nums[0] === 14
     ? isStraight(
       cards
-        .map((c) => (c.num == 14 ? { num: 1, suit: c.suit } : c))
+        .map((c) => (c.num === 14 ? { num: 1, suit: c.suit } : c))
         .sort((a, b) => b.num - a.num)
     )
     : [];
@@ -154,8 +186,8 @@ export function isStraight(cards: Card[]): Card[] {
 // console.log(r);
 
 // Rank 1: 同花顺
-export function isStraightFlush(cards: Card[]) {
-  return isStraight(isFlush(cards));
+export function isStraightFlush(cards: Card[], is_short = false) {
+  return isStraight(isFlush(cards), is_short);
 }
 
 // Rank 2: 四条
@@ -283,10 +315,10 @@ export interface PokerRank {
   type: PokerType;
   cards: Card[];
 }
-export function rank(hands: any): PokerRank {
+export function rank(hands: any, is_short = false): PokerRank {
   const cards = parse(hands);
   let maxCards: Card[] = [];
-  if ((maxCards = isStraightFlush(hands)).length > 0) {
+  if ((maxCards = isStraightFlush(hands, is_short)).length > 0) {
     return {
       type: PokerType.StraightFlush,
       cards: maxCards.splice(0, 5),
@@ -310,7 +342,7 @@ export function rank(hands: any): PokerRank {
       cards: maxCards.splice(0, 5),
     };
   }
-  if ((maxCards = isStraight(hands)).length > 0) {
+  if ((maxCards = isStraight(hands, is_short)).length > 0) {
     return {
       type: PokerType.Straight,
       cards: maxCards.splice(0, 5),
@@ -343,19 +375,74 @@ export function rank(hands: any): PokerRank {
 // const ret = rank(["2s", "2d", "2c", "3s", "3d", "3c", "13s"]);
 // console.log(ret);
 
-export function compare(cardsA: any, cardsB: Card[]) {
-  const a = rank(cardsA);
-  const b = rank(cardsB);
-  // console.log(a, b);
-  if (a.type != b.type) {
+export function compare(cardsA: any, cardsB: Card[], is_short = false) {
+  const a = rank(cardsA, is_short);
+  const b = rank(cardsB, is_short);
+  if (a.type !== b.type) {
     return b.type - a.type;
   }
-  for (let i = 0; i != a.cards.length; ++i) {
-    if (a.cards[i].num != b.cards[i].num) {
+  for (let i = 0; i !== a.cards.length; ++i) {
+    if (a.cards[i].num !== b.cards[i].num) {
       return a.cards[i].num - b.cards[i].num;
     }
   }
   return 0;
+}
+
+/** 组合下标：从 n 个里选 2 个 */
+function choose2Indices(n: number): number[][] {
+  const out: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      out.push([i, j]);
+    }
+  }
+  return out;
+}
+
+/** 组合下标：从 n 个里选 3 个 */
+function choose3Indices(n: number): number[][] {
+  const out: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      for (let k = j + 1; k < n; k++) {
+        out.push([i, j, k]);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * 奥马哈最佳牌：hand4 中选 2 张 + board 中选 3 张，共 C(4,2)*C(5,3) 种组合，返回牌力最大的 5 张及牌型。
+ * boardCards 长度须为 3、4 或 5；不足 5 时用全部公牌。
+ */
+export function bestOmahaHand(
+  hand4: Card[],
+  boardCards: Card[],
+  is_short = false
+): PokerRank {
+  if (hand4.length < 4 || boardCards.length < 3) {
+    const five = [...hand4, ...boardCards].slice(0, 5);
+    return rank(five.length >= 5 ? five : five.concat([]), is_short);
+  }
+  const board = boardCards.slice(0, 5);
+  const h2 = choose2Indices(4);
+  const b3 = choose3Indices(Math.min(5, board.length));
+  let best: PokerRank = {
+    type: PokerType.HighCards,
+    cards: [...hand4.slice(0, 2), ...board.slice(0, 3)],
+  };
+  for (const [i, j] of h2) {
+    for (const [a, b, c] of b3) {
+      const five = [hand4[i]!, hand4[j]!, board[a]!, board[b]!, board[c]!];
+      const r = rank(five, is_short);
+      if (compare(r.cards, best.cards, is_short) > 0) {
+        best = r;
+      }
+    }
+  }
+  return best;
 }
 
 // const a = hands2cards("14h13c9d8c8h8s6c");
@@ -377,9 +464,13 @@ export type PlayerInfo = {
   stage?: number;
   isWinner?: boolean;
 };
-export function settle(players: PlayerInfo[], sb: number): PlayerInfo[] {
+export function settle(
+  players: PlayerInfo[],
+  sb: number,
+  is_short = false
+): PlayerInfo[] {
   players.forEach((p) => {
-    p.maxCards = rank(p.cards).cards;
+    p.maxCards = rank(p.cards, is_short).cards;
     p.profits = 0;
     p.originTotal = p.total;
     p.isWinner = false;
@@ -387,7 +478,7 @@ export function settle(players: PlayerInfo[], sb: number): PlayerInfo[] {
 
   let aliveUsers = players
     .filter((p) => !p.fold)
-    .sort((p1, p2) => compare(p2.cards, p1.cards));
+    .sort((p1, p2) => compare(p2.cards, p1.cards, is_short));
   const foldUsers = players
     .filter((p) => p.fold)
     .sort((p1, p2) => p2.total - p1.total);
@@ -398,7 +489,7 @@ export function settle(players: PlayerInfo[], sb: number): PlayerInfo[] {
   let stage = 0;
   for (let i = 1; i < aliveUsers.length; ++i) {
     // equal to the previous one
-    if (compare(aliveUsers[i].cards, stages[stage][0].cards) === 0) {
+    if (compare(aliveUsers[i].cards, stages[stage][0].cards, is_short) === 0) {
       stages[stage].push(aliveUsers[i]);
     } else {
       stages[++stage] = [aliveUsers[i]];
@@ -431,7 +522,6 @@ export function settle(players: PlayerInfo[], sb: number): PlayerInfo[] {
     stageTail = 0;
     for (let j = i + 1; j < allUseres.length; ++j) {
       const subProfit = Math.min(aliveUsers[i].total, allUseres[j].total);
-      // console.log(i, j, subProfit);
       allUseres[j].total -= subProfit;
       subTotal += subProfit;
     }
@@ -439,9 +529,6 @@ export function settle(players: PlayerInfo[], sb: number): PlayerInfo[] {
     const stageLeftCount = stages[currentStage].length - stageIndex;
     userTail = subTotal % (sb * stageLeftCount);
     subTotal -= userTail;
-    // console.log(
-    //   `i: ${i}, stage: ${currentStage} si: ${stageIndex} subTotal: ${subTotal}`
-    // );
     for (let j = stageIndex; j < stages[currentStage].length; ++j) {
       stages[currentStage][j].profits! += subTotal / stageLeftCount;
     }

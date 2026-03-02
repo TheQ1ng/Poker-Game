@@ -29,6 +29,10 @@ export interface SimpleGame {
   isSettling: boolean;
   nextGameTime: number;
   userCount: number;
+  /** 是否短牌（仅 6～A 共 36 张） */
+  isShortDeck?: boolean;
+  /** 是否奥马哈（4 张手牌，必须 2+3 组成 5 张） */
+  isOmaha?: boolean;
 }
 
 export interface SimpleUser {
@@ -67,6 +71,10 @@ export interface SimpleRoom {
   roomid: RoomID;
   isGaming: boolean;
   users: SimpleUser[];
+  /** 是否短牌 */
+  isShortDeck?: boolean;
+  /** 是否奥马哈 */
+  isOmaha?: boolean;
 }
 
 export interface SimpleSelf {

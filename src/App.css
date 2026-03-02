@@ -239,6 +239,32 @@ body {
   margin-left: 0 !important;
   transform: translateX(-70%);
 }
+/* 奥马哈：4 张手牌摊牌时四张都叠在一起（仅 2+3 模式下使用） */
+.user .card-box-stacked-omaha4 .poker-card-wrapper,
+.owner .card-box-stacked-omaha4 .poker-card-wrapper,
+.owner-seat .card-box-stacked-omaha4 .poker-card-wrapper {
+  margin-left: 0 !important;
+}
+.user .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(1),
+.owner .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(1),
+.owner-seat .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(1) {
+  transform: translateX(0);
+}
+.user .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(2),
+.owner .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(2),
+.owner-seat .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(2) {
+  transform: translateX(-60%);
+}
+.user .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(3),
+.owner .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(3),
+.owner-seat .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(3) {
+  transform: translateX(-120%);
+}
+.user .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(4),
+.owner .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(4),
+.owner-seat .card-box-stacked-omaha4 .poker-card-wrapper:nth-child(4) {
+  transform: translateX(-180%);
+}
 /* 五张牌叠在一起：第2～6个子元素为牌，依次左叠（User 与 Owner 一致） */
 .user .card-box-stacked-5 .poker-card-wrapper:nth-child(2),
 .owner .card-box-stacked-5 .poker-card-wrapper:nth-child(2),

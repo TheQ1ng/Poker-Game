@@ -108,6 +108,8 @@ function CreateRoom() {
   const [smallBlind, setSmallBlind] = useState(1);
   const [buyIn, setBuyIn] = useState(200);
   const [reBuyLimit, setReBuyLimit] = useState(10);
+  const [isShortDeck, setIsShortDeck] = useState(false);
+  const [isOmaha, setIsOmaha] = useState(false);
   const [roomid, setRoomID] = useState("");
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -286,12 +288,50 @@ function CreateRoom() {
                   <span className="label-text">大哥允许重买</span>
                 </div>
                 <div className="poker-form-group">
+                  <label style={{ display: "flex", alignItems: "center", cursor: "pointer", margin: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isShortDeck}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        setIsShortDeck(v);
+                        if (v) setIsOmaha(false);
+                      }}
+                      style={{ marginRight: 6 }}
+                    />
+                    <span className="label-text">短</span>
+                  </label>
+                </div>
+                <div className="poker-form-group">
+                  <label style={{ display: "flex", alignItems: "center", cursor: "pointer", margin: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={isOmaha}
+                      onChange={(e) => {
+                        const v = e.target.checked;
+                        setIsOmaha(v);
+                        if (v) setIsShortDeck(false);
+                      }}
+                      style={{ marginRight: 6 }}
+                    />
+                    <span className="label-text">2+3</span>
+                  </label>
+                </div>
+                <div className="poker-form-group">
                   <Button
                     type="primary"
                     size="large"
                     block
                     onClick={() =>
-                      dispatch(createRoomAsync({ sb: smallBlind, buyIn, reBuyLimit }))
+                      dispatch(
+                        createRoomAsync({
+                          sb: smallBlind,
+                          buyIn,
+                          reBuyLimit,
+                          isShortDeck,
+                          isOmaha,
+                        })
+                      )
                     }
                     loading={status.createRoomStatus === "loading"}
                     className="poker-btn create-btn"

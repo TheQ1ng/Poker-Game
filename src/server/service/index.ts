@@ -53,13 +53,26 @@ export function createUser(token: Token, name: string, avatar: string): User {
 }
 
 // 获取所有房间列表
-export function getAllRooms(): Array<{id: string, smallBlind: number, playerCount: number, maxPlayers: number, ownerName: string}> {
-  return Object.values(roomMap).map(room => ({
+export function getAllRooms(): Array<{
+  id: string;
+  smallBlind: number;
+  playerCount: number;
+  maxPlayers: number;
+  ownerName: string;
+  isShortDeck: boolean;
+  isOmaha: boolean;
+}> {
+  return Object.values(roomMap).map((room) => ({
     id: room.id,
     smallBlind: room.smallBlind,
     playerCount: room.users.length,
     maxPlayers: 9, // 假设最大玩家数
-    ownerName: room.users.length > 0 ? userMap[room.users[0]]?.name || '未知' : '未知'
+    ownerName:
+      room.users.length > 0
+        ? userMap[room.users[0]]?.name || "未知"
+        : "未知",
+    isShortDeck: !!room.isShortDeck,
+    isOmaha: !!room.isOmaha,
   }));
 }
 
@@ -67,10 +80,12 @@ export function createRoom(
   token: Token,
   sb: number,
   buyIn: number,
-  reBuyLimit: number = 1
+  reBuyLimit: number = 1,
+  isShortDeck: boolean = false,
+  isOmaha: boolean = false
 ): Room {
   const user = userMap[token];
-  const room = new Room(genRoomID(), sb, buyIn, reBuyLimit);
+  const room = new Room(genRoomID(), sb, buyIn, reBuyLimit, isShortDeck, isOmaha);
   roomMap[room.id] = room;
   userEnterRoom(token, room.id);
   user.isRoomOwner = true;

@@ -17,7 +17,9 @@ export async function roominfo(): Promise<ApiRsp> {
 export async function createroom(
   sb: number,
   buyin: number,
-  reBuyLimit: number
+  reBuyLimit: number,
+  isShortDeck: boolean,
+  isOmaha: boolean
 ): Promise<ApiRsp> {
   const rsp = await fetch("/createroom", {
     method: "POST",
@@ -25,6 +27,8 @@ export async function createroom(
       sb,
       buyin,
       reBuyLimit,
+      isShortDeck,
+      isOmaha,
     }),
     headers: {
       authorization: localStorage["token"],
@@ -54,6 +58,8 @@ export interface RoomInfo {
   playerCount: number;
   maxPlayers: number;
   ownerName: string;
+  isShortDeck: boolean;
+  isOmaha: boolean;
 }
 
 export async function fetchRooms(): Promise<{ rooms: RoomInfo[] }> {

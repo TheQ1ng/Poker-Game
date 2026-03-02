@@ -82,8 +82,8 @@ router.post("/createroom", (ctx) => {
   if (!userMap[token]) {
     createUser(token, ctx.user, "");
   }
-  const { sb, buyin, reBuyLimit } = ctx.request.body;
-  const room = createRoom(token, sb, buyin, reBuyLimit);
+  const { sb, buyin, reBuyLimit, isShortDeck, isOmaha } = ctx.request.body;
+  const room = createRoom(token, sb, buyin, reBuyLimit, !!isShortDeck, !!isOmaha);
   ctx.data = room.id;
 });
 

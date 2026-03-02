@@ -143,6 +143,7 @@ export function User({
   const showAsWinner = (winnerPhase || settleDone) && !!user?.isWinner;
   const hideCardsInSettle = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && !showHolePhase && !showMax5Phase && !showAsWinner;
   const usePhasedSettle = isSettling && totalShowdown > 0;
+  const isOmahaGame = !!(room?.isOmaha || game?.isOmaha);
 
   const chipsRecord = room?.roomid && chipsRecordState?.roomid === room.roomid
     ? chipsRecordState.chipsRecords.find((r) => r.id === id)
@@ -559,7 +560,7 @@ export function User({
       </div>
       {usePhasedSettle ? (
         (showHolePhase || showMax5Phase || showAsWinner) ? (
-          <div className={`card-box card-box-stacked ${showHolePhase ? "card-box-stacked-2" : ""} ${(showMax5Phase || showAsWinner) ? "card-box-stacked-5" : ""} ${showAsWinner ? "settle-winner-cards" : ""}`}>
+          <div className={`card-box card-box-stacked ${showHolePhase ? (isOmahaGame ? "card-box-stacked-omaha4" : "card-box-stacked-2") : ""} ${(showMax5Phase || showAsWinner) ? "card-box-stacked-5" : ""} ${showAsWinner ? "settle-winner-cards" : ""}`}>
             {(showMax5Phase || showAsWinner) && (
               <div
                 className={`handstype ${showAsWinner ? "settle-winner-type" : ""}`}

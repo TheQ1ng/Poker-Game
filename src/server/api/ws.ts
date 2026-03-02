@@ -204,6 +204,8 @@ function getSimpleRoom(room: Room): SimpleRoom {
     roomid: room.id,
     isGaming: room.isGaming,
     users: room.users.map((t) => getSimpleUser(t)),
+    isShortDeck: !!room.isShortDeck,
+    isOmaha: !!room.isOmaha,
   };
 }
 
@@ -235,6 +237,8 @@ function getSimpleGame(game: Game): SimpleGame {
       raiseBet: 0,
       raiseBetDiff: 0,
       userCount: 0,
+      isShortDeck: false,
+      isOmaha: false,
     };
   }
   const actingUser =
@@ -255,6 +259,8 @@ function getSimpleGame(game: Game): SimpleGame {
     raiseBet: game.raiseBet,
     raiseBetDiff: game.raiseBetDiff,
     userCount: game.sortedUsers.length,
+    isShortDeck: !!game.isShortDeck,
+    isOmaha: !!game.isOmaha,
   };
 }
 

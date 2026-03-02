@@ -11,6 +11,7 @@ import {
   randomHands,
   rank,
   settle,
+  bestOmahaHand,
 } from "../utils/game-engine";
 import { logGame } from "../tests/utils";
 import { publish2all, publishLog2all, send2user, send2all } from "../api/ws";
@@ -58,6 +59,10 @@ export class Game {
   raiseBet: number = 0; // bet of the raise
   raiseBetDiff: number = 0; //  valid rasize count
   settleAfterRound: boolean = false; // 结算后解散房间
+  /** 是否短牌（仅 6～A，共 36 张，A6789 最小顺子） */
+  isShortDeck: boolean = false;
+  /** 是否奥马哈（4 张手牌，必须用 2 张手牌 + 3 张公牌组成 5 张） */
+  isOmaha: boolean = false;
 
   multiSettleStart: boolean = false;
   multiSettleRound: GameRound = GameRound.PreFlop;
@@ -72,17 +77,22 @@ export class Game {
     roomid: RoomID,
     token: Token,
     smallBlind: number,
-    reBuyLimit: number
+    reBuyLimit: number,
+    isShortDeck: boolean = false,
+    isOmaha: boolean = false
   ) {
     this.roomid = roomid;
     this.bigBlindUser = token;
     this.smallBlind = smallBlind;
     this.reBuyLimit = reBuyLimit;
+    this.isShortDeck = isShortDeck;
+    this.isOmaha = isOmaha;
   }
 
   start() {
     if (!this.initUsers()) return;
-    this.cards = randomHands(52);
+    const deckSize = this.isShortDeck ? 36 : 52;
+    this.cards = randomHands(deckSize, this.isShortDeck);
     this.cardIndex = 0;
     this.boardCards = [];
     this.isSettling = false;
@@ -344,17 +354,24 @@ export class Game {
 
     const players: PlayerInfo[] = this.sortedUsers.map((t) => {
       const user = userMap[t];
+      let cards: Card[];
+      if (this.isOmaha && user.hands.length >= 4 && this.boardCards.length >= 3) {
+        const best = bestOmahaHand(user.hands, this.boardCards, this.isShortDeck);
+        cards = best.cards;
+      } else {
+        cards = [...user.hands, ...this.boardCards];
+      }
       return {
         id: user.token,
         total: subTotal(user.totalBets),
         profits: 0,
         fold: user.isFolded,
-        cards: [...user.hands, ...this.boardCards],
+        cards,
       };
     });
 
     // console.log(JSON.stringify(players, null, 2));
-    const ps = settle(players, 1);
+    const ps = settle(players, 1, this.isShortDeck);
 
     // just log
     ps.forEach((p) => {
@@ -488,15 +505,15 @@ export class Game {
 
 
   dealCards2User() {
-    // deal cards to ready user
+    const holeCount = this.isOmaha ? 4 : 2;
     this.sortedUsers.forEach((t) => {
       const user = userMap[t];
       if (user.isReady) {
         user.hands = parse(
-          [this.cards[this.cardIndex], this.cards[this.cardIndex + 1]],
+          this.cards.slice(this.cardIndex, this.cardIndex + holeCount),
           false
         );
-        this.cardIndex += 2;
+        this.cardIndex += holeCount;
         user.isFolded = false;
       }
     });
@@ -715,9 +732,14 @@ export class Game {
   calcUserRank() {
     this.sortedUsers.forEach((t) => {
       const user = userMap[t];
-      const cards = [...user.hands, ...this.boardCards];
-      const cardsRank = rank(cards);
-      user.handsType = pokerTypeName(cardsRank.type);
+      if (this.isOmaha && user.hands.length >= 4 && this.boardCards.length >= 3) {
+        const best = bestOmahaHand(user.hands, this.boardCards, this.isShortDeck);
+        user.handsType = pokerTypeName(best.type);
+      } else {
+        const cards = [...user.hands, ...this.boardCards];
+        const cardsRank = rank(cards, this.isShortDeck);
+        user.handsType = pokerTypeName(cardsRank.type);
+      }
     });
   }
 }
@@ -738,7 +760,11 @@ class Room {
   smallBlind: number = 0;
   buyIn: number = 0;
   reBuyLimit: number = 1;
-  game: Game = new Game("", "", 0, 1);
+  /** 是否短牌（仅 6～A 共 36 张） */
+  isShortDeck: boolean = false;
+  /** 是否奥马哈（4 张手牌，必须 2+3 组成 5 张） */
+  isOmaha: boolean = false;
+  game: Game = new Game("", "", 0, 1, false, false);
   chipsRecords: ChipsRecord[] = [];
   /** 结算阶段：多人可同时请求看同一人的手牌，等待被请求者逐条同意/拒绝 */
   pendingSeeHandRequests: {
@@ -748,7 +774,14 @@ class Room {
     chips: number;
   }[] = [];
 
-  constructor(id: string, sb: number, buyIn: number, reBuyLimit: number = 1) {
+  constructor(
+    id: string,
+    sb: number,
+    buyIn: number,
+    reBuyLimit: number = 1,
+    isShortDeck: boolean = false,
+    isOmaha: boolean = false
+  ) {
     if (sb === 0 || buyIn === 0) {
       throw `small blind(${sb}) and buy in(${buyIn})] should not be 0`;
     }
@@ -757,6 +790,11 @@ class Room {
     this.smallBlind = sb;
     this.buyIn = buyIn;
     this.reBuyLimit = Math.max(1, reBuyLimit);
+    this.isShortDeck = !!isShortDeck;
+    this.isOmaha = !!isOmaha;
+    if (this.isShortDeck && this.isOmaha) {
+      throw new Error("短牌与奥马哈不能同时开启");
+    }
     this.isGaming = false;
   }
 
@@ -784,7 +822,9 @@ class Room {
       this.id,
       readyUsers.sort((_) => Math.random() - 0.5)[0],
       this.smallBlind,
-      this.reBuyLimit
+      this.reBuyLimit,
+      this.isShortDeck,
+      this.isOmaha
     );
     this.game.start();
     return true;
