@@ -369,17 +369,15 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* 玩家动作提示 */
+/* 玩家动作提示：与下注星星并列显示，不重叠 */
 .user-action-indicator {
-  position: absolute;
-  top: -5px;
-  left: 50%;
-  transform: translateX(-50%);
+  position: static;
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 10px;
   font-weight: bold;
   text-transform: uppercase;
+  margin-right: 4px;
 }
 
 .user-action-indicator.fold {

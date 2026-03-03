@@ -1,19 +1,16 @@
-import { Button, Input, message, Popconfirm, Tooltip, Modal, Tabs } from "antd";
+import { Button, Popconfirm, Tooltip, Modal } from "antd";
 import { Card as PokerCard } from "../../ApiType";
 import {
   LoginOutlined,
-  CopyOutlined,
   CoffeeOutlined,
   CaretRightOutlined,
   CheckOutlined,
   PauseOutlined,
   EyeOutlined,
-  EyeInvisibleOutlined,
+  UserOutlined,
   SoundOutlined,
   AudioMutedOutlined,
   HistoryOutlined,
-  BarChartOutlined,
-  UserAddOutlined,
   InfoCircleOutlined,
   DollarOutlined,
   CloseOutlined,
@@ -39,10 +36,7 @@ import {
   ws_startGame,
   ws_userHangup,
   ws_userLeave,
-  ws_userReady,
   ws_userWatch,
-  ws_addBot,
-  ws_kickUser,
   ws_settleGame,
   ws_extendActionTime,
   ws_respondSeeHand,
@@ -601,28 +595,19 @@ function Room() {
             height: `${100/zoom}%`,
           }}
         >
-          <div className="roominfo flex-row flex-center" style={{ color: 'white' }}>
-            <Input className="room-id-input" style={{ width: 90 }} value={roomid} readOnly />
-            <Tooltip title="复制房间ID">
-              <Button
-                className="room-action-btn"
-                icon={<CopyOutlined />}
-                style={{ marginRight: 10 }}
-                onClick={() => {
-                  if (navigator.clipboard) {
-                    navigator.clipboard.writeText(roomid || "");
-                    message.success("复制成功");
-                  } else {
-                    message.error("无法获取剪切板权限，请手动复制");
-                  }
-                }}
-              />
-            </Tooltip>
+          <div className="roominfo flex-row flex-center" style={{ color: 'white', gap: '8px' }}>
+            {/* 房间号显示 */}
+            <span style={{
+              fontSize: '14px',
+              fontWeight: 'bold',
+              color: '#ffd700',
+              textShadow: '0 0 8px rgba(255, 215, 0, 0.5)',
+              marginRight: '4px',
+            }}>房间: {roomid}</span>
             <Tooltip title={soundEnabled ? "关闭音效" : "开启音效"}>
                   <Button
                     className="room-action-btn"
                     icon={soundEnabled ? <SoundOutlined /> : <AudioMutedOutlined />}
-                    style={{ marginRight: 10 }}
                     onClick={async () => {
                       // 确保音效管理器已经初始化
                       await soundManager.init().catch(err => console.warn('Sound init failed:', err));
@@ -642,7 +627,6 @@ function Room() {
                   <Button
                     className="room-action-btn"
                     icon={<PauseOutlined />}
-                    style={{ marginRight: 10 }}
                     onClick={ws_pauseGame}
                   />
                 </Tooltip>
@@ -652,7 +636,6 @@ function Room() {
                     className="room-action-btn"
                     type="primary"
                     icon={<CaretRightOutlined />}
-                    style={{ marginRight: 10 }}
                     onClick={ws_startGame}
                   />
                 </Tooltip>
@@ -669,50 +652,36 @@ function Room() {
                 />
               </Tooltip>
             )}
-            {!self?.isSpectator ? (
-              self?.isReady ? (
-                <Tooltip title="暂时不参与游戏">
-                  <Button
-                    className="room-action-btn"
-                    icon={<CoffeeOutlined />}
-                    style={{ marginRight: 10 }}
-                    onClick={ws_userHangup}
-                  />
-                </Tooltip>
-              ) : (
-                <Tooltip title="准备">
-                  <Button
-                    className="room-action-btn"
-                    type="primary"
-                    icon={<CheckOutlined />}
-                    style={{ marginRight: 10 }}
-                    onClick={ws_userReady}
-                  />
-                </Tooltip>
-              )
-            ) : null}
-            {!self?.isReady ? (
-              !self?.isSpectator ? (
+            {!self?.isSpectator && self?.isReady && (
+              <Tooltip title="暂时不参与游戏">
+                <Button
+                  className="room-action-btn"
+                  icon={<CoffeeOutlined />}
+                  onClick={ws_userHangup}
+                />
+              </Tooltip>
+            )}
+            {/* 观战 / 落座切换：非观战时显示眼睛，观战时显示座位 */}
+            {self?.isSpectator ? (
+              <Tooltip title="参与游戏（落座）">
+                <Button
+                  className="room-action-btn"
+                  type="primary"
+                  icon={<UserOutlined />}
+                  onClick={() => ws_userWatch(false)}
+                />
+              </Tooltip>
+            ) : (
+              !self?.isReady && (
                 <Tooltip title="进入观战模式">
                   <Button
                     className="room-action-btn"
                     icon={<EyeOutlined />}
-                    style={{ marginRight: 10 }}
                     onClick={() => ws_userWatch(true)}
                   />
                 </Tooltip>
-              ) : (
-                <Tooltip title="参与游戏">
-                  <Button
-                    className="room-action-btn"
-                    type="primary"
-                    icon={<EyeInvisibleOutlined />}
-                    style={{ marginRight: 10 }}
-                    onClick={() => ws_userWatch(false)}
-                  />
-                </Tooltip>
               )
-            ) : null}
+            )}
 
             <Popconfirm
               title="如果在游戏中，将会自动放弃。确认离开？"

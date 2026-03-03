@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 import { Tooltip, Button, Popconfirm, InputNumber, Popover, Input } from "antd";
 import { ApiOutlined, CoffeeOutlined, CloseOutlined, EyeOutlined, CheckOutlined } from "@ant-design/icons";
 import { shallowEqual, useSelector, useDispatch } from "react-redux";
@@ -262,6 +263,80 @@ export function User({
         }}
       >
         <div style={{ position: 'relative', display: 'inline-block', overflow: 'visible' }}>
+        {/* 状态指示器 - 头像左上角 */}
+        <div style={{ position: 'absolute', top: -4, left: -4, display: 'flex', gap: '2px', zIndex: 10 }}>
+          {/* 断线 - 最高优先级，只要有就只显示它 */}
+          {user?.isOffline ? (
+            <div style={{
+              width: 24,
+              height: 24,
+              borderRadius: '50%',
+              background: '#ff4757',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 8px rgba(255, 71, 87, 0.5)',
+              border: '2px solid #fff',
+            }}>
+              <ApiOutlined style={{ fontSize: '14px', color: 'white' }} />
+            </div>
+          ) : (
+            <>
+              {/* 正在游戏中 - 显示游戏手柄 */}
+              {user?.isInCurrentGame && !user?.isFoled && (
+                <div style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(102, 126, 234, 0.6)',
+                  border: '2px solid #fff',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ display: 'block' }}>
+                    <path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5S18.67 9 19.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" fill="white"/>
+                  </svg>
+                </div>
+              )}
+              {/* 不在游戏中但已准备 - 显示勾 */}
+              {!user?.isInCurrentGame && user?.isReady && !user?.isFoled && (
+                <div style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(76, 175, 80, 0.6)',
+                  border: '2px solid #fff',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ display: 'block' }}>
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
+                  </svg>
+                </div>
+              )}
+              {/* 挂起（暂时不参与）- 不在游戏中时显示，或在游戏中但点了暂时不参与时与手柄并列 */}
+              {(!user?.isInCurrentGame && !user?.isReady) || (user?.isInCurrentGame && !user?.isReady && !user?.isFoled) ? (
+                <div style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  background: '#ffa502',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(255, 165, 2, 0.5)',
+                  border: '2px solid #fff',
+                }}>
+                  <CoffeeOutlined style={{ fontSize: '14px', color: 'white' }} />
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
         <div className="avatar-container" style={{ transform: 'scale(0.8)', position: 'relative' }}>
         {avatar && avatarImages[avatar] ? (
           <img 
@@ -618,38 +693,6 @@ export function User({
               boxShadow: "0 2px 8px rgba(255, 71, 87, 0.5)",
             }}>
               <ApiOutlined style={{ fontSize: "14px" }} />
-            </div>
-          </Tooltip>
-        ) : !user?.isReady ? (
-          <Tooltip title="挂起">
-            <div style={{
-              background: "#ffa502",
-              color: "white",
-              borderRadius: "50%",
-              width: "24px",
-              height: "24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(255, 165, 2, 0.5)",
-            }}>
-              <CoffeeOutlined style={{ fontSize: "14px" }} />
-            </div>
-          </Tooltip>
-        ) : user?.isFoled ? (
-          <Tooltip title="放弃">
-            <div style={{
-              background: "#747d8c",
-              color: "white",
-              borderRadius: "50%",
-              width: "24px",
-              height: "24px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              boxShadow: "0 2px 8px rgba(116, 125, 140, 0.5)",
-            }}>
-              <CloseOutlined style={{ fontSize: "14px" }} />
             </div>
           </Tooltip>
         ) : null}
