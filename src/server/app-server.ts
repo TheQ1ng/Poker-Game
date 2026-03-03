@@ -10,16 +10,25 @@ import authMiddleware from "./middleware/auth";
 
 const app = websockify(new Koa());
 
+// 提供静态文件服务
+app.use(serve(path.join(__dirname, "../../../build"), {
+  maxage: 86400000, // 24小时缓存
+  gzip: true // 启用gzip压缩
+}));
+
+// 处理API请求
 app
-  .use(serve(path.join(__dirname, "../../../build"), {
-    maxage: 86400000, // 24小时缓存
-    gzip: true // 启用gzip压缩
-  }))
   .use(koaBody({ multipart: true }))
   .use(responseMiddleware)
   .use(authMiddleware)
   .use(router.routes())
   .use(router.allowedMethods());
+
+// 对于未匹配到的路由，返回index.html，让前端路由处理
+app.use(async (ctx) => {
+  ctx.type = 'html';
+  ctx.body = require('fs').createReadStream(path.join(__dirname, "../../../build/index.html"));
+});
 
 app.ws.use(ws);
 

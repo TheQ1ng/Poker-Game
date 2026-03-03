@@ -185,7 +185,25 @@ export function isStraight(cards: Card[], is_short = false): Card[] {
 // const r = isStraight(["14s", "2s", "3c", "4s", "5s"]);
 // console.log(r);
 
-// Rank 1: 同花顺
+// 皇家同花顺
+function isRoyalFlush(cards: Card[]): Card[] {
+  const flushCards = isFlush(cards);
+  if (flushCards.length < 5) return [];
+  
+  const nums = flushCards.map(c => c.num).sort((a, b) => b - a);
+  const royalNums = [14, 13, 12, 11, 10];
+  
+  for (let i = 0; i <= nums.length - 5; i++) {
+    const slice = nums.slice(i, i + 5);
+    if (slice.every((num, index) => num === royalNums[index])) {
+      return flushCards.filter(c => royalNums.includes(c.num)).slice(0, 5);
+    }
+  }
+  
+  return [];
+}
+
+// 同花顺
 export function isStraightFlush(cards: Card[], is_short = false) {
   return isStraight(isFlush(cards), is_short);
 }
@@ -267,32 +285,44 @@ export function isPair(cards: Card[]) {
     : [];
 }
 
-// Rank 9: High cards
+// Rank 1: 皇家同花顺
+// Rank 2: 同花顺
+// Rank 3: 四条
+// Rank 4: 同花
+// Rank 5: 葫芦
+// Rank 6: 顺子
+// Rank 7: 三条
+// Rank 8: 两对
+// Rank 9: 对子
+// Rank 10: 高牌
 
 //###//
 
 export enum PokerType {
-  StraightFlush = 1, // 同花顺
-  FourKinds = 2, // 四条
-  FullHouse = 3, // 葫芦
+  RoyalFlush = 1, // 皇家同花顺
+  StraightFlush = 2, // 同花顺
+  FourKinds = 3, // 四条
   Flush = 4, // 同花
-  Straight = 5, // 顺子
-  ThreeKinds = 6, // 三条
-  TwoPair = 7, // 两对
-  OnePair = 8, // 对子
-  HighCards = 9, // 高牌
+  FullHouse = 5, // 葫芦
+  Straight = 6, // 顺子
+  ThreeKinds = 7, // 三条
+  TwoPair = 8, // 两对
+  OnePair = 9, // 对子
+  HighCards = 10, // 高牌
 }
 
 export function pokerTypeName(type: PokerType) {
   switch (type) {
+    case PokerType.RoyalFlush:
+      return "Royal Flush";
     case PokerType.StraightFlush:
       return "Straight Flush";
     case PokerType.FourKinds:
       return "Four of a Kind";
-    case PokerType.FullHouse:
-      return "Full House";
     case PokerType.Flush:
       return "Flush";
+    case PokerType.FullHouse:
+      return "Full House";
     case PokerType.Straight:
       return "Straight";
     case PokerType.ThreeKinds:
@@ -318,54 +348,80 @@ export interface PokerRank {
 export function rank(hands: any, is_short = false): PokerRank {
   const cards = parse(hands);
   let maxCards: Card[] = [];
+  
+  // 皇家同花顺
+  if ((maxCards = isRoyalFlush(hands)).length > 0) {
+    return {
+      type: PokerType.RoyalFlush,
+      cards: maxCards,
+    };
+  }
+  
+  // 同花顺
   if ((maxCards = isStraightFlush(hands, is_short)).length > 0) {
     return {
       type: PokerType.StraightFlush,
       cards: maxCards.splice(0, 5),
     };
   }
+  
+  // 四条
   if ((maxCards = isFour(hands)).length > 0) {
     return {
       type: PokerType.FourKinds,
       cards: maxCards,
     };
   }
-  if ((maxCards = isFullHouse(hands)).length > 0) {
-    return {
-      type: PokerType.FullHouse,
-      cards: maxCards,
-    };
-  }
+  
+  // 同花
   if ((maxCards = isFlush(hands)).length > 0) {
     return {
       type: PokerType.Flush,
       cards: maxCards.splice(0, 5),
     };
   }
+  
+  // 葫芦
+  if ((maxCards = isFullHouse(hands)).length > 0) {
+    return {
+      type: PokerType.FullHouse,
+      cards: maxCards,
+    };
+  }
+  
+  // 顺子
   if ((maxCards = isStraight(hands, is_short)).length > 0) {
     return {
       type: PokerType.Straight,
       cards: maxCards.splice(0, 5),
     };
   }
+  
+  // 三条
   if ((maxCards = isThreeKinds(hands)).length > 0) {
     return {
       type: PokerType.ThreeKinds,
       cards: maxCards,
     };
   }
+  
+  // 两对
   if ((maxCards = isTwoPair(hands)).length > 0) {
     return {
       type: PokerType.TwoPair,
       cards: maxCards,
     };
   }
+  
+  // 对子
   if ((maxCards = isPair(hands)).length > 0) {
     return {
       type: PokerType.OnePair,
       cards: maxCards,
     };
   }
+  
+  // 高牌
   return {
     type: PokerType.HighCards,
     cards: [...cards].splice(0, 5),

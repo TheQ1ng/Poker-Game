@@ -127,14 +127,16 @@ export function userLeaveRoom(token: Token) {
   const roomid = userMap[token].roomid;
   const room = roomMap[roomid];
   if (
-    room.isGaming &&
+    room && room.isGaming &&
     !userMap[token].isFolded &&
     userMap[token].isInCurrentGame &&
-    !room.game.isSettling
+    room.game && !room.game.isSettling
   ) {
     throw `请结束本局后再离开`;
   }
-  room.removeUser(token);
+  if (room) {
+    room.removeUser(token);
+  }
   send2user(token, {
     leave: true,
   });

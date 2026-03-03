@@ -23,6 +23,7 @@ export function initDatabase() {
       password TEXT DEFAULT '',
       nickname TEXT DEFAULT '',
       avatar TEXT DEFAULT '',
+      admin INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -44,39 +45,49 @@ export function initDatabase() {
 }
 
 // 获取用户信息
-export function getUser(username: string): { password: string; nickname: string; avatar: string } | undefined {
-  const stmt = db.prepare("SELECT password, nickname, avatar FROM users WHERE username = ?");
-  const row = stmt.get(username) as { password: string; nickname: string; avatar: string } | undefined;
+export function getUser(username: string): { password: string; nickname: string; avatar: string; admin: number } | undefined {
+  const stmt = db.prepare("SELECT password, nickname, avatar, admin FROM users WHERE username = ?");
+  const row = stmt.get(username) as { password: string; nickname: string; avatar: string; admin: number } | undefined;
   return row;
 }
 
 // 创建或更新用户
-export function saveUser(username: string, password: string, nickname: string = "", avatar: string = "") {
+export function saveUser(username: string, password: string, nickname: string = "", avatar: string = "", admin: number = 0) {
   const stmt = db.prepare(`
-    INSERT INTO users (username, password, nickname, avatar, updated_at)
-    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO users (username, password, nickname, avatar, admin, updated_at)
+    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(username) DO UPDATE SET
       password = excluded.password,
       nickname = excluded.nickname,
       avatar = excluded.avatar,
+      admin = excluded.admin,
       updated_at = CURRENT_TIMESTAMP
   `);
-  stmt.run(username, password, nickname, avatar);
+  stmt.run(username, password, nickname, avatar, admin);
 }
 
 // 更新用户资料
-export function updateUserProfile(username: string, nickname: string, avatar: string) {
+export function updateUserProfile(username: string, nickname: string, avatar: string, admin: number = 0) {
   const stmt = db.prepare(`
-    UPDATE users SET nickname = ?, avatar = ?, updated_at = CURRENT_TIMESTAMP
+    UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
     WHERE username = ?
   `);
-  stmt.run(nickname, avatar, username);
+  stmt.run(nickname, avatar, admin, username);
 }
 
 // 获取用户资料
-export function getUserProfile(username: string): { nickname: string; avatar: string } | undefined {
-  const stmt = db.prepare("SELECT nickname, avatar FROM users WHERE username = ?");
-  return stmt.get(username) as { nickname: string; avatar: string } | undefined;
+export function getUserProfile(username: string): { nickname: string; avatar: string; admin: number } | undefined {
+  const stmt = db.prepare("SELECT nickname, avatar, admin FROM users WHERE username = ?");
+  return stmt.get(username) as { nickname: string; avatar: string; admin: number } | undefined;
+}
+
+// 检查昵称是否已存在
+export function isNicknameExists(nickname: string, excludeUsername: string = ""): boolean {
+  console.log('isNicknameExists:', { nickname, excludeUsername });
+  const stmt = db.prepare("SELECT COUNT(*) as count FROM users WHERE nickname = ? AND username != ?");
+  const result = stmt.get(nickname, excludeUsername) as { count: number };
+  console.log('查询结果:', result);
+  return result.count > 0;
 }
 
 // 保存游戏记录

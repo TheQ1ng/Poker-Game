@@ -21,6 +21,19 @@ import {
 } from "../features/room/roomSlice";
 import { AppThunk } from "./store";
 
+// 快捷消息到音效的映射
+const messageToSoundMap: { [key: string]: string } = {
+  "棒棒棒棒！": "bangbangbangbang.WAV",
+  "难道他真的是赋能哥": "funeng.WAV",
+  "哈哈哈哈哈哈": "hahahhahahaha.WAV",
+  "颗秒！": "kemiao.WAV",
+  "17张牌你能秒我！": "17zhangpai.WAV",
+  "给我擦皮鞋！": "capixie.WAV",
+  "慢波！": "manbo.WAV",
+  "牌没有问题！": "meiyouwenti.WAV",
+  "我要验牌！": "yanpai.WAV"
+};
+
 let ws: WebSocket;
 function send2server(data: any) {
   ws.send(JSON.stringify(data));
@@ -139,18 +152,26 @@ export const connect2server =
           }
           if (data.roomChat) {
             dispatch(setRoomChatBubble({ userId: data.roomChat.userId, text: data.roomChat.message }));
-            // 语音播报消息，让所有玩家都能听到（表情消息不播报）
-            if ('speechSynthesis' in window) {
-              // 检查是否为表情消息（只包含表情符号）
-              const message = data.roomChat.message;
-              const isEmojiOnly = /^\p{Extended_Pictographic}+$/u.test(message);
-              if (!isEmojiOnly) {
-                const utterance = new SpeechSynthesisUtterance(message);
-                utterance.lang = 'zh-CN';
-                utterance.volume = 1;
-                utterance.rate = 1;
-                utterance.pitch = 1;
-                speechSynthesis.speak(utterance);
+            const message = data.roomChat.message;
+            // 检查是否为快捷消息（有对应的音效）
+            const soundFile = messageToSoundMap[message];
+            if (soundFile) {
+              // 播放快捷消息对应的音效
+              const audio = new Audio(`/sounds/${soundFile}`);
+              audio.play().catch(err => console.warn('Failed to play sound:', err));
+            } else {
+              // 非快捷消息，使用语音朗读
+              if ('speechSynthesis' in window) {
+                // 检查是否为表情消息（只包含表情符号）
+                const isEmojiOnly = /^\p{Extended_Pictographic}+$/u.test(message);
+                if (!isEmojiOnly) {
+                  const utterance = new SpeechSynthesisUtterance(message);
+                  utterance.lang = 'zh-CN';
+                  utterance.volume = 1;
+                  utterance.rate = 1;
+                  utterance.pitch = 1;
+                  speechSynthesis.speak(utterance);
+                }
               }
             }
           }

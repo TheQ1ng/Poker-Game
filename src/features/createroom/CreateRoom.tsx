@@ -6,6 +6,7 @@ import {
   Dropdown,
   Menu,
   Modal,
+  message,
 } from "antd";
 import Tabs from "antd/lib/tabs";
 import { DownOutlined, PlusOutlined, KeyOutlined, HistoryOutlined, LogoutOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
@@ -169,27 +170,20 @@ function CreateRoom() {
   };
   // 保存个人资料
   const handleSaveProfile = async () => {
+    console.log('开始保存个人资料', { profileNickname, profileAvatar });
+    // 直接测试错误提示
+    message.error('测试错误提示');
     try {
-      await updateProfile(profileNickname, profileAvatar);
+      const result = await updateProfile(profileNickname, profileAvatar);
+      console.log('保存成功', result);
       // 保存到 localStorage 供其他地方使用
       localStorage.setItem("nickname", profileNickname);
-  // 玩家头像选项 - 使用静态导入
-  const avatarOptions = [
-    { filename: "playerIcon.png", img: require("../../assets/playerIcon.png") },
-    { filename: "playerIcon (1).png", img: require("../../assets/playerIcon (1).png") },
-    { filename: "playerIcon (2).png", img: require("../../assets/playerIcon (2).png") },
-    { filename: "playerIcon (3).png", img: require("../../assets/playerIcon (3).png") },
-    { filename: "playerIcon (4).png", img: require("../../assets/playerIcon (4).png") },
-    { filename: "playerIcon (5).png", img: require("../../assets/playerIcon (5).png") },
-    { filename: "playerIcon (6).png", img: require("../../assets/playerIcon (6).png") },
-    { filename: "playerIcon (7).png", img: require("../../assets/playerIcon (7).png") },
-    { filename: "playerIcon (8).png", img: require("../../assets/playerIcon (8).png") },
-  ];
-
       localStorage.setItem("avatar", profileAvatar);
       setProfileModalVisible(false);
+      message.success('个人资料保存成功');
     } catch (error) {
       console.error("保存资料失败", error);
+      message.error(error instanceof Error ? error.message : String(error));
     }
   };
 

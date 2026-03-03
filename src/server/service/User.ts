@@ -28,6 +28,7 @@ class User {
   isWinner: boolean = false;
   isSpectator: boolean = false;
   isBot: boolean = false; // 是否是机器人
+  isAdmin: boolean = false; // 是否是管理员
   needAction: boolean = false; // act each round
   actionName: string = "";
   stack: number = 0;

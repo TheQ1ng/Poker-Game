@@ -23,17 +23,19 @@ import { RollingNumber } from "../../components/RollingNumber";
 import { BigBlind, Dealer, SmallBlind } from "./Symbol";
 import { selectGame, selectRoom, selectSelf, selectRoomChatBubbles, clearRoomChatBubble } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
+import { soundManager } from "../../utils/soundManager";
 
-// 预设快捷消息
+// 预设快捷消息与音效绑定
 const quickMessages = [
-  "窝腰烟牌",
-  "gay窝擦屁鞋",
-  "666",
-  "快点啊，我等到花都谢了",
-  "对A无脑冲",
-  "我中顺了",
-  "我中花了",
-  "福禄浩死打不打的过同花"
+  { text: "棒棒棒棒！", sound: "bangbangbangbang.WAV" },
+  { text: "难道他真的是赋能哥", sound: "funeng.WAV" },
+  { text: "哈哈哈哈哈哈", sound: "hahahhahahaha.WAV" },
+  { text: "颗秒！", sound: "kemiao.WAV" },
+  { text: "17张牌你能秒我！", sound: "17zhangpai.WAV" },
+  { text: "给我擦皮鞋！", sound: "capixie.WAV" },
+  { text: "慢波！", sound: "manbo.WAV" },
+  { text: "牌没有问题！", sound: "meiyouwenti.WAV" },
+  { text: "我要验牌！", sound: "yanpai.WAV" }
 ];
 
 // 表情列表
@@ -559,11 +561,12 @@ export function Owner({
                         e.currentTarget.style.backgroundColor = '#f0f0f0';
                       }}
                       onClick={() => {
-                        ws_sendMessage(message);
+                        // 发送消息，通过 websocket 处理音效播放
+                        ws_sendMessage(message.text);
                         setQuickChatVisible(false);
                       }}
                     >
-                      {message}
+                      {message.text}
                     </div>
                   ))}
                 </div>

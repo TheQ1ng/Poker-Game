@@ -75,6 +75,7 @@ export interface UserProfile {
     name: string;
     nickname: string;
     avatar: string;
+    isAdmin: boolean;
   };
 }
 
@@ -89,13 +90,26 @@ export async function fetchProfile(): Promise<UserProfile> {
 }
 
 export async function updateProfile(nickname: string, avatar: string): Promise<UserProfile> {
-  const rsp = await fetch("/updateprofile", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: localStorage.getItem("token") || "",
-    },
-    body: JSON.stringify({ nickname, avatar }),
-  });
-  return await rsp.json();
+  console.log('调用updateProfile', { nickname, avatar });
+  try {
+    const rsp = await fetch("/updateprofile", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: localStorage.getItem("token") || "",
+      },
+      body: JSON.stringify({ nickname, avatar }),
+    });
+    console.log('fetch成功，状态码:', rsp.status);
+    const data = await rsp.json();
+    console.log('updateProfile response:', data);
+    if (data.code !== 0) {
+      console.log('后端返回错误:', data.error);
+      throw new Error(data.error || "保存失败");
+    }
+    return data;
+  } catch (error) {
+    console.log('updateProfile出错:', error);
+    throw error;
+  }
 }

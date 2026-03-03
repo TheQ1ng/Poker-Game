@@ -2,7 +2,8 @@ import Router from "@koa/router";
 import * as jwt from "jsonwebtoken";
 import { secret } from "../config";
 import { createRoom, roomMap, userEnterRoom, userMap, getAllRooms, createUser } from "../service";
-import { getUserProfile, updateUserProfile, saveUser, getUser } from "../service/database";
+import { getUserProfile, updateUserProfile, saveUser, getUser, isNicknameExists } from "../service/database";
+import db from "../service/database";
 import User from "../service/User";
 
 const router = new Router();
@@ -75,8 +76,9 @@ router.post("/register", (ctx) => {
     if (!userMap[token]) {
       const user = createUser(token, name, finalAvatar);
       user.nickname = existingUser.nickname;
+      user.isAdmin = existingUser.admin === 1;
     }
-    ctx.data = token;
+    ctx.data = { token, isAdmin: existingUser.admin === 1 };
   } else {
     // 用户不存在，创建新用户并保存到数据库
     let finalAvatar = avatar || "";
@@ -95,10 +97,11 @@ router.post("/register", (ctx) => {
       const randomIndex = Math.floor(Math.random() * defaultAvatars.length);
       finalAvatar = defaultAvatars[randomIndex];
     }
-    saveUser(name, password, "", finalAvatar);
+    saveUser(name, password, "", finalAvatar, 0);
     const token = jwt.sign(name + "@" + password, secret);
-    createUser(token, name, finalAvatar);
-    ctx.data = token;
+    const user = createUser(token, name, finalAvatar);
+    user.isAdmin = false;
+    ctx.data = { token, isAdmin: false };
   }
 });
 
@@ -145,6 +148,13 @@ router.post("/updateprofile", (ctx) => {
   
   // 更新数据库中的用户资料
   if (nickname !== undefined) {
+    // 检查昵称是否已被其他用户使用
+    console.log('检查昵称是否已存在:', { nickname, username });
+    const exists = isNicknameExists(nickname, username);
+    console.log('昵称是否已存在:', exists);
+    if (nickname && exists) {
+      throw "昵称已被使用，请选择其他昵称";
+    }
     userMap[token].nickname = nickname;
   }
   if (avatar !== undefined) {
@@ -173,6 +183,7 @@ router.get("/profile", (ctx) => {
   if (userProfile) {
     userMap[token].nickname = userProfile.nickname || "";
     userMap[token].avatar = userProfile.avatar || "";
+    userMap[token].isAdmin = userProfile.admin === 1;
   }
 
   // 如果用户资料里依然没有头像（例如老数据），在登录态下兜底分配一个默认头像并持久化
@@ -191,12 +202,138 @@ router.get("/profile", (ctx) => {
     const randomIndex = Math.floor(Math.random() * defaultAvatars.length);
     const randomAvatar = defaultAvatars[randomIndex];
     userMap[token].avatar = randomAvatar;
-    updateUserProfile(username, userMap[token].nickname || "", randomAvatar);
+    updateUserProfile(username, userMap[token].nickname || "", randomAvatar, userMap[token].isAdmin ? 1 : 0);
   }
 
   ctx.data = {
     name: userMap[token].name,
     nickname: userMap[token].nickname,
     avatar: userMap[token].avatar,
+    isAdmin: userMap[token].isAdmin,
   };
+});
+
+// 管理员接口：获取所有用户
+router.get("/admin/users", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  // 从数据库获取所有用户
+  const stmt = db.prepare("SELECT username, nickname, avatar, admin, created_at FROM users");
+  const users = stmt.all();
+  ctx.data = users;
+});
+
+// 管理员接口：获取所有游戏记录
+router.get("/admin/game-records", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  // 从数据库获取所有游戏记录
+  const stmt = db.prepare("SELECT * FROM game_records ORDER BY created_at DESC");
+  const records = stmt.all();
+  
+  // 为每条记录添加nickname字段
+  const recordsWithNickname = records.map((record: any) => {
+    // 从数据库获取用户信息
+    const userProfile = getUserProfile(record.username);
+    return {
+      ...record,
+      nickname: userProfile?.nickname || record.username
+    };
+  });
+  
+  ctx.data = recordsWithNickname;
+});
+
+// 管理员接口：更新用户信息
+router.post("/admin/user/update", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  const { username, nickname, avatar, admin } = ctx.request.body;
+  if (!username) throw "username is required";
+  
+  // 更新用户信息
+  const stmt = db.prepare(`
+    UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE username = ?
+  `);
+  stmt.run(nickname, avatar, admin, username);
+  ctx.data = { success: true };
+});
+
+// 管理员接口：删除用户
+router.post("/admin/user/delete", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  const { username } = ctx.request.body;
+  if (!username || username === "admin") throw "invalid username";
+  
+  // 删除用户
+  const stmt = db.prepare("DELETE FROM users WHERE username = ?");
+  stmt.run(username);
+  ctx.data = { success: true };
+});
+
+// 管理员接口：获取房间列表
+router.get("/admin/rooms", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  // 从roomMap中获取房间信息
+  const rooms = Object.values(roomMap).map(room => {
+    return {
+      id: room.id,
+      sb: room.smallBlind,
+      buyin: room.buyIn,
+      reBuyLimit: room.reBuyLimit,
+      isShortDeck: room.isShortDeck,
+      isOmaha: room.isOmaha,
+      players: room.users.map(token => {
+        const user = userMap[token];
+        return {
+          name: user.name,
+          nickname: user.nickname,
+          avatar: user.avatar,
+          stack: user.stack,
+          isOwner: user.isRoomOwner,
+          isReady: user.isReady
+        };
+      }),
+      isActive: room?.isGaming || false
+    };
+  });
+  
+  ctx.data = rooms;
+});
+
+// 管理员接口：解散房间
+router.post("/admin/room/dissolve", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  const { roomId } = ctx.request.body;
+  if (!roomId) throw "roomId is required";
+  
+  const room = roomMap[roomId];
+  if (!room) throw "room not found";
+  
+  // 解散房间，将所有用户移出房间
+  room.users.forEach(token => {
+    const user = userMap[token];
+    user.leaveRoom();
+  });
+  
+  // 从roomMap中删除房间
+  delete roomMap[roomId];
+  
+  ctx.data = { success: true };
 });

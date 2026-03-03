@@ -567,51 +567,56 @@ export class Game {
       console.log("multi settle users:", settleUsers);
 
       // decide
-      if (!this.multiSettleStart) {
-        // multiple settle users
-        publish2all(this.roomid);
+      // 注释掉发牌次数选择逻辑，默认只发一次
+    // if (!this.multiSettleStart) {
+    //   // multiple settle users
+    //   publish2all(this.roomid);
 
-        settleUsers.forEach((t) => {
-          send2user(t, {
-            selectSettleTimes: 1,
-          });
-        });
+    //   settleUsers.forEach((t) => {
+    //     send2user(t, {
+    //       selectSettleTimes: 1,
+    //     });
+    //   });
 
-        this.multiSettleTimer = delayTry(() => {
-          settleUsers.forEach((t) => {
-            this.userSetSettleTimes(t, 4);
-            send2user(t, {
-              selectSettleTimes: 0,
-            });
-          });
-        }, 30000);
+    //   this.multiSettleTimer = delayTry(() => {
+    //     settleUsers.forEach((t) => {
+    //       this.userSetSettleTimes(t, 4);
+    //       send2user(t, {
+    //         selectSettleTimes: 0,
+    //       });
+    //     });
+    //   }, 30000);
 
-        const log =
-          "玩家" +
-          settleUsers.map((t) => userMap[t].nickname || userMap[t].name).join(", ") +
-          "决定发牌次数";
-        publishLog2all(this.roomid, [log]);
+    //   const log =
+    //     "玩家" +
+    //     settleUsers.map((t) => userMap[t].nickname || userMap[t].name).join(", ") +
+    //     "决定发牌次数";
+    //   publishLog2all(this.roomid, [log]);
 
-        this.multiSettleStart = true;
-        this.multiSettleRound = this.round;
-        this.multiSettleIndex = 0;
-        return;
-      } else if (!this.multiSettleConfirm) {
-        // check all settle users selected
-        let settleTimes = Number.MAX_VALUE;
-        settleUsers.forEach(
-          (t) => (settleTimes = Math.min(settleTimes, userMap[t].settleTimes))
-        );
-        console.log("times", settleTimes);
-        if (settleTimes === 0) {
-          // wait for other user
-          return;
-        } else {
-          this.multiSettleTimes = settleTimes;
-          this.multiSettleConfirm = true;
-          publishLog2all(this.roomid, [`发${settleTimes}次`]);
-        }
-      }
+    //   this.multiSettleStart = true;
+    //   this.multiSettleRound = this.round;
+    //   this.multiSettleIndex = 0;
+    //   return;
+    // } else if (!this.multiSettleConfirm) {
+    //   // check all settle users selected
+    //   let settleTimes = Number.MAX_VALUE;
+    //   settleUsers.forEach(
+    //     (t) => (settleTimes = Math.min(settleTimes, userMap[t].settleTimes))
+    //   );
+    //   console.log("times", settleTimes);
+    //   if (settleTimes === 0) {
+    //     // wait for other user
+    //     return;
+    //   } else {
+    //     this.multiSettleTimes = settleTimes;
+    //     this.multiSettleConfirm = true;
+    //     publishLog2all(this.roomid, [`发${settleTimes}次`]);
+    //   }
+    // }
+    
+    // 默认只发一次
+    this.multiSettleTimes = 1;
+    this.multiSettleConfirm = true;
     }
 
     this.round += 1;
