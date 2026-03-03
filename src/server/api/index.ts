@@ -34,6 +34,7 @@ router.get("/rooms", (ctx) => {
 });
 
 router.post("/register", (ctx) => {
+  console.log('[DEBUG] Register API called, body:', ctx.request.body);
   const { name, password, avatar } = ctx.request.body;
   if (name === null || name === "") {
     throw new Error(`register name is empty`);
@@ -79,6 +80,7 @@ router.post("/register", (ctx) => {
       user.isAdmin = existingUser.admin === 1;
     }
     ctx.data = { token, isAdmin: existingUser.admin === 1 };
+    console.log('[DEBUG] Existing user login success, token:', token?.substring(0, 10) + '...');
   } else {
     // 用户不存在，创建新用户并保存到数据库
     let finalAvatar = avatar || "";
@@ -102,6 +104,7 @@ router.post("/register", (ctx) => {
     const user = createUser(token, name, finalAvatar);
     user.isAdmin = false;
     ctx.data = { token, isAdmin: false };
+    console.log('[DEBUG] New user register success, token:', token?.substring(0, 10) + '...');
   }
 });
 

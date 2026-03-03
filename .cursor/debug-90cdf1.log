@@ -1,0 +1,18 @@
+{"sessionId":"90cdf1","location":"Register.tsx:12","message":"Form onFinish triggered","data":{"account":{"name":"nihaoaa","password":"nihaoaa"}},"timestamp":1772557820905,"runId":"debug1","hypothesisId":"A"}
+{"sessionId":"90cdf1","location":"registerAPI.ts:10","message":"API call started","data":{"name":"nihaoaa"},"timestamp":1772557820906,"runId":"debug1","hypothesisId":"A"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:27","message":"Thunk started","data":{"account":{"name":"nihaoaa","password":"nihaoaa"}},"timestamp":1772557820906,"runId":"debug1","hypothesisId":"C"}
+{"sessionId":"90cdf1","location":"registerAPI.ts:22","message":"API response received","data":{"code":0,"hasToken":false,"hasError":false},"timestamp":1772557820914,"runId":"debug1","hypothesisId":"D"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:30","message":"Response received in thunk","data":{"code":0,"hasData":true},"timestamp":1772557820915,"runId":"debug1","hypothesisId":"C"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:32","message":"Success branch entered","data":{},"timestamp":1772557820915,"runId":"debug1","hypothesisId":"D"}
+{"sessionId":"90cdf1","location":"Register.tsx:12","message":"Form onFinish triggered","data":{"account":{"name":"nihaoaa","password":"nihaoaa"}},"timestamp":1772557821941,"runId":"debug1","hypothesisId":"A"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:27","message":"Thunk started","data":{"account":{"name":"nihaoaa","password":"nihaoaa"}},"timestamp":1772557821942,"runId":"debug1","hypothesisId":"C"}
+{"sessionId":"90cdf1","location":"registerAPI.ts:10","message":"API call started","data":{"name":"nihaoaa"},"timestamp":1772557821942,"runId":"debug1","hypothesisId":"A"}
+{"sessionId":"90cdf1","location":"Register.tsx:12","message":"Form onFinish triggered","data":{"account":{"name":"nihaoaa","password":"nihaoaa"}},"timestamp":1772557822075,"runId":"debug1","hypothesisId":"A"}
+{"sessionId":"90cdf1","location":"registerAPI.ts:10","message":"API call started","data":{"name":"nihaoaa"},"timestamp":1772557822076,"runId":"debug1","hypothesisId":"A"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:27","message":"Thunk started","data":{"account":{"name":"nihaoaa","password":"nihaoaa"}},"timestamp":1772557822076,"runId":"debug1","hypothesisId":"C"}
+{"sessionId":"90cdf1","location":"registerAPI.ts:22","message":"API response received","data":{"code":0,"hasToken":false,"hasError":false},"timestamp":1772557822247,"runId":"debug1","hypothesisId":"D"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:30","message":"Response received in thunk","data":{"code":0,"hasData":true},"timestamp":1772557822247,"runId":"debug1","hypothesisId":"C"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:32","message":"Success branch entered","data":{},"timestamp":1772557822247,"runId":"debug1","hypothesisId":"D"}
+{"sessionId":"90cdf1","location":"registerAPI.ts:22","message":"API response received","data":{"code":0,"hasToken":false,"hasError":false},"timestamp":1772557822386,"runId":"debug1","hypothesisId":"D"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:30","message":"Response received in thunk","data":{"code":0,"hasData":true},"timestamp":1772557822386,"runId":"debug1","hypothesisId":"C"}
+{"sessionId":"90cdf1","location":"registerSlice.ts:32","message":"Success branch entered","data":{},"timestamp":1772557822386,"runId":"debug1","hypothesisId":"D"}

@@ -41,6 +41,19 @@ export function initDatabase() {
     )
   `);
 
+  // 检查并添加 admin 列（兼容旧数据库）
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(users)").all() as Array<{name: string}>;
+    const hasAdminColumn = tableInfo.some(col => col.name === 'admin');
+    if (!hasAdminColumn) {
+      console.log("检测到旧数据库，添加 admin 列...");
+      db.exec("ALTER TABLE users ADD COLUMN admin INTEGER DEFAULT 0");
+      console.log("admin 列添加成功");
+    }
+  } catch (e) {
+    console.error("迁移 admin 列失败:", e);
+  }
+
   console.log("数据库初始化完成");
 }
 

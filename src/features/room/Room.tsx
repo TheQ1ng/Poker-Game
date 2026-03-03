@@ -16,6 +16,7 @@ import {
   UserAddOutlined,
   InfoCircleOutlined,
   DollarOutlined,
+  CloseOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { User } from "./User";
@@ -30,6 +31,7 @@ import {
   getSelectSettleStatus,
   setSelectSettleTimes,
   selectServerTimeOffset,
+  selectPendingSeeHandRequests,
 } from "./roomSlice";
 import {
   ws_pauseGame,
@@ -43,6 +45,7 @@ import {
   ws_kickUser,
   ws_settleGame,
   ws_extendActionTime,
+  ws_respondSeeHand,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -68,6 +71,7 @@ function Room() {
   const serverTimeOffset = useAppSelector(selectServerTimeOffset);
   const game = useAppSelector(selectGame);
   const selectSettleStatus = useAppSelector(getSelectSettleStatus);
+  const pendingSeeHandRequests = useAppSelector(selectPendingSeeHandRequests);
   const isSettling = game?.isSettling || false;
   // 使用服务端时间偏移来计算下一局开始的剩余秒数，避免不同客户端本地时间差异
   const serverNowForNextGame = Date.now() + serverTimeOffset;
@@ -360,6 +364,46 @@ function Room() {
         }}
       >
         <Spectators />
+        {/* 结算阶段：有人申请看我的手牌时，在被请求者屏幕中央弹出对话框 */}
+        {isSettling && self && pendingSeeHandRequests && pendingSeeHandRequests.length > 0 && (
+          <div className="see-hand-center-dialog-wrapper">
+            {pendingSeeHandRequests.map((req, index) => (
+              <div
+                key={req.requestId}
+                className="see-hand-center-dialog"
+                style={{
+                  transform: `translate(-50%, -50%) translateY(${-index * 8}px)`,
+                }}
+              >
+                <div className="see-hand-center-dialog-title">看牌请求</div>
+                <div className="see-hand-center-dialog-body">
+                  <div className="see-hand-center-dialog-text">
+                    <strong>{req.fromName}</strong> 申请支付{" "}
+                    <span className="see-hand-center-dialog-chips">{req.chips}</span> 欢乐豆查看你的底牌
+                  </div>
+                  <div className="see-hand-center-dialog-actions">
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CheckOutlined />}
+                      onClick={() => ws_respondSeeHand(req.requestId, true)}
+                      style={{ marginRight: 8 }}
+                    >
+                      同意
+                    </Button>
+                    <Button
+                      size="small"
+                      icon={<CloseOutlined />}
+                      onClick={() => ws_respondSeeHand(req.requestId, false)}
+                    >
+                      拒绝
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {/* 右上角：行动倒计时 / 结算后倒计时（圆圈引线燃烧样式） */}
         {isSettlingCountdown ? (
           <div

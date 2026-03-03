@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe, selectRoomChatBubbles } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
-import { ws_kickUser, ws_requestSeeHand, ws_respondSeeHand, ws_sendMessage } from "../../app/websocket";
+import { ws_kickUser, ws_requestSeeHand, ws_sendMessage } from "../../app/websocket";
 import { clearRoomChatBubble } from "./roomSlice";
 
 // 头像图片映射
@@ -143,7 +143,6 @@ export function User({
     }
   }, [game?.bb]);
   const [seeHandPopOpen, setSeeHandPopOpen] = useState<Record<string, boolean>>({});
-  const requestFromThisUser = pendingSeeHandRequests?.find((r) => r.fromUserId === id);
   const name = user?.name || "";
   const nickname = user?.nickname || name;
   const avatar = user?.avatar || "";
@@ -402,36 +401,6 @@ export function User({
           </div>
           );
         })()}
-        {/* 被请求者看到：申请人头上的对话框，点上移；勾/叉；文案为「我想支付X欢乐豆查看你的手牌」 */}
-        {requestFromThisUser && (
-          <div className="see-hand-request-box" style={{
-            position: 'absolute',
-            top: '-42px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            marginBottom: 4,
-            padding: '8px 12px',
-            backgroundColor: 'rgba(0, 0, 0, 0.88)',
-            borderRadius: '8px',
-            border: '1px solid rgba(255,255,255,0.3)',
-            boxShadow: '0 2px 12px rgba(0,0,0,0.5)',
-            zIndex: 20,
-            minWidth: 160,
-            textAlign: 'center',
-          }}>
-            <div style={{ color: '#eee', fontSize: 12, marginBottom: 8 }}>
-              我想支付 {requestFromThisUser.chips} 欢乐豆查看你的手牌
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <Tooltip title="同意">
-                <Button size="small" type="primary" icon={<CheckOutlined />} onClick={() => ws_respondSeeHand(requestFromThisUser!.requestId, true)} />
-              </Tooltip>
-              <Tooltip title="拒绝">
-                <Button size="small" danger icon={<CloseOutlined />} onClick={() => ws_respondSeeHand(requestFromThisUser!.requestId, false)} />
-              </Tooltip>
-            </div>
-          </div>
-        )}
         {/* 聊天气泡：头顶显示最近一条消息，5 秒后自动消失 */}
         {roomChatBubbles[id] && (
           <div className="room-chat-bubble" style={{
@@ -443,34 +412,6 @@ export function User({
           }}>
             <div className="room-chat-bubble-inner">
               {roomChatBubbles[id].text}
-              {/* 看牌请求的确认按钮 */}
-              {roomChatBubbles[id].text.includes('请求看牌') && pendingSeeHandRequests && pendingSeeHandRequests.length > 0 && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 8, justifyContent: 'center' }}>
-                  {pendingSeeHandRequests.map((request) => (
-                    <Button
-                      key={request.requestId}
-                      type="primary"
-                      size="small"
-                      icon={<CheckOutlined />}
-                      onClick={() => {
-                        ws_respondSeeHand(request.requestId, true);
-                      }}
-                      style={{ background: '#52c41a', borderColor: '#52c41a' }}
-                    />
-                  ))}
-                  {pendingSeeHandRequests.map((request) => (
-                    <Button
-                      key={`${request.requestId}-reject`}
-                      size="small"
-                      icon={<CloseOutlined />}
-                      onClick={() => {
-                        ws_respondSeeHand(request.requestId, false);
-                      }}
-                      style={{ background: '#f5222d', borderColor: '#f5222d' }}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
             <div className="room-chat-bubble-tail" />
           </div>

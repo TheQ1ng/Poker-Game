@@ -9,7 +9,7 @@ function Register() {
   const error = useAppSelector(selectError);
 
   const onFinish = (account: { name: string; password: string }) => {
-    console.log(account);
+    console.log('[DEBUG] Form onFinish triggered:', account);
     dispatch(registerAsync({ account, dispatch }));
   };
 

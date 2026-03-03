@@ -206,7 +206,9 @@ body {
   position: absolute;
   width: 100%;
   height: 75px;
-  bottom: 0px;
+  /* 略微下移并向右偏一点，避免左侧玩家摊牌时出画面 */
+  bottom: -4px;
+  left: 8px;
   display: flex;
   flex-direction: row;
 }
@@ -388,6 +390,9 @@ body {
 .bet {
   font-weight: bold;
   color: white;
+  /* 确保上方玩家当轮下注不会被中间五张公共牌遮挡 */
+  position: relative;
+  z-index: 5;
 }
 
 .bet .coins {
@@ -434,6 +439,67 @@ body {
 .see-hand-request-box {
   z-index: 10050 !important;
   position: absolute;
+}
+
+/* 结算阶段：被请求者屏幕中央的看牌请求对话框（支持多条堆叠向上滑） */
+.see-hand-center-dialog-wrapper {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1200;
+  pointer-events: none; /* 仅内部对话框可交互 */
+}
+.see-hand-center-dialog {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  min-width: 260px;
+  max-width: 320px;
+  background: linear-gradient(145deg, rgba(26, 61, 40, 0.98) 0%, rgba(10, 25, 16, 0.98) 100%);
+  border-radius: 14px;
+  border: 2px solid rgba(201, 162, 39, 0.85);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
+  pointer-events: auto;
+  animation: see-hand-center-pop 0.2s ease-out;
+}
+.see-hand-center-dialog-title {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ffd700;
+  background: linear-gradient(135deg, rgba(45, 90, 61, 0.95) 0%, rgba(26, 61, 40, 0.95) 100%);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.35);
+}
+.see-hand-center-dialog-body {
+  padding: 10px 14px 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.92);
+}
+.see-hand-center-dialog-text {
+  margin-bottom: 10px;
+  line-height: 1.5;
+}
+.see-hand-center-dialog-chips {
+  color: #ffd700;
+  font-weight: bold;
+}
+.see-hand-center-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+@keyframes see-hand-center-pop {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -60%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 /* 聊天气泡：与整体深色扑克风格一致，根据内容自适应 */
 .room-chat-bubble {

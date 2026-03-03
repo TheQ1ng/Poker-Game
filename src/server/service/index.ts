@@ -397,6 +397,10 @@ export function userRespondSeeHand(token: Token, requestId: string, accept: bool
   publishLog2all(roomid, [
     `${requester.nickname || requester.name} 支付 $${chips} 查看了 ${targetUser.nickname || targetUser.name} 的手牌`,
   ]);
+  // 看牌成功后，为当前牌局增加少量缓冲时间，便于申请者查看手牌
+  if (room.game && room.game.isSettling && room.game.nextGameTime > 0) {
+    room.game.nextGameTime += 2000;
+  }
   publish2all(roomid);
   sendSeeHandRequestsToTarget(room, token);
 }

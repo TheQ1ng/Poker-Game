@@ -124,6 +124,14 @@ export class Game {
   }
   nextGame() {
     if (!roomMap[this.roomid].isGaming) return;
+    // 若结算阶段期间被额外延长了下一局开始时间，则在时间未到时延后再检查一次
+    if (this.nextGameTime && Date.now() < this.nextGameTime - 50) {
+      const remain = this.nextGameTime - Date.now();
+      delayTry(() => {
+        this.nextGame();
+      }, remain);
+      return;
+    }
     const tokens = roomMap[this.roomid].users;
     const currentBBIndex = tokens.findIndex((t) => t == this.bigBlindUser);
     for (let i = 0; i < tokens.length - 1; ++i) {

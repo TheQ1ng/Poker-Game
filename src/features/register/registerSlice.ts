@@ -25,8 +25,11 @@ export const registerAsync = createAsyncThunk(
     account: { name: string; password: string };
     dispatch: ThunkDispatch<any, any, any>;
   }) => {
+    console.log('[DEBUG] Thunk started, account:', account);
     const rsp = await registerApi(account);
+    console.log('[DEBUG] Response received in thunk:', rsp);
     if (rsp.code == 0) {
+      console.log('[DEBUG] Success branch entered, token:', (rsp as any)?.data?.token);
       localStorage['name'] = account.name;
       // 保存 token 和 isAdmin 信息
       localStorage.setItem("token", rsp.data.token);
@@ -55,7 +58,8 @@ export const registerAsync = createAsyncThunk(
         }
       }
     } else {
-      message.error(rsp.error);
+      console.log('[DEBUG] Error branch entered:', rsp);
+      message.error((rsp as any)?.error || '未知错误');
     }
     return rsp;
   }
