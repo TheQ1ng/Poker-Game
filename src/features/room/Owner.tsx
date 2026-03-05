@@ -1119,8 +1119,16 @@ export function Owner({
                             size="small"
                             onClick={() => {
                               setCalcInput((s) => {
-                                const base = (!calcDirty || s === String(minRaise)) ? "" : s;
-                                return base + String(n);
+                                // 如果输入框为空，直接输入数字
+                                if (!s) {
+                                  return String(n);
+                                }
+                                // 如果是初始状态且显示的是最小加注值，清空后输入
+                                if (!calcDirty && s === String(minRaise)) {
+                                  return String(n);
+                                }
+                                // 否则追加数字
+                                return s + String(n);
                               });
                               setCalcDirty(true);
                             }}
@@ -1129,7 +1137,16 @@ export function Owner({
                             {n}
                           </Button>
                         ))}
-                        <Button type="default" size="small" onClick={() => setCalcInput((s) => s.slice(0, -1))} style={btnStyleDel}>
+                        <Button type="default" size="small" onClick={() => {
+                          setCalcInput((s) => {
+                            const newS = s.slice(0, -1);
+                            // 如果删除后输入框为空，重置calcDirty状态
+                            if (!newS) {
+                              setCalcDirty(false);
+                            }
+                            return newS;
+                          });
+                        }} style={btnStyleDel}>
                           删除
                         </Button>
                         {[4, 5, 6].map((n) => (
@@ -1138,7 +1155,18 @@ export function Owner({
                             type="primary"
                             size="small"
                             onClick={() => {
-                              setCalcInput((s) => (calcDirty ? s : "") + String(n));
+                              setCalcInput((s) => {
+                                // 如果输入框为空，直接输入数字
+                                if (!s) {
+                                  return String(n);
+                                }
+                                // 如果是初始状态且显示的是最小加注值，清空后输入
+                                if (!calcDirty && s === String(minRaise)) {
+                                  return String(n);
+                                }
+                                // 否则追加数字
+                                return s + String(n);
+                              });
                               setCalcDirty(true);
                             }}
                             style={btnStyle}
@@ -1151,8 +1179,16 @@ export function Owner({
                           size="small"
                           onClick={() => {
                             setCalcInput((s) => {
-                              const base = (!calcDirty || s === String(minRaise)) ? "" : s;
-                              return base + "0";
+                              // 如果输入框为空，直接输入数字
+                              if (!s) {
+                                return "0";
+                              }
+                              // 如果是初始状态且显示的是最小加注值，清空后输入
+                              if (!calcDirty && s === String(minRaise)) {
+                                return "0";
+                              }
+                              // 否则追加数字
+                              return s + "0";
                             });
                             setCalcDirty(true);
                           }}
@@ -1167,8 +1203,16 @@ export function Owner({
                             size="small"
                             onClick={() => {
                               setCalcInput((s) => {
-                                const base = (!calcDirty || s === String(minRaise)) ? "" : s;
-                                return base + String(n);
+                                // 如果输入框为空，直接输入数字
+                                if (!s) {
+                                  return String(n);
+                                }
+                                // 如果是初始状态且显示的是最小加注值，清空后输入
+                                if (!calcDirty && s === String(minRaise)) {
+                                  return String(n);
+                                }
+                                // 否则追加数字
+                                return s + String(n);
                               });
                               setCalcDirty(true);
                             }}

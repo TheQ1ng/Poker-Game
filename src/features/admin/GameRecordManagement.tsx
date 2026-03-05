@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import html2canvas from 'html2canvas';
 import { Table, message, Button, Modal, Checkbox } from 'antd';
 
 interface GameRecord {
@@ -40,6 +41,7 @@ const GameRecordManagement: React.FC = () => {
   const [showSummary, setShowSummary] = useState(false);
   const [summaryStats, setSummaryStats] = useState<PlayerStats[]>([]);
   const [playerRecords, setPlayerRecords] = useState<PlayerRecord[]>([]);
+  const summaryScoreboardRef = useRef<HTMLDivElement>(null);
 
   // 获取所有游戏记录并按房间分组
   const fetchGameRecords = async () => {
@@ -153,6 +155,37 @@ const GameRecordManagement: React.FC = () => {
     }
   };
 
+  // 下载汇总积分榜为PNG
+  const downloadSummaryScoreboard = async () => {
+    if (!summaryScoreboardRef.current) {
+      message.error('无法找到积分榜元素');
+      return;
+    }
+
+    try {
+      // 使用html2canvas将元素转换为Canvas
+      const canvas = await html2canvas(summaryScoreboardRef.current, {
+        scale: 2, // 提高清晰度
+        useCORS: true, // 允许加载跨域图片
+        backgroundColor: '#ffffff' // 设置背景色为白色
+      });
+
+      // 将Canvas转换为图片URL
+      const imageUrl = canvas.toDataURL('image/png');
+
+      // 创建下载链接并触发下载
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = `汇总积分榜_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+      link.click();
+
+      message.success('积分榜下载成功');
+    } catch (error) {
+      console.error('下载失败:', error);
+      message.error('下载失败，请重试');
+    }
+  };
+
   useEffect(() => {
     fetchGameRecords();
   }, []);
@@ -242,7 +275,7 @@ const GameRecordManagement: React.FC = () => {
       key: 'buy_in',
     },
     {
-      title: '盈亏',
+      title: '积分',
       dataIndex: 'profit',
       key: 'profit',
       render: (profit: number) => (
@@ -275,7 +308,7 @@ const GameRecordManagement: React.FC = () => {
       },
     },
     {
-      title: '总盈亏',
+      title: '总积分',
       dataIndex: 'totalProfit',
       key: 'totalProfit',
       render: (totalProfit: number) => (
@@ -343,13 +376,23 @@ const GameRecordManagement: React.FC = () => {
         visible={showSummary}
         onCancel={() => setShowSummary(false)}
         width={800}
+        footer={[
+          <Button key="download" type="primary" onClick={downloadSummaryScoreboard}>
+            下载积分榜
+          </Button>,
+          <Button key="close" onClick={() => setShowSummary(false)}>
+            关闭
+          </Button>
+        ]}
       >
-        <Table 
-          columns={summaryColumns} 
-          dataSource={summaryStats} 
-          rowKey="username"
-          loading={loading}
-        />
+        <div ref={summaryScoreboardRef}>
+          <Table 
+            columns={summaryColumns} 
+            dataSource={summaryStats} 
+            rowKey="username"
+            loading={loading}
+          />
+        </div>
       </Modal>
     </div>
   );

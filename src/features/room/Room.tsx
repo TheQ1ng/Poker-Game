@@ -16,6 +16,7 @@ import {
   CloseOutlined,
   MessageOutlined,
   DeleteOutlined,
+  SaveOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { User } from "./User";
@@ -904,7 +905,7 @@ function Room() {
                 <Button
                   className="room-action-btn"
                   type="primary"
-                  icon={<DollarOutlined />}
+                  icon={<SaveOutlined />}
                   onClick={handleSaveChipsRecord}
                 />
               </Tooltip>

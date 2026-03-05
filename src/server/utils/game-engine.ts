@@ -302,8 +302,8 @@ export enum PokerType {
   RoyalFlush = 1, // 皇家同花顺
   StraightFlush = 2, // 同花顺
   FourKinds = 3, // 四条
-  Flush = 4, // 同花
-  FullHouse = 5, // 葫芦
+  FullHouse = 4, // 葫芦
+  Flush = 5, // 同花
   Straight = 6, // 顺子
   ThreeKinds = 7, // 三条
   TwoPair = 8, // 两对
@@ -373,20 +373,39 @@ export function rank(hands: any, is_short = false): PokerRank {
     };
   }
   
-  // 同花
-  if ((maxCards = isFlush(hands)).length > 0) {
-    return {
-      type: PokerType.Flush,
-      cards: maxCards.splice(0, 5),
-    };
-  }
-  
-  // 葫芦
-  if ((maxCards = isFullHouse(hands)).length > 0) {
-    return {
-      type: PokerType.FullHouse,
-      cards: maxCards,
-    };
+  // 根据模式决定检查顺序
+  if (is_short) {
+    // 短牌模式：同花 > 葫芦
+    if ((maxCards = isFlush(hands)).length > 0) {
+      return {
+        type: PokerType.Flush,
+        cards: maxCards.splice(0, 5),
+      };
+    }
+    
+    // 葫芦
+    if ((maxCards = isFullHouse(hands)).length > 0) {
+      return {
+        type: PokerType.FullHouse,
+        cards: maxCards,
+      };
+    }
+  } else {
+    // 常规模式：葫芦 > 同花
+    if ((maxCards = isFullHouse(hands)).length > 0) {
+      return {
+        type: PokerType.FullHouse,
+        cards: maxCards,
+      };
+    }
+    
+    // 同花
+    if ((maxCards = isFlush(hands)).length > 0) {
+      return {
+        type: PokerType.Flush,
+        cards: maxCards.splice(0, 5),
+      };
+    }
   }
   
   // 顺子

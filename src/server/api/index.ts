@@ -480,7 +480,7 @@ router.post("/admin/summary-scoreboard", (ctx) => {
     user.gameCount += 1;
   });
   
-  // 转换为数组并按总盈亏排序
+  // 转换为数组并按总积分排序
   const summaryStats = Array.from(summaryMap.values());
   summaryStats.sort((a, b) => b.totalProfit - a.totalProfit);
   
