@@ -16,6 +16,34 @@ export type Card = {
   suit: string;
 };
 
+export interface SimpleRoomRedPacketConfig {
+  thresholdMultiple: number;
+  maxPercent: number;
+}
+
+export interface SimpleRoomRedPacketDetail {
+  userId: string;
+  name: string;
+  amount: number;
+  autoOpened: boolean;
+}
+
+export interface SimpleRoomRedPacket {
+  id: string;
+  status: "waiting" | "result";
+  senderUserId: string;
+  senderName: string;
+  totalAmount: number;
+  /** 红包触发时，下一局倒计时剩余毫秒（用于前端显示“暂停”） */
+  pausedNextGameRemainMs: number;
+  recipientUserIds: string[];
+  openedUserIds: string[];
+  openDeadline: number;
+  resultDeadline: number;
+  luckiestUserId?: string;
+  details?: SimpleRoomRedPacketDetail[];
+}
+
 export interface SimpleGame {
   boardCards: Card[];
   pots: number;
@@ -75,6 +103,10 @@ export interface SimpleRoom {
   isShortDeck?: boolean;
   /** 是否奥马哈 */
   isOmaha?: boolean;
+  /** 红包配置：水上门槛倍数 + 最大发包比例 */
+  redPacketConfig?: SimpleRoomRedPacketConfig;
+  /** 当前红包状态 */
+  redPacket?: SimpleRoomRedPacket | null;
 }
 
 export interface SimpleSelf {
@@ -119,4 +151,6 @@ export enum ActionType {
   REQUEST_SEE_HAND = "REQUEST_SEE_HAND",
   RESPOND_SEE_HAND = "RESPOND_SEE_HAND",
   EXTEND_ACTION_TIME = "EXTEND_ACTION_TIME",
+  SEND_RED_PACKET = "SEND_RED_PACKET",
+  OPEN_RED_PACKET = "OPEN_RED_PACKET",
 }

@@ -35,6 +35,8 @@ class User {
   bets: number[] = [0, 0, 0, 0];
   totalBets: number = 0; // sum(bets)
   hands: Card[] = [];
+  /** 结算阶段主动亮牌：按手牌索引记录是否已公开 */
+  revealedHandsMask: boolean[] = [];
   maxCards: Card[] = [];
   profits: number = 0;
   handsType: string = "";
@@ -75,6 +77,7 @@ class User {
     this.roomid = roomid;
     this.bets = [0, 0, 0, 0];
     this.hands = [];
+    this.revealedHandsMask = [];
 
     this.isInRoom = true;
     this.isReady = false;
@@ -100,6 +103,7 @@ class User {
     this.isInCurrentGame = false;
     this.isWinner = false;
     this.maxCards = [];
+    this.revealedHandsMask = [];
   }
   setReady(ready: boolean) {
     this.isReady = ready;

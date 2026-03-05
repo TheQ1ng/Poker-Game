@@ -864,7 +864,7 @@ export function Owner({
                       showHand={isSettling && !selfAsUser?.hands?.[i]}
                       isSelected={false}
                       size="medium"
-                      showShowHandButton={!selfAsUser?.isAllIn}
+                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn}
                     />
                   ))}
                   <div
@@ -900,7 +900,7 @@ export function Owner({
                     showHand={isSettling && !selfAsUser?.hands[1]}
                     isSelected={false}
                     size="medium"
-                    showShowHandButton={!selfAsUser?.isAllIn}
+                    showShowHandButton={false}
                   />
                   <div
                     style={{

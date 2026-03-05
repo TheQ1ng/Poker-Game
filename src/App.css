@@ -346,6 +346,173 @@ body {
   text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
 }
 
+.manual-show-hand-btn {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: -28px !important;
+  transform: translateX(-50%) !important;
+  height: 22px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  background: linear-gradient(135deg, #f7d777 0%, #d2a433 100%) !important;
+  color: #2a2008 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25), 0 0 10px rgba(247, 215, 119, 0.35) !important;
+  transition: all 0.2s ease !important;
+}
+
+.manual-show-hand-btn:hover,
+.manual-show-hand-btn:focus {
+  transform: translateX(-50%) translateY(-1px) !important;
+  background: linear-gradient(135deg, #ffe49a 0%, #dfb44d 100%) !important;
+  color: #1f1606 !important;
+}
+
+.manual-show-hand-btn[disabled] {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  box-shadow: none !important;
+}
+
+.redpacket-send-btn {
+  background: linear-gradient(135deg, #ff8f1f 0%, #d84b1f 100%) !important;
+  border: 1px solid rgba(255, 199, 112, 0.65) !important;
+  color: #fff3db !important;
+  font-size: 16px !important;
+  box-shadow: 0 0 10px rgba(255, 143, 31, 0.5) !important;
+}
+
+.redpacket-modal .ant-modal-content {
+  background: radial-gradient(circle at top, #7f1d1d 0%, #4a1212 46%, #2a0d0d 100%) !important;
+  border: 1px solid rgba(255, 196, 112, 0.35) !important;
+}
+
+.redpacket-modal .ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(255, 196, 112, 0.2) !important;
+}
+
+.redpacket-modal .ant-modal-title {
+  color: #ffd67e !important;
+}
+
+.redpacket-modal .ant-modal-close-x {
+  color: #ffd67e !important;
+}
+
+.redpacket-send-desc {
+  color: rgba(255, 241, 220, 0.88);
+  line-height: 1.8;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.redpacket-send-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffe7bb;
+}
+
+.redpacket-amount-input {
+  width: 140px !important;
+}
+
+.redpacket-cover {
+  text-align: center;
+  color: #ffe9c3;
+}
+
+.redpacket-cover-icon {
+  font-size: 52px;
+  margin-bottom: 8px;
+}
+
+.redpacket-cover-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.redpacket-cover-amount {
+  margin-top: 8px;
+  font-size: 15px;
+  color: #ffd67e;
+}
+
+.redpacket-cover-opened {
+  margin: 16px auto 10px;
+  color: #ffe2aa;
+  font-weight: 600;
+}
+
+.redpacket-open-btn {
+  margin-top: 16px;
+  margin-bottom: 12px;
+  height: 36px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 218, 146, 0.65) !important;
+  background: linear-gradient(135deg, #ffad33 0%, #f35d1f 100%) !important;
+  font-weight: 700 !important;
+}
+
+.redpacket-progress-label {
+  margin-bottom: 8px;
+  color: rgba(255, 234, 196, 0.86);
+  font-size: 12px;
+}
+
+.redpacket-result {
+  color: #ffe8c1;
+}
+
+.redpacket-result-title {
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.redpacket-result-subtitle {
+  margin: 8px 0 14px;
+  text-align: center;
+  color: #ffdb92;
+}
+
+.redpacket-result-list {
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 218, 146, 0.2);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 12px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.redpacket-result-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 218, 146, 0.16);
+}
+
+.redpacket-result-row:last-child {
+  border-bottom: none;
+}
+
+.redpacket-result-name {
+  color: #ffe7bb;
+  font-size: 13px;
+}
+
+.redpacket-result-amount {
+  color: #ffd67e;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* 弹窗深色主题样式 */
 .ant-modal-content {
   background: linear-gradient(145deg, #1a3d28 0%, #0f2518 100%) !important;
@@ -549,4 +716,3 @@ body {
   border-color: rgba(255, 215, 0, 0.5);
   background: rgba(0, 0, 0, 0.45);
 }
-

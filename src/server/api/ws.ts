@@ -25,6 +25,8 @@ import {
   userRequestSeeHand,
   userRespondSeeHand,
   userExtendActionTime,
+  userSendRedPacket,
+  userOpenRedPacket,
 } from "../service";
 import { Token } from "../service/User";
 import Room, { Game, RoomID } from "../service/Room";
@@ -37,6 +39,7 @@ import {
   SimpleSelf,
   SimpleUser,
 } from "../../ApiType";
+import { getUser } from "../service/database";
 
 export interface PokerWebSocket extends ws {
   name?: string;
@@ -77,6 +80,15 @@ export default async (ctx: Context) => {
   let websocket: PokerWebSocket | null = null;
   try {
     const user = jwt.verify(token.toString(), secret).toString().split("@")[0];
+    
+    // 检查用户是否存在于数据库中
+    const dbUser = getUser(user);
+    if (!dbUser) {
+      ctx.websocket.send("user not found in database");
+      ctx.websocket.close();
+      return;
+    }
+    
     websocket = ctx.websocket;
     websocket.name = user;
     websocket.token = token;
@@ -163,7 +175,7 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
       userWatch(token, data.watch);
       break;
     case ActionType.SHOW_HANDS:
-      userShowHands(token, data.index);
+      userShowHands(token);
       break;
     case ActionType.SET_SETTLE_TIMES:
       userSetSettleTimes(token, data.times);
@@ -189,6 +201,12 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
     case ActionType.EXTEND_ACTION_TIME:
       userExtendActionTime(token);
       return;
+    case ActionType.SEND_RED_PACKET:
+      userSendRedPacket(token, Number(data.amount));
+      return;
+    case ActionType.OPEN_RED_PACKET:
+      userOpenRedPacket(token);
+      return;
   }
   if (data.action !== ActionType.LEAVE) {
     publish(token, data, ws);
@@ -200,12 +218,47 @@ function sum(arr: number[]): number {
 }
 
 function getSimpleRoom(room: Room): SimpleRoom {
+  const redPacket = room.activeRedPacket
+    ? {
+        id: room.activeRedPacket.id,
+        status: room.activeRedPacket.status,
+        senderUserId: userMap[room.activeRedPacket.senderToken]?.chipsRecordID || "",
+        senderName: room.activeRedPacket.senderName,
+        totalAmount: room.activeRedPacket.totalAmount,
+        pausedNextGameRemainMs: room.activeRedPacket.pausedNextGameRemainMs,
+        recipientUserIds: room.activeRedPacket.recipients.map(
+          (r) => userMap[r.token]?.chipsRecordID || ""
+        ),
+        openedUserIds: room.activeRedPacket.recipients
+          .filter((r) => r.opened)
+          .map((r) => userMap[r.token]?.chipsRecordID || ""),
+        openDeadline: room.activeRedPacket.openDeadline,
+        resultDeadline: room.activeRedPacket.resultDeadline,
+        luckiestUserId: room.activeRedPacket.luckiestToken
+          ? userMap[room.activeRedPacket.luckiestToken]?.chipsRecordID || ""
+          : "",
+        details:
+          room.activeRedPacket.status === "result"
+            ? room.activeRedPacket.recipients.map((r) => ({
+                userId: userMap[r.token]?.chipsRecordID || "",
+                name: userMap[r.token]?.nickname || userMap[r.token]?.name || "",
+                amount: r.amount,
+                autoOpened: !!r.autoOpened,
+              }))
+            : undefined,
+      }
+    : null;
   return {
     roomid: room.id,
     isGaming: room.isGaming,
     users: room.users.map((t) => getSimpleUser(t)),
     isShortDeck: !!room.isShortDeck,
     isOmaha: !!room.isOmaha,
+    redPacketConfig: {
+      thresholdMultiple: room.redPacketThresholdMultiple,
+      maxPercent: room.redPacketMaxPercent,
+    },
+    redPacket,
   };
 }
 
@@ -267,6 +320,12 @@ function getSimpleGame(game: Game): SimpleGame {
 function getSimpleUser(token: Token): SimpleUser {
   const user = userMap[token];
   const room = roomMap[user.roomid];
+  const hiddenHands = user.hands.map(() => null);
+  const publicHands = user.shouldShowHand
+    ? user.hands
+    : hiddenHands.map((card, idx) =>
+      user.revealedHandsMask && user.revealedHandsMask[idx] ? user.hands[idx] : card
+    );
   return {
     id: user.chipsRecordID,
     name: user.name,
@@ -285,7 +344,7 @@ function getSimpleUser(token: Token): SimpleUser {
     actionEndTime: user.actionEndTime,
     actionStartTime: user.actionStartTime ?? user.actionEndTime - 30000,
     actionName: user.actionName,
-    hands: user.shouldShowHand ? user.hands : [null, null],
+    hands: publicHands,
     maxCards: user.shouldShowHand ? user.maxCards : [],
     profits: user.profits,
     position: user.positon,

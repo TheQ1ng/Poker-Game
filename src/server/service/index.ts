@@ -1,8 +1,11 @@
 import User, { Token } from "./User";
-import Room, { RoomID } from "./Room";
+import Room, { RoomID, RoomRedPacket } from "./Room";
 import { PokerWebSocket, publishLog2all, send2all, send2user, publish2all } from "../api/ws";
 import { getUser, saveUser, getUserProfile, updateUserProfile, initDatabase } from "./database";
 import { v4 as uuidv4 } from "uuid";
+const RED_PACKET_WAIT_MS = 5000;
+const RED_PACKET_RESULT_MS = 3000;
+const RED_PACKET_FLOW_MS = RED_PACKET_WAIT_MS + RED_PACKET_RESULT_MS;
 
 type UserMap = {
   [token: string]: User;
@@ -61,6 +64,8 @@ export function getAllRooms(): Array<{
   ownerName: string;
   isShortDeck: boolean;
   isOmaha: boolean;
+  redPacketThresholdMultiple: number;
+  redPacketMaxPercent: number;
 }> {
   return Object.values(roomMap).map((room) => ({
     id: room.id,
@@ -73,6 +78,8 @@ export function getAllRooms(): Array<{
         : "未知",
     isShortDeck: !!room.isShortDeck,
     isOmaha: !!room.isOmaha,
+    redPacketThresholdMultiple: room.redPacketThresholdMultiple,
+    redPacketMaxPercent: room.redPacketMaxPercent,
   }));
 }
 
@@ -82,16 +89,238 @@ export function createRoom(
   buyIn: number,
   reBuyLimit: number = 1,
   isShortDeck: boolean = false,
-  isOmaha: boolean = false
+  isOmaha: boolean = false,
+  redPacketThresholdMultiple: number = 1,
+  redPacketMaxPercent: number = 30
 ): Room {
   const user = userMap[token];
-  const room = new Room(genRoomID(), sb, buyIn, reBuyLimit, isShortDeck, isOmaha);
+  const room = new Room(
+    genRoomID(),
+    sb,
+    buyIn,
+    reBuyLimit,
+    isShortDeck,
+    isOmaha,
+    redPacketThresholdMultiple,
+    redPacketMaxPercent
+  );
   roomMap[room.id] = room;
   userEnterRoom(token, room.id);
   user.isRoomOwner = true;
   user.isReady = true;
   // console.log(31, userMap);
   return room;
+}
+
+function calcUserProfit(room: Room, token: Token): { profit: number; recordBuyIn: number } {
+  const user = userMap[token];
+  const record = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
+  if (!record) {
+    throw "积分记录不存在";
+  }
+  const currentChips = user.leftStack();
+  return { profit: currentChips - record.buyIn, recordBuyIn: record.buyIn };
+}
+
+function splitLuckyAmount(totalAmount: number, count: number): number[] {
+  if (count <= 0) return [];
+  if (count === 1) return [totalAmount];
+  const cuts = new Set<number>();
+  while (cuts.size < count - 1) {
+    cuts.add(Math.floor(Math.random() * (totalAmount - 1)) + 1);
+  }
+  const sorted = [0, ...Array.from(cuts).sort((a, b) => a - b), totalAmount];
+  const ret: number[] = [];
+  for (let i = 1; i < sorted.length; i++) {
+    ret.push(sorted[i] - sorted[i - 1]);
+  }
+  return ret;
+}
+
+function clearRoomRedPacket(room: Room) {
+  clearTimeout(room.redPacketOpenTimer);
+  clearTimeout(room.redPacketResultTimer);
+  room.activeRedPacket = null;
+}
+
+function toResultPhase(room: Room, packet: RoomRedPacket) {
+  packet.status = "result";
+  packet.resultDeadline = Date.now() + RED_PACKET_RESULT_MS;
+  let luckiest = packet.recipients[0];
+  packet.recipients.forEach((r) => {
+    if (r.amount > luckiest.amount) {
+      luckiest = r;
+    }
+  });
+  packet.luckiestToken = luckiest?.token || "";
+  clearTimeout(room.redPacketOpenTimer);
+  clearTimeout(room.redPacketResultTimer);
+  room.redPacketResultTimer = setTimeout(() => {
+    const r = roomMap[room.id];
+    if (!r || !r.activeRedPacket || r.activeRedPacket.id !== packet.id) return;
+    clearRoomRedPacket(r);
+    publish2all(r.id);
+  }, RED_PACKET_RESULT_MS);
+}
+
+function settleWaitingRedPacket(room: Room, autoOpenRemaining: boolean) {
+  const packet = room.activeRedPacket;
+  if (!packet || packet.status !== "waiting") return;
+
+  if (autoOpenRemaining) {
+    packet.recipients.forEach((entry) => {
+      if (entry.opened) return;
+      const receiver = userMap[entry.token];
+      if (!receiver) return;
+      const record = room.chipsRecords.find((cr) => cr.id === receiver.chipsRecordID);
+      if (!record) return;
+      entry.opened = true;
+      entry.openedAt = Date.now();
+      entry.autoOpened = true;
+      receiver.stack += entry.amount;
+      record.chips += entry.amount;
+    });
+  }
+
+  if (!autoOpenRemaining) {
+    publish2all(room.id);
+    return;
+  }
+
+  toResultPhase(room, packet);
+  publishLog2all(room.id, [
+    `🧧 ${packet.senderName} 发出拼手气红包，共 ${packet.totalAmount} 筹码，手气王已诞生`,
+  ]);
+  publish2all(room.id);
+}
+
+export function userSendRedPacket(token: Token, amount: number) {
+  const user = userMap[token];
+  if (!user || !user.roomid) {
+    throw "not in any room";
+  }
+  const room = roomMap[user.roomid];
+  if (!room) {
+    throw "room not exists";
+  }
+  if (!room.game || !room.game.isSettling) {
+    throw "仅在结算阶段可发红包";
+  }
+  if (room.activeRedPacket) {
+    throw "当前已有红包，请稍后再发";
+  }
+
+  const senderProfitInfo = calcUserProfit(room, token);
+  const thresholdProfit = senderProfitInfo.recordBuyIn * room.redPacketThresholdMultiple;
+  if (senderProfitInfo.profit < thresholdProfit) {
+    throw `未达到发红包门槛（需盈利 ${thresholdProfit}）`;
+  }
+
+  const underwaterTokens = room.users.filter((t) => {
+    if (t === token) return false;
+    const candidate = userMap[t];
+    if (!candidate || candidate.isSpectator) return false;
+    const p = calcUserProfit(room, t).profit;
+    return p < 0;
+  });
+  if (underwaterTokens.length === 0) {
+    throw "当前没有水下玩家可抢红包";
+  }
+
+  const minAmount = underwaterTokens.length;
+  const maxAmount = Math.floor(
+    (senderProfitInfo.profit * room.redPacketMaxPercent) / 100
+  );
+  if (maxAmount < minAmount) {
+    throw "当前盈利不足以按配置发红包，请稍后再试";
+  }
+  if (!Number.isInteger(amount) || amount < minAmount || amount > maxAmount) {
+    throw `红包金额范围为 ${minAmount} ~ ${maxAmount}`;
+  }
+  if (user.leftStack() < amount) {
+    throw "筹码不足，无法发红包";
+  }
+
+  const senderRecord = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
+  if (!senderRecord) throw "积分记录不存在";
+  user.stack -= amount;
+  senderRecord.chips -= amount;
+
+  const splits = splitLuckyAmount(amount, underwaterTokens.length);
+  const senderName = user.nickname || user.name;
+  const now = Date.now();
+  const pausedNextGameRemainMs =
+    room.game.nextGameTime && room.game.nextGameTime > now
+      ? room.game.nextGameTime - now
+      : 0;
+  if (pausedNextGameRemainMs > 0) {
+    room.game.nextGameTime += RED_PACKET_FLOW_MS;
+  }
+
+  const packet: RoomRedPacket = {
+    id: uuidv4(),
+    status: "waiting",
+    senderToken: token,
+    senderName,
+    totalAmount: amount,
+    pausedNextGameRemainMs,
+    recipients: underwaterTokens.map((t, idx) => ({
+      token: t,
+      amount: splits[idx],
+      opened: false,
+      openedAt: 0,
+      autoOpened: false,
+    })),
+    openDeadline: now + RED_PACKET_WAIT_MS,
+    resultDeadline: 0,
+    luckiestToken: "",
+  };
+  room.activeRedPacket = packet;
+  clearTimeout(room.redPacketOpenTimer);
+  clearTimeout(room.redPacketResultTimer);
+  room.redPacketOpenTimer = setTimeout(() => {
+    const r = roomMap[room.id];
+    if (!r || !r.activeRedPacket || r.activeRedPacket.id !== packet.id) return;
+    settleWaitingRedPacket(r, true);
+  }, RED_PACKET_WAIT_MS);
+
+  publishLog2all(room.id, [
+    `🧧 ${senderName} 发了一个拼手气红包（${amount} 筹码）`,
+  ]);
+  publish2all(room.id);
+}
+
+export function userOpenRedPacket(token: Token) {
+  const user = userMap[token];
+  if (!user || !user.roomid) {
+    throw "not in any room";
+  }
+  const room = roomMap[user.roomid];
+  if (!room || !room.activeRedPacket) {
+    throw "当前没有可抢红包";
+  }
+  const packet = room.activeRedPacket;
+  if (packet.status !== "waiting") {
+    throw "红包已结束";
+  }
+
+  const entry = packet.recipients.find((r) => r.token === token);
+  if (!entry) {
+    throw "你不在本次红包领取名单中";
+  }
+  if (entry.opened) {
+    return;
+  }
+  const record = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
+  if (!record) throw "积分记录不存在";
+
+  entry.opened = true;
+  entry.openedAt = Date.now();
+  entry.autoOpened = false;
+  user.stack += entry.amount;
+  record.chips += entry.amount;
+
+  settleWaitingRedPacket(room, false);
 }
 
 export function userEnterRoom(token: Token, roomid: RoomID) {
@@ -247,10 +476,11 @@ export function userWatch(token: Token, watch: boolean) {
   }
 }
 
-export function userShowHands(token: Token, index: number) {
+export function userShowHands(token: Token) {
   const user = userMap[token];
   const roomid = user.roomid;
-  const game = roomMap[roomid].game;
+  const room = roomMap[roomid];
+  const game = room.game;
 
   if (!isInRoom(token, roomid)) {
     throw "invalid room";
@@ -260,26 +490,41 @@ export function userShowHands(token: Token, index: number) {
     return;
   }
 
-  if (index == 0 || index == 1) {
-    const hands: any[] = [null, null];
-    let card = "";
-    if (index == 0) {
-      hands[0] = user.hands[0];
-      card = `${hands[0].num}${hands[0].suit}`;
-    }
-    if (index == 1) {
-      hands[1] = user.hands[1];
-      card = `${hands[1].num}${hands[1].suit}`;
-    }
-    send2all(roomid, {
-      hands: {
-        id: user.chipsRecordID,
-        hands,
-      },
-    });
-    const displayName = user.nickname || user.name;
-    publishLog2all(roomid, [`${displayName}亮牌${card}`]);
+  if (!Array.isArray(user.hands) || user.hands.length === 0) {
+    return;
   }
+
+  // 已经亮牌则无需重复处理
+  if (user.shouldShowHand) {
+    return;
+  }
+
+  user.shouldShowHand = true;
+  user.revealedHandsMask = new Array(user.hands.length).fill(true);
+
+  // 主动亮牌后，自动拒绝所有指向自己的看牌请求（功能并存但不再需要继续处理）
+  if (room.pendingSeeHandRequests.length > 0) {
+    const autoDeclined = room.pendingSeeHandRequests.filter(
+      (req) => req.targetToken === token
+    );
+    if (autoDeclined.length > 0) {
+      room.pendingSeeHandRequests = room.pendingSeeHandRequests.filter(
+        (req) => req.targetToken !== token
+      );
+      autoDeclined.forEach((req) => {
+        send2user(req.requesterToken, {
+          seeHandDeclined: true,
+        });
+      });
+      // 清空被请求者端待处理弹窗
+      sendSeeHandRequestsToTarget(room, token);
+    }
+  }
+
+  const displayName = user.nickname || user.name;
+  const cardsText = user.hands.map((c) => `${c.num}${c.suit}`).join("");
+  publishLog2all(roomid, [`${displayName}亮牌【${cardsText}】`]);
+  publish2all(roomid);
 }
 
 /** 结算阶段：请求花欢乐豆看某人的手牌，对方同意后扣申请者欢乐豆、给展示者欢乐豆并仅对申请者展示手牌 */
@@ -674,6 +919,9 @@ export function settleGame(token: Token) {
 function settleAndDissolveRoom(roomid: RoomID) {
   const room = roomMap[roomid];
   if (!room) return;
+  clearTimeout(room.redPacketOpenTimer);
+  clearTimeout(room.redPacketResultTimer);
+  room.activeRedPacket = null;
   
   // 保存积分历史记录
   const chipsRecords = room.chipsRecords;

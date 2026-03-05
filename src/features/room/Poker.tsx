@@ -33,6 +33,7 @@ export function Poker({
   showShowHandButton?: boolean;
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [isShowingHand, setIsShowingHand] = useState(false);
   const cardProps = convertToCardProps(card);
   
   useEffect(() => {
@@ -51,7 +52,10 @@ export function Poker({
   }, [showHand, card]);
 
   return (
-    <div className={`poker-card-wrapper ${!isSelected ? 'card-not-selected' : ''}`} style={{ margin: "0 4px" }}>
+    <div
+      className={`poker-card-wrapper ${!isSelected ? 'card-not-selected' : ''}`}
+      style={{ margin: "0 4px", position: "relative" }}
+    >
       <BeautifulPokerCard
         suit={cardProps.suit}
         num={cardProps.num as any}
@@ -65,21 +69,19 @@ export function Poker({
         <Button
           type="primary"
           size="small"
+          className="manual-show-hand-btn"
+          disabled={isShowingHand}
           onClick={() => {
+            if (isShowingHand) {
+              return;
+            }
+            setIsShowingHand(true);
             soundManager.playButton();
-            ws_userShowHands(index);
-          }}
-          style={{ 
-            position: "absolute", 
-            bottom: "-25px", 
-            left: "50%", 
-            transform: "translateX(-50%)",
-            fontSize: "10px",
-            padding: "0 8px",
-            height: "20px",
+            ws_userShowHands();
+            setTimeout(() => setIsShowingHand(false), 700);
           }}
         >
-          亮牌
+          {isShowingHand ? "亮牌中..." : "亮牌"}
         </Button>
       ) : null}
     </div>

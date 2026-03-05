@@ -3,6 +3,7 @@ import { ActionType } from "../ApiType";
 import { setChipsRecord } from "../features/chipsrecord/chipsRecordSlice";
 import { clearCreateRoomID } from "../features/createroom/createRoomSlice";
 import { addLogs } from "../features/gamehistory/gameHistorySlice";
+import { addMessage } from "../features/chat/chatSlice";
 import { roominfo } from "../features/home/homeAPI";
 import { clearRoomID } from "../features/home/homeSlice";
 import {
@@ -145,6 +146,12 @@ export const connect2server =
           }
           if (data.roomChat) {
             dispatch(setRoomChatBubble({ userId: data.roomChat.userId, text: data.roomChat.message }));
+            // 添加到聊天消息列表
+            dispatch(addMessage({
+              sender: data.roomChat.nickname || data.roomChat.userId,
+              content: data.roomChat.message,
+              timestamp: Date.now()
+            }));
             const message = data.roomChat.message;
             // 检查是否为快捷消息（有对应的音效）
             const soundFile = messageToSoundMap[message];
@@ -242,10 +249,9 @@ export function ws_overtime() {
   });
 }
 
-export function ws_userShowHands(index: number) {
+export function ws_userShowHands() {
   send2server({
     action: ActionType.SHOW_HANDS,
-    index,
   });
 }
 
@@ -309,5 +315,18 @@ export function ws_respondSeeHand(requestId: string, accept: boolean) {
 export function ws_extendActionTime() {
   send2server({
     action: ActionType.EXTEND_ACTION_TIME,
+  });
+}
+
+export function ws_sendRedPacket(amount: number) {
+  send2server({
+    action: ActionType.SEND_RED_PACKET,
+    amount,
+  });
+}
+
+export function ws_openRedPacket() {
+  send2server({
+    action: ActionType.OPEN_RED_PACKET,
   });
 }

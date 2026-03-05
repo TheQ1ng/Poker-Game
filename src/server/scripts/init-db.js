@@ -35,10 +35,21 @@ function initDatabase() {
       CREATE TABLE IF NOT EXISTS game_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         room_id TEXT NOT NULL,
-        username TEXT NOT NULL,
-        profit INTEGER NOT NULL,
-        final_hand TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // 玩家记录表
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS player_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        game_record_id INTEGER NOT NULL,
+        username TEXT NOT NULL,
+        nickname TEXT NOT NULL,
+        chips INTEGER NOT NULL,
+        buy_in INTEGER NOT NULL,
+        profit INTEGER NOT NULL,
+        FOREIGN KEY (game_record_id) REFERENCES game_records(id)
       )
     `);
 

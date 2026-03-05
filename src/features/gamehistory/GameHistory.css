@@ -11,6 +11,36 @@
   border: 1px solid rgba(201, 162, 39, 0.25);
 }
 
+.game-history-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 12px 0;
+}
+
+.game-history-key-toggle {
+  height: 28px;
+  border-radius: 999px;
+  padding: 0 12px;
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  background: rgba(201, 162, 39, 0.12);
+  color: #f4d26a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.game-history-key-toggle:hover {
+  background: rgba(201, 162, 39, 0.22);
+  border-color: rgba(201, 162, 39, 0.7);
+}
+
+.game-history-key-toggle.active {
+  background: linear-gradient(145deg, #d7b23e, #a27d1d);
+  border-color: rgba(231, 192, 84, 0.9);
+  color: #1f1f1f;
+}
+
 /* 滑动区域：只保留最近 200 条，纵向滚动 */
 .game-history-scroll {
   flex: 1;
@@ -76,71 +106,332 @@
 }
 
 .game-history-line {
-  margin-bottom: 6px;
-  padding: 4px 0;
+  margin-bottom: 8px;
+  padding: 8px 10px;
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
   word-break: break-word;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .game-history-line:last-child {
   margin-bottom: 0;
 }
 
-.game-history-line-head {
-  font-weight: bold;
-  color: #ffd700;
+.game-history-line-street,
+.game-history-line-action,
+.game-history-line-seehand,
+.game-history-line-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.game-history-line-settle {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-history-line-warning {
+  border-color: rgba(255, 107, 107, 0.6);
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.gh-settle-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.gh-settle-cards {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gh-settle-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gh-settle-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gh-settle-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.gh-poker-cards {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gh-poker-card {
+  width: 30px;
+  height: 42px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, #ffffff 0%, #f3f5f8 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.gh-poker-card-rank {
+  font-size: 12px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.gh-poker-card-suit {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.gh-poker-card-red {
+  color: #d44b4b;
+}
+
+.gh-poker-card-black {
+  color: #2c2f36;
+}
+
+.gh-cards-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.gh-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.gh-suit-h {
+  color: #ff6b6b;
+}
+
+.gh-suit-d {
+  color: #6cb6ff;
+}
+
+.gh-suit-c {
+  color: #74d88b;
+}
+
+.gh-suit-s {
+  color: #f5f7fa;
+}
+
+.gh-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.gh-pill-street {
+  background: rgba(100, 149, 237, 0.18);
+  border-color: rgba(100, 149, 237, 0.45);
+  color: #9fc3ff;
+}
+
+.gh-pill-action {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #f5f5f5;
+}
+
+.gh-pill-action-allin {
+  background: rgba(255, 95, 95, 0.2);
+  border-color: rgba(255, 95, 95, 0.45);
+  color: #ffb7b7;
+}
+
+.gh-pill-action-raise {
+  background: rgba(255, 190, 70, 0.2);
+  border-color: rgba(255, 190, 70, 0.45);
+  color: #ffd88d;
+}
+
+.gh-pill-action-call,
+.gh-pill-action-check {
+  background: rgba(100, 210, 160, 0.2);
+  border-color: rgba(100, 210, 160, 0.45);
+  color: #b3f0cd;
+}
+
+.gh-pill-action-fold {
+  background: rgba(160, 160, 160, 0.2);
+  border-color: rgba(160, 160, 160, 0.45);
+  color: #d7d7d7;
+}
+
+.gh-pill-win {
+  background: rgba(94, 200, 126, 0.22);
+  border-color: rgba(94, 200, 126, 0.55);
+  color: #bbefcb;
+}
+
+.gh-pill-lose {
+  background: rgba(235, 93, 93, 0.2);
+  border-color: rgba(235, 93, 93, 0.5);
+  color: #ffc2c2;
+}
+
+.gh-pill-meta {
+  background: rgba(169, 120, 255, 0.18);
+  border-color: rgba(169, 120, 255, 0.45);
+  color: #d7bcff;
+}
+
+.gh-pill-chat {
+  background: rgba(89, 170, 255, 0.2);
+  border-color: rgba(89, 170, 255, 0.5);
+  color: #b9dbff;
+}
+
+.gh-player {
+  color: #f8da85;
+  font-weight: 600;
+}
+
+.gh-amount {
+  color: #7be0a0;
+  font-weight: 700;
+}
+
+.gh-text {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.gh-chat-text {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.gh-handtype {
+  color: #ffd86b;
+  font-weight: 600;
+  background: rgba(255, 216, 107, 0.12);
+  border: 1px solid rgba(255, 216, 107, 0.35);
+  border-radius: 6px;
+  padding: 2px 8px;
 }
 
 .game-history-container strong {
   color: #ffd700;
 }
 
-/* 聊天输入区 */
-.game-history-chat {
+/* 游戏局数容器 */
+.game-history-game {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* 游戏局数标题 */
+.game-history-game-header {
   display: flex;
-  flex-direction: row;
-  flex-shrink: 0;
+  justify-content: space-between;
+  align-items: center;
   padding: 10px 12px;
-  gap: 8px;
-  border-top: 1px solid rgba(201, 162, 39, 0.2);
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.game-history-chat input {
-  flex: 1;
-  min-width: 0;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 215, 0, 0.25);
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.game-history-chat input::placeholder {
-  color: rgba(255, 255, 255, 0.35);
-}
-
-.game-history-chat input:focus {
-  outline: none;
-  border-color: rgba(255, 215, 0, 0.5);
-}
-
-.game-history-chat button {
-  background: linear-gradient(180deg, #2d5a3d 0%, #1a3d28 100%);
-  border: 1px solid rgba(201, 162, 39, 0.4);
-  color: #ffd700;
-  padding: 8px 14px;
-  border-radius: 6px;
+  background: linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%);
   cursor: pointer;
-  font-weight: bold;
-  font-size: 14px;
-  flex-shrink: 0;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.3);
 }
 
-.game-history-chat button:hover {
-  background: linear-gradient(180deg, #3d6a4d 0%, #2a4d38 100%);
+.game-history-game-header:hover {
+  background: linear-gradient(135deg, #3a7a51 0%, #255d3a 100%);
+}
+
+.game-history-game-title {
+  font-weight: bold;
+  color: #ffd700;
+  font-size: 14px;
+}
+
+.game-history-game-toggle {
+  color: #ffd700;
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.game-history-game-toggle.expanded {
+  transform: rotate(0deg);
+}
+
+/* 游戏内容 */
+.game-history-game-content {
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* 扑克牌样式 */
+.poker-card {
+  display: inline-block;
+  width: 30px;
+  height: 40px;
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: 4px;
+  margin: 0 2px;
+  padding: 2px;
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.2;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.poker-card-red {
+  color: #ff4444;
+}
+
+.poker-card-black {
+  color: #ffffff;
 }
 
 /* 滚动条 */

@@ -78,12 +78,21 @@ export const roomSlice = createSlice({
       const { id, hands } = action.payload;
       const user = room?.users.find((u) => u.id == id);
       if (user) {
-        user.hands = user.hands || [null, null];
-        if (hands[0]) {
-          user.hands[0] = hands[0];
+        const maxLen = Math.max(user.hands?.length || 0, hands?.length || 0);
+        if (!user.hands || user.hands.length !== maxLen) {
+          const nextHands = new Array(maxLen).fill(null);
+          (user.hands || []).forEach((card, idx) => {
+            nextHands[idx] = card;
+          });
+          user.hands = nextHands;
         }
-        if (hands[1]) {
-          user.hands[1] = hands[1];
+        hands.forEach((card, idx) => {
+          if (card) {
+            user.hands[idx] = card;
+          }
+        });
+        if (maxLen === 0) {
+          user.hands = [];
         }
       }
     },

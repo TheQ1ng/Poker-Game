@@ -29,33 +29,30 @@ export const registerAsync = createAsyncThunk(
     const rsp = await registerApi(account);
     console.log('[DEBUG] Response received in thunk:', rsp);
     if (rsp.code == 0) {
-      console.log('[DEBUG] Success branch entered, token:', (rsp as any)?.data?.token);
+      console.log('[DEBUG] Success branch entered, token:', (rsp as any)?.data?.token, 'isAdmin:', rsp.data.isAdmin);
       localStorage['name'] = account.name;
       // 保存 token 和 isAdmin 信息
       localStorage.setItem("token", rsp.data.token);
       localStorage.setItem("isAdmin", rsp.data.isAdmin.toString());
       
-      // 登录成功后获取用户资料并保存到 localStorage
+      // 立即跳转到相应页面，不等待 fetchProfile
+      if (rsp.data.isAdmin) {
+        console.log('[DEBUG] Admin login detected, redirecting to /admin');
+        window.location.href = "/admin";
+      } else {
+        console.log('[DEBUG] Regular user login detected, redirecting to /');
+        window.location.href = "/";
+      }
+      
+      // 登录成功后获取用户资料并保存到 localStorage（后台执行）
       try {
         const profile = await fetchProfile();
         localStorage.setItem("nickname", profile.data?.nickname || "");
         localStorage.setItem("avatar", profile.data?.avatar || "");
         localStorage.setItem("isAdmin", profile.data?.isAdmin.toString());
-        
-        // 根据 isAdmin 字段跳转到不同界面
-        if (profile.data?.isAdmin) {
-          window.location.href = "/admin";
-        } else {
-          window.location.href = "/";
-        }
+        console.log('[DEBUG] Profile fetched successfully:', profile.data);
       } catch (e) {
         console.error("Failed to fetch profile after login:", e);
-        // 出错时根据登录返回的 isAdmin 字段跳转
-        if (rsp.data.isAdmin) {
-          window.location.href = "/admin";
-        } else {
-          window.location.href = "/";
-        }
       }
     } else {
       console.log('[DEBUG] Error branch entered:', rsp);

@@ -74,13 +74,20 @@ router.post("/register", (ctx) => {
 
     // 密码正确，生成token返回
     const token = jwt.sign(name + "@" + password, secret);
+    const isAdminValue = existingUser.admin === 1;
     if (!userMap[token]) {
       const user = createUser(token, name, finalAvatar);
       user.nickname = existingUser.nickname;
-      user.isAdmin = existingUser.admin === 1;
+      user.isAdmin = isAdminValue;
+    } else {
+      // 更新现有用户的信息，包括 isAdmin
+      userMap[token].name = name;
+      userMap[token].avatar = finalAvatar;
+      userMap[token].nickname = existingUser.nickname;
+      userMap[token].isAdmin = isAdminValue;
     }
-    ctx.data = { token, isAdmin: existingUser.admin === 1 };
-    console.log('[DEBUG] Existing user login success, token:', token?.substring(0, 10) + '...');
+    ctx.data = { token, isAdmin: isAdminValue };
+    console.log('[DEBUG] Existing user login success, token:', token?.substring(0, 10) + '...', 'isAdmin:', isAdminValue);
   } else {
     // 用户不存在，创建新用户并保存到数据库
     let finalAvatar = avatar || "";
@@ -123,8 +130,25 @@ router.post("/createroom", (ctx) => {
   if (!userMap[token]) {
     createUser(token, ctx.user, "");
   }
-  const { sb, buyin, reBuyLimit, isShortDeck, isOmaha } = ctx.request.body;
-  const room = createRoom(token, sb, buyin, reBuyLimit, !!isShortDeck, !!isOmaha);
+  const {
+    sb,
+    buyin,
+    reBuyLimit,
+    isShortDeck,
+    isOmaha,
+    redPacketThresholdMultiple,
+    redPacketMaxPercent,
+  } = ctx.request.body;
+  const room = createRoom(
+    token,
+    sb,
+    buyin,
+    reBuyLimit,
+    !!isShortDeck,
+    !!isOmaha,
+    Number(redPacketThresholdMultiple ?? 1),
+    Number(redPacketMaxPercent ?? 30)
+  );
   ctx.data = room.id;
 });
 
@@ -238,17 +262,7 @@ router.get("/admin/game-records", (ctx) => {
   const stmt = db.prepare("SELECT * FROM game_records ORDER BY created_at DESC");
   const records = stmt.all();
   
-  // 为每条记录添加nickname字段
-  const recordsWithNickname = records.map((record: any) => {
-    // 从数据库获取用户信息
-    const userProfile = getUserProfile(record.username);
-    return {
-      ...record,
-      nickname: userProfile?.nickname || record.username
-    };
-  });
-  
-  ctx.data = recordsWithNickname;
+  ctx.data = records;
 });
 
 // 管理员接口：更新用户信息
@@ -339,4 +353,136 @@ router.post("/admin/room/dissolve", (ctx) => {
   delete roomMap[roomId];
   
   ctx.data = { success: true };
+});
+
+// 保存积分榜接口（房主和管理员都可以）
+router.post("/admin/save-chips-record", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token]) throw "user not found";
+  
+  const { roomId, chipsRecords } = ctx.request.body;
+  if (!roomId || !chipsRecords || !Array.isArray(chipsRecords)) throw "invalid request";
+  
+  // 检查用户是否是房主或管理员
+  const user = userMap[token];
+  const room = roomMap[roomId];
+  if (!room) throw "room not found";
+  
+  // 验证用户是否是房主或管理员
+  if (!user.isAdmin && !room.users.some(u => u === token && userMap[u]?.isRoomOwner)) {
+    throw "only room owner or admin can save chips record";
+  }
+  
+  try {
+    // 开始事务
+    db.exec('BEGIN TRANSACTION');
+    
+    // 插入游戏记录
+    const gameRecordStmt = db.prepare(`
+      INSERT INTO game_records (room_id, username, profit, created_at)
+      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+    const gameRecordResult = gameRecordStmt.run(roomId, user.name, 0);
+    const gameRecordId = gameRecordResult.lastInsertRowid;
+    
+    // 插入玩家记录
+    const playerRecordStmt = db.prepare(`
+      INSERT INTO player_records (game_record_id, username, nickname, chips, buy_in, profit)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    
+    chipsRecords.forEach(record => {
+      playerRecordStmt.run(
+        gameRecordId,
+        record.username,
+        record.nickname,
+        record.chips,
+        record.buyIn,
+        record.profit
+      );
+    });
+    
+    // 提交事务
+    db.exec('COMMIT');
+    
+    ctx.data = { success: true, gameRecordId };
+  } catch (error) {
+    // 回滚事务
+    db.exec('ROLLBACK');
+    throw error;
+  }
+});
+
+// 管理员接口：获取游戏记录的玩家记录
+router.get("/admin/game-record/:id/players", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  const gameRecordId = ctx.params.id;
+  if (!gameRecordId) throw "game record id is required";
+  
+  // 查询玩家记录
+  const stmt = db.prepare(`
+    SELECT * FROM player_records 
+    WHERE game_record_id = ? 
+    ORDER BY profit DESC
+  `);
+  const playerRecords = stmt.all(gameRecordId);
+  
+  ctx.data = playerRecords;
+});
+
+// 管理员接口：获取汇总积分榜
+router.post("/admin/summary-scoreboard", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+  
+  const { roomIds } = ctx.request.body;
+  if (!roomIds || !Array.isArray(roomIds)) throw "invalid request";
+  
+  // 查询指定房间的所有游戏记录
+  const gameRecordStmt = db.prepare(`
+    SELECT id FROM game_records 
+    WHERE room_id IN (${roomIds.map(() => '?').join(',')})
+  `);
+  const gameRecords = gameRecordStmt.all(...roomIds);
+  const gameRecordIds = gameRecords.map((record: any) => record.id);
+  
+  if (gameRecordIds.length === 0) {
+    ctx.data = [];
+    return;
+  }
+  
+  // 查询这些游戏记录的所有玩家记录
+  const playerRecordStmt = db.prepare(`
+    SELECT * FROM player_records 
+    WHERE game_record_id IN (${gameRecordIds.map(() => '?').join(',')})
+  `);
+  const playerRecords = playerRecordStmt.all(...gameRecordIds);
+  
+  // 汇总数据
+  const summaryMap = new Map<string, any>();
+  playerRecords.forEach((record: any) => {
+    if (!summaryMap.has(record.username)) {
+      summaryMap.set(record.username, {
+        username: record.username,
+        nicknames: [],
+        totalProfit: 0,
+        gameCount: 0,
+      });
+    }
+    const user = summaryMap.get(record.username);
+    user.nicknames.push(record.nickname);
+    user.totalProfit += record.profit;
+    user.gameCount += 1;
+  });
+  
+  // 转换为数组并按总盈亏排序
+  const summaryStats = Array.from(summaryMap.values());
+  summaryStats.sort((a, b) => b.totalProfit - a.totalProfit);
+  
+  ctx.data = summaryStats;
 });

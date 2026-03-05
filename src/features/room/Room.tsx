@@ -1,4 +1,4 @@
-import { Button, Popconfirm, Tooltip, Modal } from "antd";
+import { Button, Popconfirm, Tooltip, Modal, message, InputNumber, Progress } from "antd";
 import { Card as PokerCard } from "../../ApiType";
 import {
   LoginOutlined,
@@ -14,10 +14,13 @@ import {
   InfoCircleOutlined,
   DollarOutlined,
   CloseOutlined,
+  MessageOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { User } from "./User";
 import { Owner } from "./Owner";
+import { Chat } from "../chat/Chat";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import {
   selectSelf,
@@ -40,6 +43,8 @@ import {
   ws_settleGame,
   ws_extendActionTime,
   ws_respondSeeHand,
+  ws_sendRedPacket,
+  ws_openRedPacket,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -47,6 +52,7 @@ import { ChipsRecord } from "../chipsrecord/ChipsRecord";
 import GameHistory from "../gamehistory/GameHistory";
 import { Spectators } from "./Spectators";
 import { soundManager } from "../../utils/soundManager";
+import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
 
 function Room() {
   const dispatch = useAppDispatch();
@@ -58,10 +64,91 @@ function Room() {
   const [activeTab, setActiveTab] = useState('history');
   const [, setTick] = useState(0);
   const [disclaimerModalVisible, setDisclaimerModalVisible] = useState(false);
+  const [redPacketSendVisible, setRedPacketSendVisible] = useState(false);
+  const [redPacketAmount, setRedPacketAmount] = useState<number>(0);
+
+  // 清除缓存和localStorage
+  const handleClearCache = () => {
+    try {
+      // 保存登录相关数据
+      const token = localStorage.getItem('token');
+      const isAdmin = localStorage.getItem('isAdmin');
+      const name = localStorage.getItem('name');
+      // 清除localStorage
+      localStorage.clear();
+      // 恢复登录相关数据
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+      if (isAdmin) {
+        localStorage.setItem('isAdmin', isAdmin);
+      }
+      if (name) {
+        localStorage.setItem('name', name);
+      }
+      // 清除缓存
+      if ('caches' in window) {
+        caches.keys().then((cacheNames) => {
+          cacheNames.forEach((cacheName) => {
+            caches.delete(cacheName);
+          });
+        });
+      }
+      message.success('缓存和本地存储已清除');
+      // 刷新页面
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      message.error('清除缓存失败');
+      console.error('清除缓存失败:', error);
+    }
+  };
+
+  // 保存积分榜到数据库
+  const handleSaveChipsRecord = async () => {
+    try {
+      // 构建积分榜数据
+      const chipsRecordData = chipsRecords.map(record => {
+        const user = room?.users?.find(u => u.id === record.id);
+        return {
+          username: user?.name || record.id,
+          nickname: user?.nickname || user?.name || record.id,
+          chips: record.chips,
+          buyIn: record.buyIn,
+          profit: record.chips - record.buyIn
+        };
+      });
+
+      // 发送到服务器
+      const response = await fetch('/admin/save-chips-record', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: localStorage.getItem('token') || '',
+        },
+        body: JSON.stringify({
+          roomId: roomid,
+          chipsRecords: chipsRecordData
+        }),
+      });
+
+      const data = await response.json();
+      if (data.code === 0) {
+        message.success('积分榜保存成功');
+      } else {
+        message.error(data.error || '保存失败');
+      }
+    } catch (error) {
+      message.error('保存积分榜失败');
+      console.error('保存积分榜失败:', error);
+    }
+  };
   const roomid = useAppSelector(selectRoomID);
   const users = useAppSelector(selectUsers) || [];
   const room = useAppSelector(selectRoom);
   const self = useAppSelector(selectSelf);
+  const chipsRecordState = useAppSelector(selectChipsRecord);
   const serverTimeOffset = useAppSelector(selectServerTimeOffset);
   const game = useAppSelector(selectGame);
   const selectSettleStatus = useAppSelector(getSelectSettleStatus);
@@ -73,6 +160,40 @@ function Room() {
     ((game?.nextGameTime || serverNowForNextGame) - serverNowForNextGame) / 1000
   );
   const cards: PokerCard[] = [...(game?.boardCards || [])];
+  const chipsRecords =
+    room?.roomid && chipsRecordState?.roomid === room.roomid
+      ? chipsRecordState.chipsRecords
+      : [];
+  const selfRecord = self?.id ? chipsRecords.find((cr) => cr.id === self.id) : undefined;
+  const selfProfit = selfRecord ? selfRecord.chips - selfRecord.buyIn : 0;
+  const redPacketThresholdMultiple = room?.redPacketConfig?.thresholdMultiple ?? 1;
+  const redPacketMaxPercent = room?.redPacketConfig?.maxPercent ?? 30;
+  const underwaterUsers = (room?.users || []).filter((u) => {
+    if (u.isSpectator) return false;
+    if (u.id === self?.id) return false;
+    const cr = chipsRecords.find((item) => item.id === u.id);
+    return !!cr && cr.chips < cr.buyIn;
+  });
+  const underwaterCount = underwaterUsers.length;
+  const minRedPacketAmount = underwaterCount;
+  const maxRedPacketAmount = Math.max(
+    0,
+    Math.min(
+      Math.floor((Math.max(0, selfProfit) * redPacketMaxPercent) / 100),
+      Math.floor(self?.stack || 0)
+    )
+  );
+  const senderThresholdProfit = Math.floor((selfRecord?.buyIn || 0) * redPacketThresholdMultiple);
+  const activeRedPacket = room?.redPacket || null;
+  const canSendRedPacket =
+    !!self &&
+    !!selfRecord &&
+    !self.isSpectator &&
+    !activeRedPacket &&
+    (game?.isSettling ?? false) &&
+    underwaterCount > 0 &&
+    selfProfit >= senderThresholdProfit &&
+    maxRedPacketAmount >= minRedPacketAmount;
 
   const showdownPlayers = useMemo(() => {
     const list = room?.users?.filter((u) => u.shouldShowHand) || [];
@@ -165,6 +286,37 @@ function Room() {
     : 30;
   const isMyTurnToAct = !!actingUserId && self?.id === actingUserId;
   const addTimeRemaining = isMyTurnToAct ? Math.max(0, 3 - (self?.addTimeUsed ?? 0)) : 0;
+  const isRedPacketSender = !!activeRedPacket && self?.id === activeRedPacket.senderUserId;
+  const isRedPacketRecipient =
+    !!activeRedPacket && !!self?.id && activeRedPacket.recipientUserIds.includes(self.id);
+  const isRedPacketOpenedByMe =
+    !!activeRedPacket && !!self?.id && activeRedPacket.openedUserIds.includes(self.id);
+  const redPacketWaitMs =
+    activeRedPacket?.status === "waiting"
+      ? Math.max(0, activeRedPacket.openDeadline - serverNow)
+      : 0;
+  const redPacketWaitPercent =
+    activeRedPacket?.status === "waiting"
+      ? Math.max(0, Math.min(100, (redPacketWaitMs / 5000) * 100))
+      : 0;
+  const redPacketResultMs =
+    activeRedPacket?.status === "result"
+      ? Math.max(0, activeRedPacket.resultDeadline - serverNow)
+      : 0;
+  const redPacketResultPercent =
+    activeRedPacket?.status === "result"
+      ? Math.max(0, Math.min(100, (redPacketResultMs / 3000) * 100))
+      : 0;
+  const redPacketDetails = (activeRedPacket?.details || [])
+    .slice()
+    .sort((a, b) => b.amount - a.amount);
+  const redPacketPauseActive =
+    !!activeRedPacket &&
+    isSettlingCountdown &&
+    (activeRedPacket.pausedNextGameRemainMs || 0) > 0;
+  const pausedNextGameSeconds = redPacketPauseActive
+    ? Math.max(0, Math.ceil((activeRedPacket?.pausedNextGameRemainMs || 0) / 1000))
+    : 0;
 
   // 结算阶段：胜者动画结束后的倒计时（用于右上角圆形读条）
   const [settleCountdownTotal, setSettleCountdownTotal] = useState<number | null>(null);
@@ -198,6 +350,29 @@ function Room() {
     const t = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(t);
   }, [isSettling, game?.nextGameTime]);
+
+  useEffect(() => {
+    if (!activeRedPacket) return;
+    const t = setInterval(() => setTick((n) => n + 1), 200);
+    return () => clearInterval(t);
+  }, [activeRedPacket?.id, activeRedPacket?.status, activeRedPacket?.openDeadline, activeRedPacket?.resultDeadline]);
+
+  useEffect(() => {
+    if (!redPacketSendVisible) return;
+    setRedPacketAmount((prev) => {
+      if (minRedPacketAmount <= 0) return prev;
+      if (prev < minRedPacketAmount || prev > maxRedPacketAmount) {
+        return minRedPacketAmount;
+      }
+      return prev;
+    });
+  }, [redPacketSendVisible, minRedPacketAmount, maxRedPacketAmount]);
+
+  useEffect(() => {
+    if (activeRedPacket && redPacketSendVisible) {
+      setRedPacketSendVisible(false);
+    }
+  }, [activeRedPacket, redPacketSendVisible]);
 
   function setSettleTimes(times: number) {
     ws_settleTimes(times);
@@ -286,6 +461,19 @@ function Room() {
             >
               积分
             </Button>
+            <Button
+              type={activeTab === 'chat' ? 'primary' : 'default'}
+              onClick={() => setActiveTab('chat')}
+              icon={<MessageOutlined />}
+              style={{
+                flex: 1,
+                background: activeTab === 'chat' ? "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)" : "rgba(255,255,255,0.1)",
+                border: "2px solid rgba(201, 162, 39, 0.5)",
+                color: "#fff",
+              }}
+            >
+              聊天
+            </Button>
           </div>
           
           {/* 内容区域 */}
@@ -298,6 +486,11 @@ function Room() {
             {activeTab === 'chips' && (
               <div style={{ height: "100%", overflow: "auto" }}>
                 <ChipsRecord />
+              </div>
+            )}
+            {activeTab === 'chat' && (
+              <div style={{ height: "100%", overflow: "auto" }}>
+                <Chat />
               </div>
             )}
           </div>
@@ -399,7 +592,60 @@ function Room() {
           </div>
         )}
         {/* 右上角：行动倒计时 / 结算后倒计时（圆圈引线燃烧样式） */}
-        {isSettlingCountdown ? (
+        {redPacketPauseActive ? (
+          <div
+            style={{
+              position: "absolute",
+              top: 14,
+              right: 14,
+              zIndex: 50,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <div
+              className="action-countdown-circle"
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: "50%",
+                background: "linear-gradient(145deg, #3a1010 0%, #1d0a0a 100%)",
+                border: "3px solid rgba(255, 172, 74, 0.75)",
+                boxShadow: "0 0 20px rgba(255, 143, 31, 0.42), inset 0 0 15px rgba(0,0,0,0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              <span
+                style={{
+                  position: "relative",
+                  zIndex: 1,
+                  fontSize: 24,
+                  filter: "drop-shadow(0 0 5px rgba(255, 223, 173, 0.6))",
+                }}
+              >
+                🧧
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "#ffe6c4",
+                textShadow: "0 0 6px rgba(0, 0, 0, 0.6)",
+                padding: "2px 8px",
+                borderRadius: 12,
+                background: "rgba(0, 0, 0, 0.55)",
+                border: "1px solid rgba(255, 172, 74, 0.6)",
+              }}
+            >
+              红包进行中，倒计时暂停（剩 {pausedNextGameSeconds}s）
+            </div>
+          </div>
+        ) : isSettlingCountdown ? (
           <div
             style={{
               position: "absolute",
@@ -652,6 +898,32 @@ function Room() {
                 />
               </Tooltip>
             )}
+            {/* 保存积分榜按钮 - 仅房主可见 */}
+            {self?.isRoomOwner && roomid && (
+              <Tooltip title="保存当前积分榜到数据库">
+                <Button
+                  className="room-action-btn"
+                  type="primary"
+                  icon={<DollarOutlined />}
+                  onClick={handleSaveChipsRecord}
+                />
+              </Tooltip>
+            )}
+            {canSendRedPacket && (
+              <Tooltip
+                title={`发拼手气红包（范围 ${minRedPacketAmount}~${maxRedPacketAmount}，上限为盈利 ${redPacketMaxPercent}%）`}
+              >
+                <Button
+                  className="room-action-btn redpacket-send-btn"
+                  onClick={() => {
+                    setRedPacketAmount(minRedPacketAmount);
+                    setRedPacketSendVisible(true);
+                  }}
+                >
+                  🧧
+                </Button>
+              </Tooltip>
+            )}
             {!self?.isSpectator && self?.isReady && (
               <Tooltip title="暂时不参与游戏">
                 <Button
@@ -683,6 +955,13 @@ function Room() {
               )
             )}
 
+            <Tooltip title="清除缓存和本地存储">
+              <Button
+                className="room-action-btn"
+                icon={<DeleteOutlined />}
+                onClick={handleClearCache}
+              />
+            </Tooltip>
             <Popconfirm
               title="如果在游戏中，将会自动放弃。确认离开？"
               okText="确定离开"
@@ -870,6 +1149,118 @@ function Room() {
           </div>
         </div>
       </div>
+
+      {/* 发红包弹窗 */}
+      <Modal
+        title={<span style={{ color: "#f7d777" }}>🧧 发送拼手气红包</span>}
+        visible={redPacketSendVisible}
+        onCancel={() => setRedPacketSendVisible(false)}
+        onOk={() => {
+          if (redPacketAmount < minRedPacketAmount || redPacketAmount > maxRedPacketAmount) {
+            message.error(`红包金额需在 ${minRedPacketAmount} ~ ${maxRedPacketAmount} 之间`);
+            return;
+          }
+          ws_sendRedPacket(Math.floor(redPacketAmount));
+          setRedPacketSendVisible(false);
+        }}
+        okText="发送红包"
+        cancelText="取消"
+        className="redpacket-modal"
+      >
+        <div className="redpacket-send-desc">
+          <div>水上门槛：盈利达到初始筹码 x{redPacketThresholdMultiple}</div>
+          <div>可抢人数：{underwaterCount}（当前所有水下玩家）</div>
+          <div>红包范围：{minRedPacketAmount} ~ {maxRedPacketAmount}</div>
+        </div>
+        <div className="redpacket-send-input-row">
+          <span>红包金额</span>
+          <InputNumber
+            min={minRedPacketAmount}
+            max={maxRedPacketAmount}
+            value={redPacketAmount}
+            onChange={(v) => setRedPacketAmount(Number(v || minRedPacketAmount))}
+            className="redpacket-amount-input"
+          />
+          <span>筹码</span>
+        </div>
+      </Modal>
+
+      {/* 抢红包弹窗（仅水下玩家可见） */}
+      <Modal
+        visible={!!activeRedPacket && activeRedPacket.status === "waiting" && isRedPacketRecipient}
+        footer={null}
+        closable={false}
+        maskClosable={false}
+        className="redpacket-modal"
+        centered
+      >
+        <div className="redpacket-cover">
+          <div className="redpacket-cover-icon">🧧</div>
+          <div className="redpacket-cover-title">{activeRedPacket?.senderName} 发来拼手气红包</div>
+          <div className="redpacket-cover-amount">总额 {activeRedPacket?.totalAmount || 0} 筹码</div>
+          {isRedPacketOpenedByMe ? (
+            <div className="redpacket-cover-opened">你已打开红包，等待揭晓...</div>
+          ) : (
+            <Button
+              type="primary"
+              className="redpacket-open-btn"
+              onClick={ws_openRedPacket}
+            >
+              抢红包
+            </Button>
+          )}
+          <div className="redpacket-progress-label">
+            {Math.max(0, Math.ceil(redPacketWaitMs / 1000))}s 后自动开奖
+          </div>
+          <Progress
+            percent={redPacketWaitPercent}
+            showInfo={false}
+            strokeColor={{ "0%": "#f7d777", "100%": "#d46b08" }}
+            trailColor="rgba(255,255,255,0.15)"
+          />
+        </div>
+      </Modal>
+
+      {/* 红包结果弹窗（发送者 + 领取者可见） */}
+      <Modal
+        visible={
+          !!activeRedPacket &&
+          activeRedPacket.status === "result" &&
+          (isRedPacketSender || isRedPacketOpenedByMe)
+        }
+        footer={null}
+        closable={false}
+        maskClosable={false}
+        className="redpacket-modal"
+        centered
+      >
+        <div className="redpacket-result">
+          <div className="redpacket-result-title">🎉 拼手气红包结果</div>
+          <div className="redpacket-result-subtitle">
+            {activeRedPacket?.senderName} 发出 {activeRedPacket?.totalAmount || 0} 筹码
+          </div>
+          <div className="redpacket-result-list">
+            {redPacketDetails.map((item) => (
+              <div key={item.userId} className="redpacket-result-row">
+                <span className="redpacket-result-name">
+                  {item.name}
+                  {activeRedPacket?.luckiestUserId === item.userId ? " 👑手气王" : ""}
+                </span>
+                <span className="redpacket-result-amount">
+                  +{item.amount}
+                  {item.autoOpened ? "（自动）" : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+          <Progress
+            percent={redPacketResultPercent}
+            showInfo={false}
+            strokeColor={{ "0%": "#f7d777", "100%": "#ffec99" }}
+            trailColor="rgba(255,255,255,0.18)"
+          />
+        </div>
+      </Modal>
 
       {/* 免责声明Modal */}
       <Modal

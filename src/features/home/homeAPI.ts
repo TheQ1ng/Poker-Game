@@ -19,7 +19,9 @@ export async function createroom(
   buyin: number,
   reBuyLimit: number,
   isShortDeck: boolean,
-  isOmaha: boolean
+  isOmaha: boolean,
+  redPacketThresholdMultiple: number,
+  redPacketMaxPercent: number
 ): Promise<ApiRsp> {
   const rsp = await fetch("/createroom", {
     method: "POST",
@@ -29,6 +31,8 @@ export async function createroom(
       reBuyLimit,
       isShortDeck,
       isOmaha,
+      redPacketThresholdMultiple,
+      redPacketMaxPercent,
     }),
     headers: {
       authorization: localStorage["token"],
@@ -60,6 +64,8 @@ export interface RoomInfo {
   ownerName: string;
   isShortDeck: boolean;
   isOmaha: boolean;
+  redPacketThresholdMultiple?: number;
+  redPacketMaxPercent?: number;
 }
 
 export async function fetchRooms(): Promise<{ rooms: RoomInfo[] }> {

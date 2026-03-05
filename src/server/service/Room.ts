@@ -168,6 +168,7 @@ export class Game {
       user.totalBets = 0;
       user.maxCards = [];
       user.profits = 0;
+      user.revealedHandsMask = [];
       user.settleTimes = 0;
       user.addTimeUsed = 0;
     });
@@ -521,6 +522,7 @@ export class Game {
           this.cards.slice(this.cardIndex, this.cardIndex + holeCount),
           false
         );
+        user.revealedHandsMask = new Array(holeCount).fill(false);
         this.cardIndex += holeCount;
         user.isFolded = false;
       }
@@ -768,6 +770,27 @@ type ChipsRecord = {
   buyIn: number; // total buy in
 };
 
+export type RoomRedPacketDetail = {
+  token: Token;
+  amount: number;
+  opened: boolean;
+  openedAt: number;
+  autoOpened: boolean;
+};
+
+export type RoomRedPacket = {
+  id: string;
+  status: "waiting" | "result";
+  senderToken: Token;
+  senderName: string;
+  totalAmount: number;
+  pausedNextGameRemainMs: number;
+  recipients: RoomRedPacketDetail[];
+  openDeadline: number;
+  resultDeadline: number;
+  luckiestToken: Token;
+};
+
 class Room {
   id: RoomID = ""; // string
   users: Token[] = [];
@@ -779,6 +802,10 @@ class Room {
   isShortDeck: boolean = false;
   /** 是否奥马哈（4 张手牌，必须 2+3 组成 5 张） */
   isOmaha: boolean = false;
+  /** 红包门槛：盈利达到初始买入多少倍才可发红包 */
+  redPacketThresholdMultiple: number = 1;
+  /** 红包额度上限：最多可发盈利筹码的百分比（1~100） */
+  redPacketMaxPercent: number = 30;
   game: Game = new Game("", "", 0, 1, false, false);
   chipsRecords: ChipsRecord[] = [];
   /** 结算阶段：多人可同时请求看同一人的手牌，等待被请求者逐条同意/拒绝 */
@@ -788,6 +815,10 @@ class Room {
     targetToken: Token;
     chips: number;
   }[] = [];
+  /** 当前红包状态（最多同时存在一个） */
+  activeRedPacket: RoomRedPacket | null = null;
+  redPacketOpenTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
+  redPacketResultTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
 
   constructor(
     id: string,
@@ -795,7 +826,9 @@ class Room {
     buyIn: number,
     reBuyLimit: number = 1,
     isShortDeck: boolean = false,
-    isOmaha: boolean = false
+    isOmaha: boolean = false,
+    redPacketThresholdMultiple: number = 1,
+    redPacketMaxPercent: number = 30
   ) {
     if (sb === 0 || buyIn === 0) {
       throw `small blind(${sb}) and buy in(${buyIn})] should not be 0`;
@@ -807,6 +840,8 @@ class Room {
     this.reBuyLimit = Math.max(1, reBuyLimit);
     this.isShortDeck = !!isShortDeck;
     this.isOmaha = !!isOmaha;
+    this.redPacketThresholdMultiple = Math.max(0, Number(redPacketThresholdMultiple) || 0);
+    this.redPacketMaxPercent = Math.min(100, Math.max(1, Number(redPacketMaxPercent) || 30));
     if (this.isShortDeck && this.isOmaha) {
       throw new Error("短牌与奥马哈不能同时开启");
     }
@@ -907,6 +942,9 @@ class Room {
       const index = this.users.findIndex((t) => userMap[t].isInRoom);
       if (index == -1) {
         // none user inRoom, remove game
+        clearTimeout(this.redPacketOpenTimer);
+        clearTimeout(this.redPacketResultTimer);
+        this.activeRedPacket = null;
         delete roomMap[this.id];
         this.users.forEach((t) => userMap[t].leaveRoom());
         this.users = [];

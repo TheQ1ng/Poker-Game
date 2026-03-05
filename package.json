@@ -66,6 +66,7 @@
       "last 1 safari version"
     ]
   },
+  "proxy": "http://localhost:8086",
   "devDependencies": {
     "@types/chai": "^4.3.0",
     "@types/jsonwebtoken": "^8.5.8",

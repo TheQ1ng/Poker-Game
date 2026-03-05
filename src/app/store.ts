@@ -6,6 +6,7 @@ import createRoomReducer from "../features/createroom/createRoomSlice";
 import roomReducer from "../features/room/roomSlice";
 import chipsRecordReducer from "../features/chipsrecord/chipsRecordSlice";
 import gameHistoryReducer from "../features/gamehistory/gameHistorySlice";
+import chatReducer from "../features/chat/chatSlice";
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     room: roomReducer,
     chipsrecord: chipsRecordReducer,
     gamehistory: gameHistoryReducer,
+    chat: chatReducer,
   },
 });
 

@@ -1,8 +1,7 @@
 import { Card } from "../../ApiType";
 import { useAppSelector } from "../../app/hooks";
 import { selectGameHistory } from "./gameHistorySlice";
-import { useMemo, useRef, useState } from "react";
-import { ws_sendMessage } from "../../app/websocket";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "./GameHistory.css";
 
 export function card2html(cards: Card[]): string {
@@ -30,6 +29,184 @@ function prettifyHtml(log: string) {
     s = `<strong>${s}</strong>`;
   }
   return s;
+}
+
+function parseCompactCards(raw: string): Card[] {
+  const cards: Card[] = [];
+  const regex = /(\d+)(c|d|h|s)/g;
+  let match: RegExpExecArray | null = regex.exec(raw);
+  while (match) {
+    cards.push({ num: Number(match[1]), suit: match[2] as Card["suit"] });
+    match = regex.exec(raw);
+  }
+  return cards;
+}
+
+function cardNumLabel(num: number): string {
+  if (num === 14) return "A";
+  if (num === 13) return "K";
+  if (num === 12) return "Q";
+  if (num === 11) return "J";
+  if (num === 10) return "T";
+  return String(num);
+}
+
+function suitLabel(suit: Card["suit"]): string {
+  if (suit === "h") return "♥";
+  if (suit === "d") return "♦";
+  if (suit === "c") return "♣";
+  return "♠";
+}
+
+function actionLabel(action: string): string {
+  if (action === "AllIn") return "全下";
+  if (action === "Raise") return "加注";
+  if (action === "Call") return "跟注";
+  if (action === "Bet") return "下注";
+  if (action === "Fold") return "弃牌";
+  if (action === "Check") return "过牌";
+  return action;
+}
+
+function PokerStyledCard({ card }: { card: Card }) {
+  const isRed = card.suit === "h" || card.suit === "d";
+  return (
+    <span className={`gh-poker-card ${isRed ? "gh-poker-card-red" : "gh-poker-card-black"}`}>
+      <span className="gh-poker-card-rank">{cardNumLabel(card.num)}</span>
+      <span className="gh-poker-card-suit">{suitLabel(card.suit)}</span>
+    </span>
+  );
+}
+
+type ParsedLogLine =
+  | {
+      kind: "street";
+      phase: string;
+      cards: Card[];
+    }
+  | {
+      kind: "action";
+      player: string;
+      action: "AllIn" | "Raise" | "Call" | "Bet" | "Fold" | "Check";
+      amount?: number;
+    }
+  | {
+      kind: "settle";
+      player: string;
+      holeCards: Card[];
+      bestCards: Card[];
+      handType?: string;
+      result: "win" | "lose";
+      amount: number;
+    }
+  | {
+      kind: "seeHand";
+      requester: string;
+      target: string;
+      chips: number;
+    }
+  | {
+      kind: "chat";
+      player: string;
+      text: string;
+    }
+  | {
+      kind: "warning";
+      html: string;
+    }
+  | {
+      kind: "plain";
+      html: string;
+    };
+
+function parseLogLine(line: string): ParsedLogLine {
+  const trimmed = line.trim();
+  const phaseMap: Record<string, string> = {
+    PreFlop: "翻前",
+    Flop: "翻牌",
+    Turn: "转牌",
+    River: "河牌",
+  };
+
+  const streetMatch = trimmed.match(/^(PreFlop|Flop|Turn|River):\s*([0-9cdhs]+)/);
+  if (streetMatch) {
+    const phase = phaseMap[streetMatch[1]] || streetMatch[1];
+    return {
+      kind: "street",
+      phase,
+      cards: parseCompactCards(streetMatch[2]),
+    };
+  }
+
+  const actionMatch = trimmed.match(
+    /^(.+?)\s+(AllIn|Raise to|Call|Bet|Fold|Check)(?:\s+\$?(-?\d+))?$/
+  );
+  if (actionMatch) {
+    const rawAction = actionMatch[2];
+    const action =
+      rawAction === "Raise to"
+        ? "Raise"
+        : (rawAction as "AllIn" | "Call" | "Bet" | "Fold" | "Check");
+    return {
+      kind: "action",
+      player: actionMatch[1],
+      action,
+      amount: actionMatch[3] ? Number(actionMatch[3]) : undefined,
+    };
+  }
+
+  const settleMatch = trimmed.match(
+    /^(.+?)\s+(?:【([0-9cdhs]+)】([0-9cdhs]+)\s+(.+?)\s+)?(win💰|lose)\s+(-?\d+)$/
+  );
+  if (settleMatch) {
+    return {
+      kind: "settle",
+      player: settleMatch[1],
+      holeCards: settleMatch[2] ? parseCompactCards(settleMatch[2]) : [],
+      bestCards: settleMatch[3] ? parseCompactCards(settleMatch[3]) : [],
+      handType: settleMatch[4],
+      result: settleMatch[5] === "win💰" ? "win" : "lose",
+      amount: Number(settleMatch[6]),
+    };
+  }
+
+  const seeHandMatch = trimmed.match(
+    /^(.+?)\s+支付\s+\$?(-?\d+)\s+查看了\s+(.+?)\s+的手牌$/
+  );
+  if (seeHandMatch) {
+    return {
+      kind: "seeHand",
+      requester: seeHandMatch[1],
+      chips: Number(seeHandMatch[2]),
+      target: seeHandMatch[3],
+    };
+  }
+
+  const chatMatch = trimmed.match(/^<strong[^>]*>(.*?)<\/strong>:\s*(.*)$/);
+  if (chatMatch) {
+    return {
+      kind: "chat",
+      player: chatMatch[1],
+      text: chatMatch[2],
+    };
+  }
+
+  if (trimmed.includes("⚠️")) {
+    return { kind: "warning", html: prettifyHtml(line) };
+  }
+
+  return { kind: "plain", html: prettifyHtml(line) };
+}
+
+function isKeyEventLine(line: string): boolean {
+  const parsed = parseLogLine(line);
+  if (parsed.kind === "settle" || parsed.kind === "seeHand" || parsed.kind === "warning") {
+    return true;
+  }
+  if (parsed.kind === "action") {
+    return parsed.action === "AllIn" || parsed.action === "Raise";
+  }
+  return false;
 }
 
 type BlockType = "start" | "street" | "action" | "settle" | "meta";
@@ -73,10 +250,10 @@ function groupLogsByFlow(logs: string[]): LogBlock[] {
       pushCurrent();
       const phase = streetMatch[1];
       const phaseNames: Record<string, string> = {
-        第一轮: "第一轮",
-        第二轮: "第二轮",
-        第三轮: "第三轮",
-        第四轮: "第四轮",
+        PreFlop: "翻前",
+        Flop: "翻牌",
+        Turn: "转牌",
+        River: "河牌",
       };
       current = { type: "street", title: phaseNames[phase] || phase, lines: [line] };
       continue;
@@ -143,23 +320,189 @@ function groupLogsByFlow(logs: string[]): LogBlock[] {
 }
 
 function BlockRow({ line }: { line: string }) {
-  const html = prettifyHtml(line);
-  const isBold = /^(Flop|Turn|River|PreFlop|===)/.test(line.trim());
+  const parsed = parseLogLine(line);
+  if (parsed.kind === "street") {
+    return (
+      <div className="game-history-line game-history-line-street">
+        <span className="gh-pill gh-pill-street">{parsed.phase}</span>
+        <div className="gh-cards-wrap">
+          {parsed.cards.map((card, idx) => (
+            <span key={`${card.num}-${card.suit}-${idx}`} className={`gh-card gh-suit-${card.suit}`}>
+              {cardNumLabel(card.num)}
+              {suitLabel(card.suit)}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (parsed.kind === "action") {
+    return (
+      <div className="game-history-line game-history-line-action">
+        <span className={`gh-pill gh-pill-action gh-pill-action-${parsed.action.toLowerCase()}`}>
+          {actionLabel(parsed.action)}
+        </span>
+        <span className="gh-player">{parsed.player}</span>
+        {parsed.amount !== undefined && (
+          <span className="gh-amount">${parsed.amount}</span>
+        )}
+      </div>
+    );
+  }
+
+  if (parsed.kind === "settle") {
+    const settleAmount = Math.abs(parsed.amount);
+    return (
+      <div className="game-history-line game-history-line-settle">
+        <div className="gh-settle-main">
+          <span className="gh-player">{parsed.player}</span>
+          <span className={`gh-pill ${parsed.result === "win" ? "gh-pill-win" : "gh-pill-lose"}`}>
+            {parsed.result === "win" ? `赢 +${settleAmount}` : `输 -${settleAmount}`}
+          </span>
+        </div>
+        {(parsed.holeCards.length > 0 || parsed.bestCards.length > 0) && (
+          <div className="gh-settle-sections">
+            {parsed.holeCards.length > 0 && (
+              <div className="gh-settle-section">
+                <span className="gh-settle-label">手牌</span>
+                <div className="gh-poker-cards">
+                  {parsed.holeCards.map((card, idx) => (
+                    <PokerStyledCard key={`h-${card.num}-${card.suit}-${idx}`} card={card} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {parsed.bestCards.length > 0 && (
+              <div className="gh-settle-section">
+                <span className="gh-settle-label">最终牌</span>
+                <div className="gh-poker-cards">
+                  {parsed.bestCards.map((card, idx) => (
+                    <PokerStyledCard key={`b-${card.num}-${card.suit}-${idx}`} card={card} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {parsed.handType && <span className="gh-handtype">{parsed.handType}</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (parsed.kind === "seeHand") {
+    return (
+      <div className="game-history-line game-history-line-seehand">
+        <span className="gh-pill gh-pill-meta">看牌</span>
+        <span className="gh-player">{parsed.requester}</span>
+        <span className="gh-text">支付</span>
+        <span className="gh-amount">${parsed.chips}</span>
+        <span className="gh-text">查看了</span>
+        <span className="gh-player">{parsed.target}</span>
+      </div>
+    );
+  }
+
+  if (parsed.kind === "chat") {
+    return (
+      <div className="game-history-line game-history-line-chat">
+        <span className="gh-pill gh-pill-chat">聊天</span>
+        <span className="gh-player">{parsed.player}</span>
+        <span className="gh-text">：</span>
+        <span className="gh-chat-text">{parsed.text}</span>
+      </div>
+    );
+  }
+
+  if (parsed.kind === "warning") {
+    return (
+      <div
+        className="game-history-line game-history-line-warning"
+        dangerouslySetInnerHTML={{ __html: parsed.html }}
+      />
+    );
+  }
+
   return (
     <div
-      className={`game-history-line ${isBold ? "game-history-line-head" : ""}`}
-      dangerouslySetInnerHTML={{ __html: html }}
+      className="game-history-line"
+      dangerouslySetInnerHTML={{ __html: parsed.html }}
     />
   );
 }
 
 export default function GameHistory() {
-  const [message, setMessage] = useState("");
   const logs = useAppSelector(selectGameHistory);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [expandedGames, setExpandedGames] = useState<Set<number>>(new Set());
+  const [showKeyEventsOnly, setShowKeyEventsOnly] = useState(false);
 
-  const blocks = useMemo(() => groupLogsByFlow(logs), [logs]);
-  const reversedBlocks = useMemo(() => [...blocks].reverse(), [blocks]);
+  // 按游戏局数分组
+  const games = useMemo(() => {
+    const gameGroups: { id: number; blocks: LogBlock[] }[] = [];
+    let currentGameLogs: string[] = [];
+    
+    logs.forEach((log) => {
+      if (log.trim() === "====游戏开始====") {
+        if (currentGameLogs.length > 0) {
+          const blocks = groupLogsByFlow(currentGameLogs);
+          gameGroups.push({ id: gameGroups.length, blocks });
+        }
+        currentGameLogs = [log];
+      } else if (currentGameLogs.length > 0) {
+        currentGameLogs.push(log);
+      }
+    });
+    
+    if (currentGameLogs.length > 0) {
+      const blocks = groupLogsByFlow(currentGameLogs);
+      gameGroups.push({ id: gameGroups.length, blocks });
+    }
+    
+    return gameGroups.reverse();
+  }, [logs]);
+
+  const displayGames = useMemo(() => {
+    if (!showKeyEventsOnly) {
+      return games;
+    }
+    return games
+      .map((game) => ({
+        ...game,
+        blocks: game.blocks
+          .map((block) => ({
+            ...block,
+            lines: block.lines.filter(isKeyEventLine),
+          }))
+          .filter((block) => block.lines.length > 0),
+      }))
+      .filter((game) => game.blocks.length > 0);
+  }, [games, showKeyEventsOnly]);
+
+  useEffect(() => {
+    if (displayGames.length === 0) {
+      if (expandedGames.size !== 0) {
+        setExpandedGames(new Set());
+      }
+      return;
+    }
+    const hasVisibleExpanded = [...expandedGames].some((id) =>
+      displayGames.some((g) => g.id === id)
+    );
+    if (!hasVisibleExpanded) {
+      setExpandedGames(new Set([displayGames[0].id]));
+    }
+  }, [displayGames, expandedGames]);
+
+  const toggleGame = (gameId: number) => {
+    const newExpanded = new Set(expandedGames);
+    if (newExpanded.has(gameId)) {
+      newExpanded.delete(gameId);
+    } else {
+      newExpanded.add(gameId);
+    }
+    setExpandedGames(newExpanded);
+  };
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     const el = scrollRef.current;
@@ -173,49 +516,58 @@ export default function GameHistory() {
     }
   };
 
-  const handleSend = () => {
-    if (!message.trim()) return;
-    ws_sendMessage(message);
-    setMessage("");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleSend();
-  };
-
   return (
     <div className="game-history-container">
+      <div className="game-history-toolbar">
+        <button
+          type="button"
+          className={`game-history-key-toggle ${showKeyEventsOnly ? "active" : ""}`}
+          onClick={() => setShowKeyEventsOnly((v) => !v)}
+        >
+          {showKeyEventsOnly ? "显示全部事件" : "只看关键事件"}
+        </button>
+      </div>
       <div
         ref={scrollRef}
         className="game-history-scroll"
         onWheel={handleWheel}
         style={{ overflowY: "auto" }}
       >
-        {reversedBlocks.length === 0 ? (
-          <div className="game-history-empty">暂无战况</div>
+        {displayGames.length === 0 ? (
+          <div className="game-history-empty">
+            {showKeyEventsOnly ? "暂无关键事件" : "暂无战况"}
+          </div>
         ) : (
-          reversedBlocks.map((block, idx) => (
-            <div key={idx} className={`game-history-block game-history-block-${block.type}`}>
-              {block.title && (
-                <div className="game-history-block-title">{block.title}</div>
-              )}
-              <div className="game-history-block-lines">
-                {block.lines.map((line, i) => (
-                  <BlockRow key={i} line={line} />
-                ))}
+          displayGames.map((game, gameIdx) => (
+            <div key={game.id} className="game-history-game">
+              <div 
+                className="game-history-game-header"
+                onClick={() => toggleGame(game.id)}
+              >
+                <span className="game-history-game-title">第 {displayGames.length - gameIdx} 局</span>
+                <span className={`game-history-game-toggle ${expandedGames.has(game.id) ? 'expanded' : ''}`}>
+                  {expandedGames.has(game.id) ? '▼' : '▶'}
+                </span>
               </div>
+              {expandedGames.has(game.id) && (
+                <div className="game-history-game-content">
+                  {game.blocks.map((block, blockIdx) => (
+                    <div key={blockIdx} className={`game-history-block game-history-block-${block.type}`}>
+                      {block.title && (
+                        <div className="game-history-block-title">{block.title}</div>
+                      )}
+                      <div className="game-history-block-lines">
+                        {block.lines.map((line, lineIdx) => (
+                          <BlockRow key={lineIdx} line={line} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))
         )}
-      </div>
-      <div className="game-history-chat">
-        <input
-          placeholder="CMD/Ctrl+Enter 发送"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-        />
-        <button type="button" onClick={handleSend}>&gt;</button>
       </div>
     </div>
   );

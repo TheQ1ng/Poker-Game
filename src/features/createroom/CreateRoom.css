@@ -180,6 +180,24 @@
   margin-bottom: 16px;
 }
 
+.redpacket-setting-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border: 1px solid rgba(201, 162, 39, 0.22);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.redpacket-setting-title {
+  color: #ffd67e;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-shadow: 0 0 8px rgba(255, 214, 126, 0.35);
+}
+
 /* 输入框标签 */
 .label {
   color: #c9a227;
@@ -373,6 +391,201 @@
   background: rgba(201, 162, 39, 0.4);
 }
 
+/* 寻找房间面板 */
+.find-room-card .ant-card-body {
+  padding: 16px !important;
+}
+
+.find-room-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.room-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stat-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(201, 162, 39, 0.18);
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  color: #f7d877;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.refresh-room-btn {
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(201, 162, 39, 0.5) !important;
+  background: rgba(201, 162, 39, 0.12) !important;
+  color: #f4d26a !important;
+}
+
+.refresh-room-btn:hover {
+  background: rgba(201, 162, 39, 0.22) !important;
+  border-color: #c9a227 !important;
+}
+
+.no-rooms {
+  min-height: 220px;
+  border-radius: 14px;
+  border: 1px dashed rgba(201, 162, 39, 0.45);
+  background: linear-gradient(135deg, rgba(6, 44, 27, 0.9), rgba(6, 30, 20, 0.8));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 22px 16px;
+  text-align: center;
+}
+
+.no-rooms-title {
+  margin: 0;
+  color: #f2cd62;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.no-rooms-desc {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.room-list {
+  max-height: 330px;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.room-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.room-list::-webkit-scrollbar-thumb {
+  background: rgba(201, 162, 39, 0.5);
+  border-radius: 999px;
+}
+
+.room-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(201, 162, 39, 0.26);
+  background: linear-gradient(135deg, rgba(13, 71, 43, 0.92), rgba(7, 42, 26, 0.95));
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.room-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201, 162, 39, 0.55);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.22);
+}
+
+.room-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.room-main-row,
+.room-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.room-main-row {
+  margin-bottom: 6px;
+}
+
+.room-detail-row {
+  margin-bottom: 8px;
+}
+
+.room-id {
+  color: #ffe089;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.room-owner,
+.room-blind,
+.room-mode {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+}
+
+.room-mode {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.room-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.room-players {
+  color: #e8f8ee;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.room-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.room-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #9ef0bc 0%, #f2cd62 100%);
+}
+
+.join-room-btn {
+  min-width: 66px;
+  height: 34px !important;
+  border-radius: 8px !important;
+  background: linear-gradient(145deg, #d7b23e, #a27d1d) !important;
+  border: none !important;
+  color: #1e1e1e !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 12px rgba(201, 162, 39, 0.35) !important;
+}
+
+.join-room-btn:hover {
+  background: linear-gradient(145deg, #ebc85c, #b78f27) !important;
+  color: #151515 !important;
+}
+
+.join-room-btn[disabled] {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+  box-shadow: none !important;
+}
+
 /* 历史记录弹窗 */
 .history-modal .ant-modal-content {
   background: linear-gradient(145deg, #1a3d2a, #0d2818) !important;
@@ -520,6 +733,14 @@
     height: 40px !important;
     font-size: 14px !important;
   }
+
+  .room-list {
+    max-height: 220px;
+  }
+
+  .room-item {
+    padding: 10px;
+  }
 }
 
 /* 手机竖屏 */
@@ -616,6 +837,33 @@
   
   .or-divider {
     margin: 10px 0;
+  }
+
+  .find-room-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .refresh-room-btn {
+    width: 100%;
+  }
+
+  .room-item {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .room-main-row,
+  .room-detail-row {
+    flex-wrap: wrap;
+  }
+
+  .room-progress-wrap {
+    margin-bottom: 8px;
+  }
+
+  .join-room-btn {
+    width: 100%;
   }
 }
 

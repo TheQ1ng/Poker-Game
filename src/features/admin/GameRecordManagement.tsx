@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Table, message, Button, Modal, Checkbox, Space } from 'antd';
+import { Table, message, Button, Modal, Checkbox } from 'antd';
 
 interface GameRecord {
   id: number;
   room_id: string;
-  username: string;
-  profit: number;
-  final_hand: string;
   created_at: string;
-  nickname?: string;
+  players?: PlayerRecord[];
+}
+
+interface PlayerRecord {
+  id: number;
+  game_record_id: number;
+  username: string;
+  nickname: string;
+  chips: number;
+  buy_in: number;
+  profit: number;
 }
 
 interface RoomInfo {
   id: string;
   created_at: string;
-  records: GameRecord[];
+  gameRecords: GameRecord[];
 }
 
 interface PlayerStats {
   username: string;
-  nickname: string;
+  nicknames: string[];
   totalProfit: number;
   gameCount: number;
 }
@@ -29,9 +36,10 @@ const GameRecordManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedRooms, setSelectedRooms] = useState<string[]>([]);
   const [showScoreboard, setShowScoreboard] = useState(false);
-  const [currentRoomId, setCurrentRoomId] = useState<string>('');
+  const [currentGameRecord, setCurrentGameRecord] = useState<GameRecord | null>(null);
   const [showSummary, setShowSummary] = useState(false);
   const [summaryStats, setSummaryStats] = useState<PlayerStats[]>([]);
+  const [playerRecords, setPlayerRecords] = useState<PlayerRecord[]>([]);
 
   // 获取所有游戏记录并按房间分组
   const fetchGameRecords = async () => {
@@ -55,13 +63,13 @@ const GameRecordManagement: React.FC = () => {
 
         // 转换为房间信息数组
         const roomList: RoomInfo[] = [];
-        roomMap.forEach((records, roomId) => {
-          // 按创建时间排序，取最早的时间作为房间创建时间
-          records.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        roomMap.forEach((gameRecords, roomId) => {
+          // 按创建时间倒序排序
+          gameRecords.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
           roomList.push({
             id: roomId,
-            created_at: records[0].created_at,
-            records,
+            created_at: gameRecords[0].created_at,
+            gameRecords,
           });
         });
 
@@ -79,44 +87,61 @@ const GameRecordManagement: React.FC = () => {
     }
   };
 
-  // 查看房间积分榜
-  const viewScoreboard = (roomId: string) => {
-    setCurrentRoomId(roomId);
-    setShowScoreboard(true);
+  // 查看游戏记录的积分榜
+  const viewScoreboard = async (gameRecord: GameRecord) => {
+    setCurrentGameRecord(gameRecord);
+    setLoading(true);
+    try {
+      const response = await fetch(`/admin/game-record/${gameRecord.id}/players`, {
+        headers: {
+          Authorization: localStorage.getItem('token') || '',
+        },
+      });
+      const data = await response.json();
+      if (data.code === 0) {
+        setPlayerRecords(data.data);
+        setShowScoreboard(true);
+      } else {
+        message.error(data.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch player records:', error);
+      message.error('获取玩家记录失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 查看汇总积分榜
-  const viewSummaryScoreboard = () => {
+  const viewSummaryScoreboard = async () => {
     if (selectedRooms.length === 0) {
       message.warning('请至少选择一个房间');
       return;
     }
 
-    // 汇总所选房间的记录
-    const userMap = new Map<string, PlayerStats>();
-    rooms.forEach(room => {
-      if (selectedRooms.includes(room.id)) {
-        room.records.forEach(record => {
-          if (!userMap.has(record.username)) {
-            userMap.set(record.username, {
-              username: record.username,
-              nickname: record.nickname || record.username,
-              totalProfit: 0,
-              gameCount: 0,
-            });
-          }
-          const stats = userMap.get(record.username)!;
-          stats.totalProfit += record.profit;
-          stats.gameCount += 1;
-        });
+    setLoading(true);
+    try {
+      const response = await fetch('/admin/summary-scoreboard', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: localStorage.getItem('token') || '',
+        },
+        body: JSON.stringify({ roomIds: selectedRooms }),
+      });
+      const data = await response.json();
+      if (data.code === 0) {
+        setSummaryStats(data.data);
+        setShowSummary(true);
+      } else {
+        message.error(data.error);
       }
-    });
-
-    // 转换为数组并按总积分排序
-    const statsArray = Array.from(userMap.values());
-    statsArray.sort((a, b) => b.totalProfit - a.totalProfit);
-    setSummaryStats(statsArray);
-    setShowSummary(true);
+    } catch (error) {
+      console.error('Failed to fetch summary scoreboard:', error);
+      message.error('获取汇总积分榜失败');
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 处理房间选择
@@ -155,15 +180,29 @@ const GameRecordManagement: React.FC = () => {
       key: 'created_at',
     },
     {
-      title: '游戏局数',
-      key: 'gameCount',
-      render: (_: any, room: RoomInfo) => room.records.length,
+      title: '保存的记录数',
+      key: 'recordCount',
+      render: (_: any, room: RoomInfo) => room.gameRecords.length,
+    },
+  ];
+
+  // 游戏记录列定义
+  const gameRecordColumns = [
+    {
+      title: '记录ID',
+      dataIndex: 'id',
+      key: 'id',
+    },
+    {
+      title: '保存时间',
+      dataIndex: 'created_at',
+      key: 'created_at',
     },
     {
       title: '操作',
       key: 'action',
-      render: (_: any, room: RoomInfo) => (
-        <Button type="primary" onClick={() => viewScoreboard(room.id)}>
+      render: (_: any, record: GameRecord) => (
+        <Button type="primary" onClick={() => viewScoreboard(record)}>
           查看积分榜
         </Button>
       ),
@@ -179,32 +218,38 @@ const GameRecordManagement: React.FC = () => {
     },
     {
       title: '用户名',
+      dataIndex: 'username',
       key: 'username',
-      render: (_: any, record: GameRecord) => record.username,
     },
     {
       title: '昵称',
+      dataIndex: 'nickname',
       key: 'nickname',
-      render: (_: any, record: GameRecord) => record.nickname || record.username,
     },
     {
-      title: '积分',
-      key: 'profit',
-      render: (_: any, record: GameRecord) => (
-        <span style={{ color: record.profit >= 0 ? 'green' : 'red' }}>
-          {record.profit >= 0 ? '+' : ''}{record.profit}
+      title: '最终积分',
+      dataIndex: 'chips',
+      key: 'chips',
+      render: (chips: number) => (
+        <span style={{ color: 'blue' }}>
+          {chips}
         </span>
       ),
     },
     {
-      title: '最终手牌',
-      key: 'final_hand',
-      render: (_: any, record: GameRecord) => record.final_hand,
+      title: '买入',
+      dataIndex: 'buy_in',
+      key: 'buy_in',
     },
     {
-      title: '时间',
-      key: 'created_at',
-      render: (_: any, record: GameRecord) => record.created_at,
+      title: '盈亏',
+      dataIndex: 'profit',
+      key: 'profit',
+      render: (profit: number) => (
+        <span style={{ color: profit >= 0 ? 'green' : 'red' }}>
+          {profit >= 0 ? '+' : ''}{profit}
+        </span>
+      ),
     },
   ];
 
@@ -222,11 +267,15 @@ const GameRecordManagement: React.FC = () => {
     },
     {
       title: '昵称',
-      dataIndex: 'nickname',
-      key: 'nickname',
+      key: 'nicknames',
+      render: (_: any, record: PlayerStats) => {
+        // 去重并显示所有昵称
+        const uniqueNicknames = [...new Set(record.nicknames)];
+        return uniqueNicknames.join(' / ');
+      },
     },
     {
-      title: '总积分',
+      title: '总盈亏',
       dataIndex: 'totalProfit',
       key: 'totalProfit',
       render: (totalProfit: number) => (
@@ -236,14 +285,11 @@ const GameRecordManagement: React.FC = () => {
       ),
     },
     {
-      title: '游戏局数',
+      title: '参与次数',
       dataIndex: 'gameCount',
       key: 'gameCount',
     },
   ];
-
-  // 获取当前房间的记录
-  const currentRoomRecords = rooms.find(room => room.id === currentRoomId)?.records || [];
 
   return (
     <div>
@@ -264,19 +310,30 @@ const GameRecordManagement: React.FC = () => {
         rowKey="id" 
         loading={loading}
         pagination={{ pageSize: 10 }}
+        expandable={{
+          expandedRowRender: (room: RoomInfo) => (
+            <Table
+              columns={gameRecordColumns}
+              dataSource={room.gameRecords}
+              rowKey="id"
+              pagination={false}
+            />
+          ),
+        }}
       />
 
-      {/* 房间积分榜模态框 */}
+      {/* 游戏记录积分榜模态框 */}
       <Modal
-        title={`房间 ${currentRoomId} 的积分榜`}
+        title={`游戏记录 ${currentGameRecord?.id} 的积分榜 (${currentGameRecord?.room_id})`}
         visible={showScoreboard}
         onCancel={() => setShowScoreboard(false)}
         width={800}
       >
         <Table 
           columns={scoreboardColumns} 
-          dataSource={currentRoomRecords} 
+          dataSource={playerRecords} 
           rowKey="id"
+          loading={loading}
         />
       </Modal>
 
@@ -291,6 +348,7 @@ const GameRecordManagement: React.FC = () => {
           columns={summaryColumns} 
           dataSource={summaryStats} 
           rowKey="username"
+          loading={loading}
         />
       </Modal>
     </div>

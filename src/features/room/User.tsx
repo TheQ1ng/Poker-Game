@@ -152,7 +152,7 @@ export function User({
   const isActing = user?.isActing || false;
   const actionEndTime = user?.actionEndTime || Date.now();
   const revealedForMe = revealedHandsForMe[id];
-  const showHands = user?.hands && (user?.hands[0] || user?.hands[1]);
+  const showHands = !!user?.hands?.some((card) => !!card);
   const displayHands = user?.shouldShowHand ? user : revealedForMe;
   const showHandsArea = showHands || (revealedForMe && revealedForMe.hands?.length);
   const handsToShow = user?.shouldShowHand ? user?.hands : revealedForMe?.hands;
@@ -657,7 +657,7 @@ export function User({
               isSelected={false}
               showHand={shouldShowCards}
               size="small"
-              showShowHandButton={!user?.isAllIn && !revealedForMe}
+              showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe}
             />
           ))}
           <div
