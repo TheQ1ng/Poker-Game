@@ -138,6 +138,9 @@ router.post("/createroom", (ctx) => {
     isOmaha,
     redPacketThresholdMultiple,
     redPacketMaxPercent,
+    supportEnabled,
+    supportMinPot,
+    supportMaxPercent,
   } = ctx.request.body;
   const room = createRoom(
     token,
@@ -147,7 +150,10 @@ router.post("/createroom", (ctx) => {
     !!isShortDeck,
     !!isOmaha,
     Number(redPacketThresholdMultiple ?? 1),
-    Number(redPacketMaxPercent ?? 30)
+    Number(redPacketMaxPercent ?? 30),
+    !!supportEnabled,
+    Number(supportMinPot ?? 600),
+    Number(supportMaxPercent ?? 5)
   );
   ctx.data = room.id;
 });

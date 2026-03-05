@@ -7,6 +7,7 @@ import {
   Menu,
   Modal,
   message,
+  Switch,
 } from "antd";
 import Tabs from "antd/lib/tabs";
 import { DownOutlined, PlusOutlined, KeyOutlined, HistoryOutlined, LogoutOutlined, SearchOutlined, UserOutlined, DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
@@ -113,6 +114,12 @@ function CreateRoom() {
   const [isOmaha, setIsOmaha] = useState(false);
   const [redPacketThresholdMultiple, setRedPacketThresholdMultiple] = useState(1);
   const [redPacketMaxPercent, setRedPacketMaxPercent] = useState(30);
+  const [redPacketExpanded, setRedPacketExpanded] = useState(false);
+  // 支持功能参数
+  const [supportEnabled, setSupportEnabled] = useState(false);
+  const [supportMinPot, setSupportMinPot] = useState(600);
+  const [supportMaxPercent, setSupportMaxPercent] = useState(5);
+  const [supportExpanded, setSupportExpanded] = useState(false);
   const [roomid, setRoomID] = useState("");
   const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
@@ -368,33 +375,97 @@ function CreateRoom() {
                     <span className="label-text">2+3</span>
                   </label>
                 </div>
-                <div className="poker-form-group redpacket-setting-title">
-                  🧧 红包设置
+                <div
+                  className="poker-form-group redpacket-setting-title"
+                  onClick={() => setRedPacketExpanded(!redPacketExpanded)}
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                >
+                  🧧 红包设置 {redPacketExpanded ? "▲" : "▼"}
                 </div>
-                <div className="poker-form-group redpacket-setting-group">
-                  <span className="label">红包门槛</span>
-                  <InputNumber
-                    min={0}
-                    step={0.5}
-                    value={redPacketThresholdMultiple}
-                    onChange={(v) => setRedPacketThresholdMultiple(Math.max(0, Number(v || 0)))}
-                    className="poker-input rebuy-input"
-                  />
-                  <span className="label-text">盈利达到初始筹码 x 倍可发红包</span>
+                {redPacketExpanded && (
+                  <>
+                    <div className="poker-form-group redpacket-setting-group">
+                      <span className="label">红包门槛</span>
+                      <InputNumber
+                        min={0}
+                        step={0.5}
+                        value={redPacketThresholdMultiple}
+                        onChange={(v) => setRedPacketThresholdMultiple(Math.max(0, Number(v || 0)))}
+                        className="poker-input rebuy-input"
+                      />
+                      <span className="label-text">倍</span>
+                    </div>
+                    <div className="poker-form-group redpacket-setting-group">
+                      <span className="label">红包上限</span>
+                      <InputNumber
+                        min={1}
+                        max={100}
+                        value={redPacketMaxPercent}
+                        onChange={(v) =>
+                          setRedPacketMaxPercent(Math.min(100, Math.max(1, Number(v || 1))))
+                        }
+                        className="poker-input rebuy-input"
+                      />
+                      <span className="label-text">%</span>
+                    </div>
+                  </>
+                )}
+                {/* 支持功能设置 */}
+                <div
+                  className="poker-form-group redpacket-setting-title"
+                  onClick={() => setSupportExpanded(!supportExpanded)}
+                  style={{ cursor: "pointer", userSelect: "none" }}
+                >
+                  🤝 支持功能 {supportExpanded ? "▲" : "▼"}
                 </div>
-                <div className="poker-form-group redpacket-setting-group">
-                  <span className="label">红包上限</span>
-                  <InputNumber
-                    min={1}
-                    max={100}
-                    value={redPacketMaxPercent}
-                    onChange={(v) =>
-                      setRedPacketMaxPercent(Math.min(100, Math.max(1, Number(v || 1))))
-                    }
-                    className="poker-input rebuy-input"
-                  />
-                  <span className="label-text">最多可发盈利筹码 y%</span>
-                </div>
+                {supportExpanded && (
+                  <>
+                    <div className="poker-form-group redpacket-setting-group">
+                      <span className="label">开启支持</span>
+                      <Switch
+                        checked={supportEnabled}
+                        onChange={setSupportEnabled}
+                        style={{ marginRight: 6 }}
+                      />
+                    </div>
+                    {supportEnabled && (
+                      <>
+                        <div className="poker-form-group redpacket-setting-group" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                          <span className="label">最小奖池 [{supportMinPot}] 🌟</span>
+                          <input
+                            type="range"
+                            min={100}
+                            max={2000}
+                            step={100}
+                            value={supportMinPot}
+                            onChange={(e) => setSupportMinPot(Number(e.target.value))}
+                            style={{ width: "100%", marginTop: 8 }}
+                          />
+                          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 12, color: "#888", marginTop: 4 }}>
+                            <span>100</span>
+                            <span>2000</span>
+                          </div>
+                        </div>
+                        <div className="poker-form-group redpacket-setting-group" style={{ flexDirection: "column", alignItems: "flex-start" }}>
+                          <span className="label">支持上限 [{supportMaxPercent}] %</span>
+                          <input
+                            type="range"
+                            min={1}
+                            max={20}
+                            step={1}
+                            value={supportMaxPercent}
+                            onChange={(e) => setSupportMaxPercent(Number(e.target.value))}
+                            style={{ width: "100%", marginTop: 8 }}
+                          />
+                          <div style={{ display: "flex", justifyContent: "space-between", width: "100%", fontSize: 12, color: "#888", marginTop: 4 }}>
+                            <span>1%</span>
+                            <span>20%</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
                 <div className="poker-form-group">
                   <Button
                     type="primary"
@@ -410,6 +481,9 @@ function CreateRoom() {
                           isOmaha,
                           redPacketThresholdMultiple,
                           redPacketMaxPercent,
+                          supportEnabled,
+                          supportMinPot,
+                          supportMaxPercent,
                         })
                       )
                     }

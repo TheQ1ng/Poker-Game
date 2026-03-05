@@ -33,6 +33,9 @@ import {
   setSelectSettleTimes,
   selectServerTimeOffset,
   selectPendingSeeHandRequests,
+  selectPendingSupportRequests,
+  selectSupportPhase,
+  clearSupportPhase,
 } from "./roomSlice";
 import {
   ws_pauseGame,
@@ -46,6 +49,8 @@ import {
   ws_respondSeeHand,
   ws_sendRedPacket,
   ws_openRedPacket,
+  ws_requestSupport,
+  ws_respondSupport,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -154,6 +159,8 @@ function Room() {
   const game = useAppSelector(selectGame);
   const selectSettleStatus = useAppSelector(getSelectSettleStatus);
   const pendingSeeHandRequests = useAppSelector(selectPendingSeeHandRequests);
+  const pendingSupportRequests = useAppSelector(selectPendingSupportRequests);
+  const supportPhase = useAppSelector(selectSupportPhase);
   const isSettling = game?.isSettling || false;
   // 使用服务端时间偏移来计算下一局开始的剩余秒数，避免不同客户端本地时间差异
   const serverNowForNextGame = Date.now() + serverTimeOffset;
@@ -590,6 +597,185 @@ function Room() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {/* 支持阶段：有人申请支持我时，在被支持者屏幕中央弹出对话框 */}
+        {self && pendingSupportRequests && pendingSupportRequests.length > 0 && (
+          <div className="see-hand-center-dialog-wrapper">
+            {pendingSupportRequests.map((req, index) => (
+              <div
+                key={req.requestId}
+                className="see-hand-center-dialog"
+                style={{
+                  transform: `translate(-50%, -50%) translateY(${-index * 8}px)`,
+                }}
+              >
+                <div className="see-hand-center-dialog-title">🤝 支持请求</div>
+                <div className="see-hand-center-dialog-body">
+                  <div className="see-hand-center-dialog-text">
+                    <strong>{req.fromName}</strong> 请求支持您 <span className="see-hand-center-dialog-chips">{req.amount}</span> 🌟
+                    <br />
+                    <small>如果您获胜，需分给对方盈利的一部分作为回报</small>
+                  </div>
+                  <div className="see-hand-center-dialog-actions">
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CheckOutlined />}
+                      onClick={() => ws_respondSupport(req.requestId, true)}
+                      style={{ marginRight: 8 }}
+                    >
+                      接受
+                    </Button>
+                    <Button
+                      size="small"
+                      icon={<CloseOutlined />}
+                      onClick={() => ws_respondSupport(req.requestId, false)}
+                    >
+                      拒绝
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {/* 支持阶段：弃牌玩家选择支持目标 */}
+        {supportPhase?.isActive && self?.isFoled && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0, 0, 0, 0.7)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+            }}
+          >
+            <div
+              style={{
+                background: "linear-gradient(145deg, #1a3d28 0%, #0f2518 100%)",
+                padding: "24px",
+                borderRadius: "16px",
+                border: "2px solid rgba(201, 162, 39, 0.5)",
+                maxWidth: "400px",
+                width: "90%",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ color: "#ffd700", marginTop: 0, textAlign: "center", flex: 1 }}>
+                  🤝 支持阶段
+                </h3>
+                {/* 右上角关闭按钮，只是关闭本地弹窗显示 */}
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<CloseOutlined />}
+                  style={{ color: "#fff" }}
+                  onClick={() => {
+                    dispatch(clearSupportPhase());
+                  }}
+                />
+              </div>
+              {/* 倒计时进度条 */}
+              <div style={{ marginBottom: 12 }}>
+                <div
+                  style={{
+                    height: 6,
+                    borderRadius: 999,
+                    background: "rgba(255,255,255,0.15)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.max(0, Math.min(100, (supportPhase.time / 15) * 100))}%`,
+                      height: "100%",
+                      background: "linear-gradient(90deg, #ffd700, #ff8c00)",
+                      transition: "width 0.3s linear",
+                    }}
+                  />
+                </div>
+                <div style={{ color: "#fff", fontSize: 12, marginTop: 4, textAlign: "right" }}>
+                  剩余 {supportPhase.time}s
+                </div>
+              </div>
+              <p style={{ color: "white", textAlign: "center", marginBottom: "16px" }}>
+                选择一位玩家并输入支持金额
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                {supportPhase.targets.map((target) => (
+                  <div
+                    key={target.id}
+                    style={{
+                      background: "rgba(255, 255, 255, 0.1)",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: "#ffd700", fontWeight: "bold" }}>{target.name}</div>
+                      <div style={{ color: "#aaa", fontSize: "12px", marginBottom: 4 }}>
+                        下注: {target.totalBet} | 最多支持: {target.maxSupport}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ color: "#ccc", fontSize: 12 }}>支持金额</span>
+                        {/* 这里先用浏览器原生输入，后续如果你愿意可以换成 antd InputNumber */}
+                        <input
+                          type="number"
+                          min={1}
+                          max={Math.min(target.maxSupport, supportPhase.myStack)}
+                          defaultValue={Math.min(target.maxSupport, supportPhase.myStack)}
+                          style={{
+                            width: 80,
+                            background: "rgba(0,0,0,0.4)",
+                            border: "1px solid rgba(255,255,255,0.3)",
+                            borderRadius: 4,
+                            color: "#fff",
+                            padding: "2px 6px",
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => {
+                            const v = Number(e.target.value) || 0;
+                            if (v < 0) e.target.value = "0";
+                          }}
+                          id={`support-amount-${target.id}`}
+                        />
+                        <span style={{ color: "#ffd700", fontSize: 12 }}>🌟 (你当前 {supportPhase.myStack})</span>
+                      </div>
+                    </div>
+                    <div>
+                      <Button
+                        type="primary"
+                        size="small"
+                        onClick={() => {
+                          const input = document.getElementById(
+                            `support-amount-${target.id}`
+                          ) as HTMLInputElement | null;
+                          const raw = input ? Number(input.value) || 0 : 0;
+                          const max = Math.min(target.maxSupport, supportPhase.myStack);
+                          const amount = Math.max(1, Math.min(max, raw));
+                          if (amount > 0) {
+                            ws_requestSupport(target.id, amount);
+                          }
+                        }}
+                        disabled={supportPhase.myStack <= 0}
+                      >
+                        支持
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
         {/* 右上角：行动倒计时 / 结算后倒计时（圆圈引线燃烧样式） */}

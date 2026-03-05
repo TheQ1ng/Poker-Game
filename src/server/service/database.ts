@@ -68,6 +68,21 @@ export function initDatabase() {
     console.error("迁移 admin 列失败:", e);
   }
 
+  // 房间战况日志表
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS room_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      room_id TEXT NOT NULL,
+      log TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // 创建索引加速查询
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_room_logs_room_id ON room_logs(room_id)
+  `);
+
   console.log("数据库初始化完成");
 }
 
@@ -111,7 +126,7 @@ export function getUserProfile(username: string): { nickname: string; avatar: st
 // 检查昵称是否已存在
 export function isNicknameExists(nickname: string, excludeUsername: string = ""): boolean {
   console.log('isNicknameExists:', { nickname, excludeUsername });
-  const stmt = db.prepare("SELECT COUNT(*) as count FROM users WHERE nickname = ? AND username != ?");
+  const stmt = db.prepare("SELECT COUNT(*)  as count FROM users WHERE nickname = ? AND username != ?");
   const result = stmt.get(nickname, excludeUsername) as { count: number };
   console.log('查询结果:', result);
   return result.count > 0;
@@ -147,6 +162,62 @@ export function getAllGameRecords(limit: number = 50) {
     LIMIT ?
   `);
   return stmt.all(limit);
+}
+
+// 保存房间战况日志
+export function saveRoomLog(roomId: string, log: string) {
+  const stmt = db.prepare(`
+    INSERT INTO room_logs (room_id, log)
+    VALUES (?, ?)
+  `);
+  stmt.run(roomId, log);
+}
+
+// 批量保存房间战况日志
+export function saveRoomLogs(roomId: string, logs: string[]) {
+  const insert = db.prepare(`
+    INSERT INTO room_logs (room_id, log)
+    VALUES (?, ?)
+  `);
+  const insertMany = db.transaction((logsToInsert: string[]) => {
+    for (const log of logsToInsert) {
+      insert.run(roomId, log);
+    }
+  });
+  insertMany(logs);
+}
+
+// 获取房间的所有战况日志（按时间顺序）
+export function getRoomLogs(roomId: string): string[] {
+  const stmt = db.prepare(`
+    SELECT log
+    FROM room_logs
+    WHERE room_id = ?
+    ORDER BY created_at ASC
+  `);
+  const rows = stmt.all(roomId) as Array<{log: string}>;
+  return rows.map(row => row.log);
+}
+
+// 清理房间的旧日志（保留最近500条）
+export function cleanupOldRoomLogs(roomId: string, keepCount: number = 500) {
+  const countStmt = db.prepare(`
+    SELECT COUNT(*) as count FROM room_logs WHERE room_id = ?
+  `);
+  const { count } = countStmt.get(roomId) as { count: number };
+  
+  if (count > keepCount) {
+    const deleteStmt = db.prepare(`
+      DELETE FROM room_logs
+      WHERE id IN (
+        SELECT id FROM room_logs
+        WHERE room_id = ?
+        ORDER BY created_at ASC
+        LIMIT ?
+      )
+    `);
+    deleteStmt.run(roomId, count - keepCount);
+  }
 }
 
 export default db;

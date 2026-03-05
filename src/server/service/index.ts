@@ -1,7 +1,7 @@
 import User, { Token } from "./User";
 import Room, { RoomID, RoomRedPacket } from "./Room";
 import { PokerWebSocket, publishLog2all, send2all, send2user, publish2all } from "../api/ws";
-import { getUser, saveUser, getUserProfile, updateUserProfile, initDatabase } from "./database";
+import { getUser, saveUser, getUserProfile, updateUserProfile, initDatabase, getRoomLogs } from "./database";
 import { v4 as uuidv4 } from "uuid";
 const RED_PACKET_WAIT_MS = 5000;
 const RED_PACKET_RESULT_MS = 3000;
@@ -91,7 +91,10 @@ export function createRoom(
   isShortDeck: boolean = false,
   isOmaha: boolean = false,
   redPacketThresholdMultiple: number = 1,
-  redPacketMaxPercent: number = 30
+  redPacketMaxPercent: number = 30,
+  supportEnabled: boolean = false,
+  supportMinPot: number = 600,
+  supportMaxPercent: number = 5
 ): Room {
   const user = userMap[token];
   const room = new Room(
@@ -102,7 +105,10 @@ export function createRoom(
     isShortDeck,
     isOmaha,
     redPacketThresholdMultiple,
-    redPacketMaxPercent
+    redPacketMaxPercent,
+    supportEnabled,
+    supportMinPot,
+    supportMaxPercent
   );
   roomMap[room.id] = room;
   userEnterRoom(token, room.id);
@@ -339,6 +345,16 @@ export function userEnterRoom(token: Token, roomid: RoomID) {
   
   if (room.addUser(token)) {
     userMap[token].setRoom(roomid);
+  }
+
+  // 从数据库加载该房间的战况历史日志并发送给用户
+  try {
+    const historyLogs = getRoomLogs(roomid);
+    if (historyLogs.length > 0) {
+      send2user(token, { logs: historyLogs });
+    }
+  } catch (e) {
+    console.error("加载房间历史日志失败:", e);
   }
 
   // 为了保证前端拿到最新头像信息，在加入房间约 1 秒后再广播一次房间状态
@@ -660,6 +676,243 @@ function sendSeeHandRequestsToTarget(room: Room, targetToken: Token) {
       chips: r.chips,
     }));
   send2user(targetToken, { seeHandRequests: list });
+}
+
+/**
+ * 弃牌玩家申请支持目标玩家
+ * @param token 申请者（支持者）token
+ * @param targetId 目标玩家ID（chipsRecordID）
+ * @param amount 支持金额
+ */
+export function userRequestSupport(token: Token, targetId: string, amount: number) {
+  const user = userMap[token];
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+
+  if (!isInRoom(token, roomid)) {
+    throw "invalid room";
+  }
+
+  const game = room.game;
+
+  // 检查是否处于支持阶段
+  if (!room.isSupportPhase) {
+    throw "当前不在支持阶段";
+  }
+
+  // 验证支持者已弃牌且有余额
+  if (!user.isFolded || user.stack <= 0) {
+    throw "只有弃牌玩家可以支持";
+  }
+
+  // 验证目标玩家
+  const target = room.users.find((t) =>
+    userMap[t].chipsRecordID === targetId &&
+    !userMap[t].isFolded &&
+    userMap[t].isInCurrentGame
+  );
+  if (!target) {
+    throw "无效的目标玩家";
+  }
+  const targetUser = userMap[target];
+
+  // 计算目标当前总下注额
+  const targetTotalBet = targetUser.bets.reduce((a, b) => a + b, 0);
+  const maxSupport = Math.floor(targetTotalBet * room.supportMaxPercent / 100);
+
+  // 验证金额
+  if (amount <= 0 || amount > maxSupport) {
+    throw `支持金额必须在 1-${maxSupport} 之间`;
+  }
+  if (amount > user.stack) {
+    throw "余额不足";
+  }
+
+  // 检查是否已经申请过支持该目标
+  const alreadyRequested = room.pendingSupportRequests.some(
+    (r) => r.supporterToken === token && r.targetToken === target
+  );
+  if (alreadyRequested) {
+    throw "你已经申请过支持该玩家";
+  }
+
+  // 生成请求ID
+  const requestId = uuidv4();
+
+  // 记录待处理请求
+  room.pendingSupportRequests.push({
+    requestId,
+    supporterToken: token,
+    targetToken: target,
+    amount,
+  });
+
+  // 通知目标玩家有新请求（类似看牌请求格式）
+  const supporterName = user.nickname || user.name;
+  send2user(target, {
+    supportRequests: room.pendingSupportRequests
+      .filter((r) => r.targetToken === target)
+      .map((r) => ({
+        requestId: r.requestId,
+        fromUserId: userMap[r.supporterToken].chipsRecordID,
+        fromName: userMap[r.supporterToken].nickname || userMap[r.supporterToken].name,
+        amount: r.amount,
+      })),
+  });
+
+  // 广播有新的支持申请（仅数量）
+  send2all(roomid, {
+    supportRequestCount: room.pendingSupportRequests.length,
+  });
+}
+
+/**
+ * 目标玩家响应支持申请
+ * @param token 目标玩家token
+ * @param requestId 请求ID
+ * @param accept 是否接受
+ */
+export function userRespondSupport(token: Token, requestId: string, accept: boolean) {
+  const user = userMap[token];
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+
+  if (!isInRoom(token, roomid)) {
+    throw "invalid room";
+  }
+
+  // 查找请求
+  const idx = room.pendingSupportRequests.findIndex(
+    (r) => r.targetToken === token && r.requestId === requestId
+  );
+  if (idx === -1) {
+    throw "无效或已过期的支持请求";
+  }
+
+  const pending = room.pendingSupportRequests[idx];
+  room.pendingSupportRequests.splice(idx, 1);
+
+  if (!accept) {
+    // 拒绝：通知支持者
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: user.chipsRecordID,
+      targetName: user.nickname || user.name,
+      requestId,
+    });
+    // 更新目标玩家的待处理列表
+    sendSupportRequestsToTarget(room, token);
+    return;
+  }
+
+  // 接受：执行资金流转
+  const supporter = userMap[pending.supporterToken];
+  const targetUser = userMap[pending.targetToken];
+  const amount = pending.amount;
+
+  // 检查支持者余额
+  const supporterStack = supporter.stack - supporter.bets.reduce((a, b) => a + b, 0);
+  if (supporterStack < amount) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: user.chipsRecordID,
+      targetName: user.nickname || user.name,
+      requestId,
+      reason: "支持者余额不足",
+    });
+    sendSupportRequestsToTarget(room, token);
+    return;
+  }
+
+  // 扣除支持者筹码
+  supporter.stack -= amount;
+
+  // 加到目标玩家账户
+  targetUser.stack += amount;
+
+  // 更新筹码记录
+  room.chipsRecords.forEach((cr) => {
+    if (cr.id === supporter.chipsRecordID) {
+      cr.chips = supporter.stack;
+    }
+    if (cr.id === targetUser.chipsRecordID) {
+      cr.chips = targetUser.stack;
+    }
+  });
+
+  // #region agent log: support-accept
+  fetch('http://127.0.0.1:7804/ingest/6ab4a1e7-b028-42d3-9c9e-0b441d29976b', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '90cdf1',
+    },
+    body: JSON.stringify({
+      sessionId: '90cdf1',
+      runId: 'pre-fix',
+      hypothesisId: 'chips-sync',
+      location: 'service/index.ts:userRespondSupport',
+      message: 'support accepted, stacks updated',
+      data: {
+        roomid,
+        supporterToken: pending.supporterToken,
+        targetToken: pending.targetToken,
+        amount,
+        supporterStackAfter: supporter.stack,
+        targetStackAfter: targetUser.stack,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+
+  // 计算分成比例
+  const targetTotalBet = targetUser.bets.reduce((a, b) => a + b, 0);
+  const sharePercent = amount / targetTotalBet;
+
+  // 记录支持关系
+  room.supportRecords.push({
+    supporterToken: pending.supporterToken,
+    targetToken: pending.targetToken,
+    amount,
+    sharePercent,
+  });
+
+  // 通知双方
+  send2user(pending.supporterToken, {
+    supportAccepted: true,
+    targetId: targetUser.chipsRecordID,
+    targetName: targetUser.nickname || targetUser.name,
+    amount,
+    sharePercent: Math.round(sharePercent * 10000) / 100, // 保留2位小数
+  });
+
+  send2user(token, {
+    supportConfirmed: true,
+    supporterId: supporter.chipsRecordID,
+    amount,
+    newStack: targetUser.stack,
+  });
+
+  // 广播支持成功
+  publishLog2all(roomid, [
+    `${supporter.nickname || supporter.name} 支持 ${targetUser.nickname || targetUser.name} ${amount} 🌟`,
+  ]);
+
+  // 更新目标玩家的待处理列表
+  sendSupportRequestsToTarget(room, token);
+}
+
+function sendSupportRequestsToTarget(room: Room, targetToken: Token) {
+  const list = room.pendingSupportRequests
+    .filter((r) => r.targetToken === targetToken)
+    .map((r) => ({
+      requestId: r.requestId,
+      fromUserId: userMap[r.supporterToken].chipsRecordID,
+      fromName: userMap[r.supporterToken].nickname || userMap[r.supporterToken].name,
+      amount: r.amount,
+    }));
+  send2user(targetToken, { supportRequests: list });
 }
 
 export function userSetSettleTimes(token: Token, times: number) {

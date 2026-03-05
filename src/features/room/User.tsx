@@ -11,7 +11,7 @@ import { soundManager } from "../../utils/soundManager";
 import { BeautifulPokerCard } from "../../components/BeautifulPokerCard";
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe, selectRoomChatBubbles } from "./roomSlice";
+import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe, selectRoomChatBubbles, selectSupportedTargetId } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
 import { ws_kickUser, ws_requestSeeHand, ws_sendMessage } from "../../app/websocket";
 import { clearRoomChatBubble } from "./roomSlice";
@@ -115,6 +115,9 @@ export function User({
   isSettlingCountdown?: boolean;
   nextPositionUserIds?: { SB: string | null; BB: string | null; D: string | null };
 }) {
+  // 计算是否处于胜者动画阶段（亮牌按钮只在此时显示）
+  const isWinnerPhase = totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
+
   const user = useSelector((state: RootState) => {
     const users = state.room.room?.users;
     if (!users) return null;
@@ -236,6 +239,9 @@ export function User({
   useEffect(() => {
     if (!isSettling) setSeeHandPopOpen({});
   }, [isSettling]);
+
+  // 我支持的目标玩家ID，用于在其昵称旁显示小红旗
+  const supportedTargetId = useSelector(selectSupportedTargetId);
 
   return (
     <div className={`user flex-column flex-center ${user?.isFoled ? "folded" : ""}`}>
@@ -537,6 +543,18 @@ export function User({
             </Popover>
           )}
           {nickname}
+          {supportedTargetId === id && (
+            <span
+              style={{
+                marginLeft: 6,
+                fontSize: 12,
+                color: "#ff4d4f",
+                textShadow: "0 0 6px rgba(255,77,79,0.8)",
+              }}
+            >
+              🚩
+            </span>
+          )}
           {self?.isRoomOwner && !isSelf && (
             <Popconfirm
               title="确认踢出该玩家吗？"
@@ -657,7 +675,8 @@ export function User({
               isSelected={false}
               showHand={shouldShowCards}
               size="small"
-              showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe}
+              // 亮牌按钮只在胜者动画阶段显示，避免干扰分阶段比牌动画
+              showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe && isWinnerPhase}
             />
           ))}
           <div

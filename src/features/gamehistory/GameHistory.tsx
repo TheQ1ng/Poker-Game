@@ -403,15 +403,9 @@ function BlockRow({ line }: { line: string }) {
     );
   }
 
+  // 战况不显示玩家聊天内容
   if (parsed.kind === "chat") {
-    return (
-      <div className="game-history-line game-history-line-chat">
-        <span className="gh-pill gh-pill-chat">聊天</span>
-        <span className="gh-player">{parsed.player}</span>
-        <span className="gh-text">：</span>
-        <span className="gh-chat-text">{parsed.text}</span>
-      </div>
-    );
+    return null;
   }
 
   if (parsed.kind === "warning") {

@@ -382,6 +382,12 @@ export class Game {
     // console.log(JSON.stringify(players, null, 2));
     const ps = settle(players, 1, this.isShortDeck);
 
+    // 每个玩家本局从底池中实际赢到的筹码总额（不扣除自己下注）
+    const potWinMap: { [id: string]: number } = {};
+    ps.forEach((p) => {
+      potWinMap[p.id] = p.profits || 0;
+    });
+
     // just log
     ps.forEach((p) => {
       const user = userMap[p.id];
@@ -453,6 +459,85 @@ export class Game {
       crs.find((cr) => cr.id === user.chipsRecordID)!.chips = user.stack;
     });
 
+    // 处理支持盈利分成：使用「本局赢得筹码数 / 本局下注筹码数 * 支持筹码数」公式
+    const roomForSupport = roomMap[this.roomid];
+    if (roomForSupport.supportRecords.length > 0) {
+      const supportLogs: string[] = [];
+
+      // 找出所有有支持记录的目标玩家
+      roomForSupport.supportRecords.forEach((record: { supporterToken: string; targetToken: string; amount: number; sharePercent: number }) => {
+        const targetUser = userMap[record.targetToken];
+        const supporterUser = userMap[record.supporterToken];
+
+        // 只有目标玩家获胜且本局有从底池赢到筹码时才分成
+        const potWin = potWinMap[record.targetToken] || 0; // 本局赢得筹码数（含自己的下注）
+        if (targetUser.isWinner && potWin > 0) {
+          // 返还公式：本局赢得筹码数 / 本局下注筹码数 * 支持筹码数
+          // 这里 sharePercent = 支持筹码数 / 本局下注筹码数
+          const profitShare = Math.floor(potWin * record.sharePercent);
+
+          if (profitShare > 0) {
+            // 从目标扣除
+            targetUser.stack -= profitShare;
+            targetUser.profits -= profitShare;
+
+            // 给支持者
+            supporterUser.stack += profitShare;
+
+            // 记录日志
+            supportLogs.push(
+              `${supporterUser.nickname || supporterUser.name} 因支持 ${targetUser.nickname || targetUser.name} 获得分成 ${profitShare} 🌟`
+            );
+
+            // #region agent log: support-profit-share
+            fetch('http://127.0.0.1:7804/ingest/6ab4a1e7-b028-42d3-9c9e-0b441d29976b', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Debug-Session-Id': '90cdf1',
+              },
+              body: JSON.stringify({
+                sessionId: '90cdf1',
+                runId: 'pre-fix',
+                hypothesisId: 'chips-sync',
+                location: 'service/Room.ts:settle',
+                message: 'support profit share applied',
+                data: {
+                  roomid: this.roomid,
+                  supporterToken: record.supporterToken,
+                  targetToken: record.targetToken,
+                  amount: record.amount,
+                  sharePercent: record.sharePercent,
+                  profitShare,
+                  targetStackAfter: targetUser.stack,
+                  supporterStackAfter: supporterUser.stack,
+                },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {});
+            // #endregion
+          }
+        }
+      });
+
+      if (supportLogs.length > 0) {
+        publishLog2all(this.roomid, ["🤝 支持分成:", ...supportLogs]);
+      }
+
+      // 分红后，重新同步积分榜中的筹码（以最新 stack 为准）
+      roomForSupport.chipsRecords.forEach((cr) => {
+        const token = roomForSupport.users.find(
+          (t) => userMap[t].chipsRecordID === cr.id
+        );
+        if (token) {
+          cr.chips = userMap[token].stack;
+        }
+      });
+
+      // 清空支持记录，避免重复处理
+      roomForSupport.supportRecords = [];
+    }
+
     publishLog2all(this.roomid, logs);
 
     // just log
@@ -487,8 +572,8 @@ export class Game {
 
     this.isSettling = true;
 
-    const room = roomMap[this.roomid];
-    const hasPendingSeeHand = room.pendingSeeHandRequests && room.pendingSeeHandRequests.length > 0;
+    const roomForSettle = roomMap[this.roomid];
+    const hasPendingSeeHand = roomForSettle.pendingSeeHandRequests && roomForSettle.pendingSeeHandRequests.length > 0;
     const showdownCount = this.sortedUsers.filter((t) => userMap[t].shouldShowHand).length;
     // 前端分阶段展示：每玩家 2*2.5s（两张+五张）+ 胜者阶段 3.5s；胜者动画播完后倒计时再开下一局
     const settleAnimationMs = Math.ceil(showdownCount * 5000 + 3500);
@@ -512,6 +597,135 @@ export class Game {
     }
   }
 
+  /**
+   * 进入支持阶段或直接进入结算
+   * 检查条件：
+   * 1. 支持功能是否开启
+   * 2. 总奖池是否大于阈值
+   * 3. 是否有弃牌玩家可以参与
+   * 4. 是否有未弃牌玩家可以被支持
+   */
+  enterSupportPhaseOrSettle(): void {
+    const room = roomMap[this.roomid];
+
+    // 检查支持功能是否开启
+    if (!room.supportEnabled) {
+      this.settle();
+      return;
+    }
+
+    // 计算总奖池
+    const totalPot = this.sortedUsers.reduce(
+      (sum, t) => sum + userMap[t].bets.reduce((a, b) => a + b, 0),
+      0
+    );
+
+    // 检查奖池是否达到阈值
+    if (totalPot < room.supportMinPot) {
+      this.settle();
+      return;
+    }
+
+    // 找出所有弃牌且有余额的玩家（可以支持别人）
+    const potentialSupporters = this.sortedUsers.filter(
+      (t) =>
+        userMap[t].isFolded &&
+        userMap[t].isInCurrentGame &&
+        userMap[t].stack > 0
+    );
+
+    // 找出所有未弃牌且参与游戏的玩家（可以被支持）
+    const supportableTargets = this.sortedUsers.filter(
+      (t) =>
+        !userMap[t].isFolded &&
+        userMap[t].isInCurrentGame &&
+        userMap[t].bets.reduce((a, b) => a + b, 0) > 0
+    );
+
+    // 没有支持者或没有目标，直接结算
+    if (potentialSupporters.length === 0 || supportableTargets.length === 0) {
+      this.settle();
+      return;
+    }
+
+    // 进入支持阶段
+    room.isSupportPhase = true;
+    room.pendingSupportRequests = [];
+    room.supportRecords = [];
+
+    // 计算每个目标的信息
+    const targetInfo = supportableTargets.map((t) => {
+      const user = userMap[t];
+      const totalBet = user.bets.reduce((a, b) => a + b, 0);
+      const maxSupport = Math.floor(totalBet * room.supportMaxPercent / 100);
+      return {
+        token: t,
+        id: user.chipsRecordID,
+        name: user.nickname || user.name,
+        totalBet,
+        maxSupport: Math.max(1, maxSupport),
+      };
+    });
+
+    // 通知所有潜在支持者进入支持阶段
+    potentialSupporters.forEach((t) => {
+      const supporter = userMap[t];
+      send2user(t, {
+        type: "supportPhase",
+        time: 15,
+        targets: targetInfo.filter((ti) => ti.maxSupport > 0),
+        myStack: supporter.stack,
+      });
+    });
+
+    // 15秒后结束支持阶段，进入结算
+    room.supportPhaseTimer = delayTry(() => {
+      this.endSupportPhase();
+    }, 15000);
+
+    // 广播支持阶段开始（给所有人，包括非弃牌玩家）
+    send2all(this.roomid, {
+      type: "supportPhaseStarted",
+      duration: 15,
+      supportersCount: potentialSupporters.length,
+      targetsCount: supportableTargets.length,
+    });
+  }
+
+  /**
+   * 结束支持阶段，处理所有已接受的请求，进入结算
+   */
+  endSupportPhase(): void {
+    const room = roomMap[this.roomid];
+    if (!room.isSupportPhase) return;
+
+    // 清理定时器
+    clearTimeout(room.supportPhaseTimer);
+
+    // 自动拒绝所有未处理的请求
+    room.pendingSupportRequests.forEach((req) => {
+      const targetUser = userMap[req.targetToken];
+      send2user(req.supporterToken, {
+        type: "supportRejected",
+        targetId: targetUser.chipsRecordID,
+        targetName: targetUser.nickname || targetUser.name,
+        requestId: req.requestId,
+        reason: "超时未响应",
+      });
+    });
+
+    room.pendingSupportRequests = [];
+    room.isSupportPhase = false;
+
+    // 广播支持阶段结束
+    send2all(this.roomid, {
+      type: "supportPhaseEnded",
+      acceptedCount: room.supportRecords.length,
+    });
+
+    // 进入正常结算
+    this.settle();
+  }
 
   dealCards2User() {
     const holeCount = this.isOmaha ? 4 : 2;
@@ -546,8 +760,8 @@ export class Game {
   }
   nextRound(): void {
     if (this.round === GameRound.River) {
-      console.log("already river turn, goto settle");
-      this.settle();
+      console.log("already river turn, goto enter support phase or settle");
+      this.enterSupportPhaseOrSettle();
       return;
     }
 
@@ -567,67 +781,15 @@ export class Game {
         }
       });
 
-      const settleUsers = this.sortedUsers.filter((t) => {
-        const user = userMap[t];
-        return (
-          !user.isFolded && user.isInCurrentGame && user.bets[this.round] > 0
-        );
-      });
+      console.log("only one or zero active user, auto deal next round");
 
-      console.log("multi settle users:", settleUsers);
+      // 牌没发完，继续自动发牌，不进入支持阶段
+      // 等到River轮结束才会触发支持阶段
+    }
 
-      // decide
-      // 注释掉发牌次数选择逻辑，默认只发一次
-    // if (!this.multiSettleStart) {
-    //   // multiple settle users
-    //   publish2all(this.roomid);
-
-    //   settleUsers.forEach((t) => {
-    //     send2user(t, {
-    //       selectSettleTimes: 1,
-    //     });
-    //   });
-
-    //   this.multiSettleTimer = delayTry(() => {
-    //     settleUsers.forEach((t) => {
-    //       this.userSetSettleTimes(t, 4);
-    //       send2user(t, {
-    //         selectSettleTimes: 0,
-    //       });
-    //     });
-    //   }, 30000);
-
-    //   const log =
-    //     "玩家" +
-    //     settleUsers.map((t) => userMap[t].nickname || userMap[t].name).join(", ") +
-    //     "决定发牌次数";
-    //   publishLog2all(this.roomid, [log]);
-
-    //   this.multiSettleStart = true;
-    //   this.multiSettleRound = this.round;
-    //   this.multiSettleIndex = 0;
-    //   return;
-    // } else if (!this.multiSettleConfirm) {
-    //   // check all settle users selected
-    //   let settleTimes = Number.MAX_VALUE;
-    //   settleUsers.forEach(
-    //     (t) => (settleTimes = Math.min(settleTimes, userMap[t].settleTimes))
-    //   );
-    //   console.log("times", settleTimes);
-    //   if (settleTimes === 0) {
-    //     // wait for other user
-    //     return;
-    //   } else {
-    //     this.multiSettleTimes = settleTimes;
-    //     this.multiSettleConfirm = true;
-    //     publishLog2all(this.roomid, [`发${settleTimes}次`]);
-    //   }
-    // }
-    
     // 默认只发一次
     this.multiSettleTimes = 1;
     this.multiSettleConfirm = true;
-    }
 
     this.round += 1;
     this.roundLeader = "";
@@ -806,6 +968,12 @@ class Room {
   redPacketThresholdMultiple: number = 1;
   /** 红包额度上限：最多可发盈利筹码的百分比（1~100） */
   redPacketMaxPercent: number = 30;
+  /** 是否开启支持功能 */
+  supportEnabled: boolean = false;
+  /** 支持功能最小奖池阈值 */
+  supportMinPot: number = 600;
+  /** 支持金额上限（目标玩家下注额的百分比） */
+  supportMaxPercent: number = 5;
   game: Game = new Game("", "", 0, 1, false, false);
   chipsRecords: ChipsRecord[] = [];
   /** 结算阶段：多人可同时请求看同一人的手牌，等待被请求者逐条同意/拒绝 */
@@ -819,6 +987,23 @@ class Room {
   activeRedPacket: RoomRedPacket | null = null;
   redPacketOpenTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
   redPacketResultTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
+  /** 支持阶段：弃牌玩家可以支持尚未弃牌的玩家 */
+  isSupportPhase: boolean = false;
+  /** 支持请求列表 */
+  pendingSupportRequests: {
+    requestId: string;
+    supporterToken: Token;
+    targetToken: Token;
+    amount: number;
+  }[] = [];
+  /** 已确认的支持记录 */
+  supportRecords: {
+    supporterToken: Token;
+    targetToken: Token;
+    amount: number;
+    sharePercent: number;
+  }[] = [];
+  supportPhaseTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
 
   constructor(
     id: string,
@@ -828,7 +1013,10 @@ class Room {
     isShortDeck: boolean = false,
     isOmaha: boolean = false,
     redPacketThresholdMultiple: number = 1,
-    redPacketMaxPercent: number = 30
+    redPacketMaxPercent: number = 30,
+    supportEnabled: boolean = false,
+    supportMinPot: number = 600,
+    supportMaxPercent: number = 5
   ) {
     if (sb === 0 || buyIn === 0) {
       throw `small blind(${sb}) and buy in(${buyIn})] should not be 0`;
@@ -842,6 +1030,9 @@ class Room {
     this.isOmaha = !!isOmaha;
     this.redPacketThresholdMultiple = Math.max(0, Number(redPacketThresholdMultiple) || 0);
     this.redPacketMaxPercent = Math.min(100, Math.max(1, Number(redPacketMaxPercent) || 30));
+    this.supportEnabled = !!supportEnabled;
+    this.supportMinPot = Math.max(100, Number(supportMinPot) || 600);
+    this.supportMaxPercent = Math.min(50, Math.max(1, Number(supportMaxPercent) || 5));
     if (this.isShortDeck && this.isOmaha) {
       throw new Error("短牌与奥马哈不能同时开启");
     }
@@ -861,7 +1052,11 @@ class Room {
     }
     this.isGaming = true;
     this.pendingSeeHandRequests = [];
-    send2all(this.id, { seeHandRequests: [] });
+    this.pendingSupportRequests = [];
+    this.supportRecords = [];
+    this.isSupportPhase = false;
+    clearTimeout(this.supportPhaseTimer);
+    send2all(this.id, { seeHandRequests: [], supportRequests: [] });
 
     // already in game
     if (this.game && !this.game.isSettling) {

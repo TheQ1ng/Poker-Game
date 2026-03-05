@@ -95,6 +95,12 @@ export interface SimpleUser {
   addTimeUsed?: number;
 }
 
+export interface SimpleRoomSupportConfig {
+  enabled: boolean;
+  minPot: number;
+  maxPercent: number;
+}
+
 export interface SimpleRoom {
   roomid: RoomID;
   isGaming: boolean;
@@ -107,6 +113,8 @@ export interface SimpleRoom {
   redPacketConfig?: SimpleRoomRedPacketConfig;
   /** 当前红包状态 */
   redPacket?: SimpleRoomRedPacket | null;
+  /** 支持功能配置 */
+  supportConfig?: SimpleRoomSupportConfig;
 }
 
 export interface SimpleSelf {
@@ -153,4 +161,6 @@ export enum ActionType {
   EXTEND_ACTION_TIME = "EXTEND_ACTION_TIME",
   SEND_RED_PACKET = "SEND_RED_PACKET",
   OPEN_RED_PACKET = "OPEN_RED_PACKET",
+  REQUEST_SUPPORT = "REQUEST_SUPPORT",
+  RESPOND_SUPPORT = "RESPOND_SUPPORT",
 }

@@ -27,6 +27,8 @@ import {
   userExtendActionTime,
   userSendRedPacket,
   userOpenRedPacket,
+  userRequestSupport,
+  userRespondSupport,
 } from "../service";
 import { Token } from "../service/User";
 import Room, { Game, RoomID } from "../service/Room";
@@ -39,7 +41,7 @@ import {
   SimpleSelf,
   SimpleUser,
 } from "../../ApiType";
-import { getUser } from "../service/database";
+import { getUser, saveRoomLogs, getRoomLogs } from "../service/database";
 
 export interface PokerWebSocket extends ws {
   name?: string;
@@ -198,6 +200,12 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
     case ActionType.RESPOND_SEE_HAND:
       userRespondSeeHand(token, data.requestId, data.accept);
       return;
+    case ActionType.REQUEST_SUPPORT:
+      userRequestSupport(token, data.targetUserId, data.amount);
+      return;
+    case ActionType.RESPOND_SUPPORT:
+      userRespondSupport(token, data.requestId, data.accept);
+      return;
     case ActionType.EXTEND_ACTION_TIME:
       userExtendActionTime(token);
       return;
@@ -259,6 +267,11 @@ function getSimpleRoom(room: Room): SimpleRoom {
       maxPercent: room.redPacketMaxPercent,
     },
     redPacket,
+    supportConfig: {
+      enabled: !!room.supportEnabled,
+      minPot: room.supportMinPot,
+      maxPercent: room.supportMaxPercent,
+    },
   };
 }
 
@@ -433,6 +446,9 @@ export function publish2all(roomid: RoomID) {
 }
 
 export function publishLog2all(roomid: RoomID, logs: string[]) {
+  // 先保存到数据库
+  saveRoomLogs(roomid, logs);
+  // 再广播给所有客户端
   send2all(roomid, {
     logs,
   });

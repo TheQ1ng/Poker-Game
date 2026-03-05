@@ -32,6 +32,9 @@ export const createRoomAsync = createAsyncThunk(
     isOmaha,
     redPacketThresholdMultiple,
     redPacketMaxPercent,
+    supportEnabled,
+    supportMinPot,
+    supportMaxPercent,
   }: {
     sb: number;
     buyIn: number;
@@ -40,6 +43,9 @@ export const createRoomAsync = createAsyncThunk(
     isOmaha: boolean;
     redPacketThresholdMultiple: number;
     redPacketMaxPercent: number;
+    supportEnabled: boolean;
+    supportMinPot: number;
+    supportMaxPercent: number;
   }) => {
     return await createroom(
       sb,
@@ -48,7 +54,10 @@ export const createRoomAsync = createAsyncThunk(
       isShortDeck,
       isOmaha,
       redPacketThresholdMultiple,
-      redPacketMaxPercent
+      redPacketMaxPercent,
+      supportEnabled,
+      supportMinPot,
+      supportMaxPercent
     );
   }
 );

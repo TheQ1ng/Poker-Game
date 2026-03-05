@@ -21,7 +21,10 @@ export async function createroom(
   isShortDeck: boolean,
   isOmaha: boolean,
   redPacketThresholdMultiple: number,
-  redPacketMaxPercent: number
+  redPacketMaxPercent: number,
+  supportEnabled: boolean = false,
+  supportMinPot: number = 600,
+  supportMaxPercent: number = 5
 ): Promise<ApiRsp> {
   const rsp = await fetch("/createroom", {
     method: "POST",
@@ -33,6 +36,9 @@ export async function createroom(
       isOmaha,
       redPacketThresholdMultiple,
       redPacketMaxPercent,
+      supportEnabled,
+      supportMinPot,
+      supportMaxPercent,
     }),
     headers: {
       authorization: localStorage["token"],
@@ -58,64 +64,50 @@ export async function joinroom(roomid: string): Promise<ApiRsp> {
 
 export interface RoomInfo {
   id: string;
-  smallBlind: number;
   playerCount: number;
   maxPlayers: number;
-  ownerName: string;
-  isShortDeck: boolean;
-  isOmaha: boolean;
-  redPacketThresholdMultiple?: number;
-  redPacketMaxPercent?: number;
+  smallBlind: number;
+  ownerName?: string;
+  isShortDeck?: boolean;
+  isOmaha?: boolean;
 }
 
 export async function fetchRooms(): Promise<{ rooms: RoomInfo[] }> {
   const rsp = await fetch("/rooms", {
     method: "GET",
-  });
-  return await rsp.json();
-}
-
-export interface UserProfile {
-  code: number;
-  data: {
-    name: string;
-    nickname: string;
-    avatar: string;
-    isAdmin: boolean;
-  };
-}
-
-export async function fetchProfile(): Promise<UserProfile> {
-  const rsp = await fetch("/profile", {
-    method: "GET",
     headers: {
-      Authorization: localStorage.getItem("token") || "",
+      authorization: localStorage["token"],
     },
   });
   return await rsp.json();
 }
 
-export async function updateProfile(nickname: string, avatar: string): Promise<UserProfile> {
-  console.log('调用updateProfile', { nickname, avatar });
-  try {
-    const rsp = await fetch("/updateprofile", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: localStorage.getItem("token") || "",
-      },
-      body: JSON.stringify({ nickname, avatar }),
-    });
-    console.log('fetch成功，状态码:', rsp.status);
-    const data = await rsp.json();
-    console.log('updateProfile response:', data);
-    if (data.code !== 0) {
-      console.log('后端返回错误:', data.error);
-      throw new Error(data.error || "保存失败");
-    }
-    return data;
-  } catch (error) {
-    console.log('updateProfile出错:', error);
-    throw error;
-  }
+export interface ProfileData {
+  nickname: string;
+  avatar: string;
+}
+
+export async function fetchProfile(): Promise<ApiRsp & { data?: ProfileData }> {
+  const rsp = await fetch("/profile", {
+    method: "GET",
+    headers: {
+      authorization: localStorage["token"],
+    },
+  });
+  return await rsp.json();
+}
+
+export async function updateProfile(nickname: string, avatar: string): Promise<ApiRsp> {
+  const rsp = await fetch("/updateprofile", {
+    method: "POST",
+    body: JSON.stringify({
+      nickname,
+      avatar,
+    }),
+    headers: {
+      authorization: localStorage["token"],
+      "Content-Type": "application/json",
+    },
+  });
+  return await rsp.json();
 }

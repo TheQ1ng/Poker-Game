@@ -19,6 +19,12 @@ import {
   clearRevealedHandsForMe,
   setServerTimeOffset,
   setRoomChatBubble,
+  setSupportRequests,
+  setSupportPhase,
+  clearSupportRequest,
+  clearSupportPhase,
+  setSupportedTargetId,
+  clearSupportedTargetId,
 } from "../features/room/roomSlice";
 import { AppThunk } from "./store";
 
@@ -91,6 +97,9 @@ export const connect2server =
             if (!data.game.isSettling) {
               dispatch(clearRevealedHandsForMe());
               dispatch(clearSeeHandRequest());
+              // 新一局开始时，清除上一局的支持状态
+              dispatch(clearSupportPhase());
+              dispatch(clearSupportedTargetId());
             }
           }
           if (data.serverTime != null) {
@@ -143,6 +152,47 @@ export const connect2server =
           }
           if (data.seeHandDeclined) {
             message.info("对方拒绝了看牌请求");
+          }
+          // 支持功能消息处理
+          if (data.supportRequests) {
+            dispatch(setSupportRequests(data.supportRequests));
+          }
+          if (data.type === "supportPhase") {
+            dispatch(setSupportPhase({
+              isActive: true,
+              time: data.time || 15,
+              targets: data.targets || [],
+              myStack: data.myStack || 0,
+            }));
+          }
+          if (data.supportDeclined) {
+            const name = data.targetName || "对方";
+            // 区分余额不足等特殊原因
+            if (data.reason && String(data.reason).includes("余额不足")) {
+              message.info(`${name} 因余额不足，无法接受你的支持`);
+            } else {
+              message.info(`${name} 拒绝了你的支持`);
+            }
+            dispatch(clearSupportRequest());
+          }
+          if (data.supportAccepted) {
+            const name = data.targetName || "对方";
+            message.success(`${name} 同意了你的支持（支持金额 ${data.amount} 🌟）`);
+            // 记录当前我支持的目标玩家ID，并关闭支持弹窗
+            if (data.targetId) {
+              dispatch(setSupportedTargetId(data.targetId));
+            }
+            dispatch(clearSupportRequest());
+            dispatch(clearSupportPhase());
+          }
+          if (data.type === "supportRejected") {
+            const name = data.targetName || "对方";
+            // 超时未响应视为忽略
+            message.info(`${name} 忽略了你的支持`);
+            dispatch(clearSupportRequest());
+          }
+          if (data.type === "supportPhaseEnded") {
+            dispatch(clearSupportPhase());
           }
           if (data.roomChat) {
             dispatch(setRoomChatBubble({ userId: data.roomChat.userId, text: data.roomChat.message }));
@@ -328,5 +378,21 @@ export function ws_sendRedPacket(amount: number) {
 export function ws_openRedPacket() {
   send2server({
     action: ActionType.OPEN_RED_PACKET,
+  });
+}
+
+export function ws_requestSupport(targetUserId: string, amount: number) {
+  send2server({
+    action: ActionType.REQUEST_SUPPORT,
+    targetUserId,
+    amount,
+  });
+}
+
+export function ws_respondSupport(requestId: string, accept: boolean) {
+  send2server({
+    action: ActionType.RESPOND_SUPPORT,
+    requestId,
+    accept,
   });
 }

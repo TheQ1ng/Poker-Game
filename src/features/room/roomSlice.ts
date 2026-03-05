@@ -23,6 +23,27 @@ export interface RevealedHandPayload {
   maxCards: Card[];
 }
 
+export interface SupportRequestPayload {
+  requestId: string;
+  fromUserId: string;
+  fromName: string;
+  amount: number;
+}
+
+export interface SupportTargetInfo {
+  id: string;
+  name: string;
+  totalBet: number;
+  maxSupport: number;
+}
+
+export interface SupportPhasePayload {
+  isActive: boolean;
+  time: number;
+  targets: SupportTargetInfo[];
+  myStack: number;
+}
+
 export interface RoomState {
   room: SimpleRoom | null;
   game: SimpleGame | null;
@@ -36,6 +57,12 @@ export interface RoomState {
   revealedHandsForMe: Record<string, RevealedHandPayload>;
   /** 房间内玩家头顶气泡：userId -> { text, at }，用于聊天展示 */
   roomChatBubbles: Record<string, { text: string; at: number }>;
+  /** 有人请求支持我（仅我作为被支持者时） */
+  pendingSupportRequests: SupportRequestPayload[];
+  /** 支持阶段状态（仅弃牌玩家可见） */
+  supportPhase: SupportPhasePayload | null;
+  /** 我当前支持的目标玩家ID（chipsRecordID），用于在其头像旁显示小红旗 */
+  supportedTargetId: string | null;
 }
 
 const initialState: RoomState = {
@@ -47,6 +74,9 @@ const initialState: RoomState = {
   pendingSeeHandRequests: [],
   revealedHandsForMe: {},
   roomChatBubbles: {},
+  pendingSupportRequests: [],
+  supportPhase: null,
+  supportedTargetId: null,
 };
 
 export const roomSlice = createSlice({
@@ -122,6 +152,24 @@ export const roomSlice = createSlice({
     clearRoomChatBubble(state, action: PayloadAction<string>) {
       delete state.roomChatBubbles[action.payload];
     },
+    setSupportRequests(state, action: PayloadAction<SupportRequestPayload[]>) {
+      state.pendingSupportRequests = action.payload;
+    },
+    setSupportPhase(state, action: PayloadAction<SupportPhasePayload | null>) {
+      state.supportPhase = action.payload;
+    },
+    clearSupportRequest(state) {
+      state.pendingSupportRequests = [];
+    },
+    clearSupportPhase(state) {
+      state.supportPhase = null;
+    },
+    setSupportedTargetId(state, action: PayloadAction<string | null>) {
+      state.supportedTargetId = action.payload;
+    },
+    clearSupportedTargetId(state) {
+      state.supportedTargetId = null;
+    },
   },
   extraReducers: (builder) => {},
 });
@@ -140,6 +188,12 @@ export const {
   clearRevealedHandsForMe,
   setRoomChatBubble,
   clearRoomChatBubble,
+  setSupportRequests,
+  setSupportPhase,
+  clearSupportRequest,
+  clearSupportPhase,
+  setSupportedTargetId,
+  clearSupportedTargetId,
 } = roomSlice.actions;
 export const selectRoomID = (state: RootState) => state.room.room?.roomid;
 export const selectServerTimeOffset = (state: RootState) => state.room.serverTimeOffset;
@@ -181,5 +235,14 @@ export const selectRevealedHandsForMe = (state: RootState) =>
 
 export const selectRoomChatBubbles = (state: RootState) =>
   state.room.roomChatBubbles;
+
+export const selectPendingSupportRequests = (state: RootState) =>
+  state.room.pendingSupportRequests;
+
+export const selectSupportPhase = (state: RootState) =>
+  state.room.supportPhase;
+
+export const selectSupportedTargetId = (state: RootState) =>
+  state.room.supportedTargetId;
 
 export default roomSlice.reducer;

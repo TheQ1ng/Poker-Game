@@ -115,6 +115,9 @@ export function Owner({
   isSettlingCountdown?: boolean;
   nextPositionUserIds?: { SB: string | null; BB: string | null; D: string | null };
 }) {
+  // 计算是否处于胜者动画阶段（亮牌按钮只在此时显示）
+  const isWinnerPhase = totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
+
   const hintSoundRef = useRef<HTMLAudioElement>(null);
   const dealCardSoundRef = useRef<HTMLAudioElement>(null);
 
@@ -864,7 +867,8 @@ export function Owner({
                       showHand={isSettling && !selfAsUser?.hands?.[i]}
                       isSelected={false}
                       size="medium"
-                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn}
+                      // 亮牌按钮只在胜者动画阶段显示，避免干扰分阶段比牌动画
+                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn && isWinnerPhase}
                     />
                   ))}
                   <div
@@ -892,7 +896,8 @@ export function Owner({
                     showHand={isSettling && !selfAsUser?.hands[0]}
                     isSelected={false}
                     size="medium"
-                    showShowHandButton={!selfAsUser?.isAllIn}
+                    // 亮牌按钮只在胜者动画阶段显示，避免干扰分阶段比牌动画
+                    showShowHandButton={!selfAsUser?.isAllIn && isWinnerPhase}
                   />
                   <Poker
                     card={self?.hands[1] || null}
