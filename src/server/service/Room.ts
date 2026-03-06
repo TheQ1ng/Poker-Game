@@ -70,6 +70,8 @@ export class Game {
   multiSettleTimes: number = 1; // settle times
   multiSettleIndex: number = 0;
   multiSettleTimer = setTimeout(() => { }, 0);
+  /** all-in 自动补牌流程中，是否已先亮过在场玩家手牌 */
+  allInRunoutHandsRevealed: boolean = false;
 
 
 
@@ -90,6 +92,8 @@ export class Game {
   }
 
   start() {
+    roomMap[this.roomid].supportPhaseDoneThisHand = false;
+    roomMap[this.roomid].supportPhaseContext = "beforeSettle";
     if (!this.initUsers()) return;
     const deckSize = this.isShortDeck ? 36 : 52;
     this.cards = randomHands(deckSize, this.isShortDeck);
@@ -105,6 +109,7 @@ export class Game {
     this.multiSettleConfirm = false;
     this.multiSettleTimes = 1;
     this.multiSettleIndex = 0;
+    this.allInRunoutHandsRevealed = false;
     clearTimeout(this.multiSettleTimer);
 
     this.sortedUsers = this.sortUsersBySmallBlind();
@@ -456,87 +461,59 @@ export class Game {
       if (user.stack < this.smallBlind * 2) {
         user.isReady = false;
       }
-      crs.find((cr) => cr.id === user.chipsRecordID)!.chips = user.stack;
     });
 
-    // 处理支持盈利分成：使用「本局赢得筹码数 / 本局下注筹码数 * 支持筹码数」公式
+    // 处理支持盈利分成：返还公式 = floor(本局赢得筹码数 * 支持金额 / 目标本局总下注)
+    // 当目标盈利时，返还值天然包含支持本金 + 按占比分成。
     const roomForSupport = roomMap[this.roomid];
     if (roomForSupport.supportRecords.length > 0) {
       const supportLogs: string[] = [];
 
-      // 找出所有有支持记录的目标玩家
-      roomForSupport.supportRecords.forEach((record: { supporterToken: string; targetToken: string; amount: number; sharePercent: number }) => {
+      roomForSupport.supportRecords.forEach((record) => {
         const targetUser = userMap[record.targetToken];
         const supporterUser = userMap[record.supporterToken];
+        if (!targetUser || !supporterUser) return;
 
-        // 只有目标玩家获胜且本局有从底池赢到筹码时才分成
         const potWin = potWinMap[record.targetToken] || 0; // 本局赢得筹码数（含自己的下注）
-        if (targetUser.isWinner && potWin > 0) {
-          // 返还公式：本局赢得筹码数 / 本局下注筹码数 * 支持筹码数
-          // 这里 sharePercent = 支持筹码数 / 本局下注筹码数
-          const profitShare = Math.floor(potWin * record.sharePercent);
-
-          if (profitShare > 0) {
-            // 从目标扣除
-            targetUser.stack -= profitShare;
-            targetUser.profits -= profitShare;
-
-            // 给支持者
-            supporterUser.stack += profitShare;
-
-            // 记录日志
-            supportLogs.push(
-              `${supporterUser.nickname || supporterUser.name} 因支持 ${targetUser.nickname || targetUser.name} 获得分成 ${profitShare} 🌟`
-            );
-
-            // #region agent log: support-profit-share
-            fetch('http://127.0.0.1:7804/ingest/6ab4a1e7-b028-42d3-9c9e-0b441d29976b', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Debug-Session-Id': '90cdf1',
-              },
-              body: JSON.stringify({
-                sessionId: '90cdf1',
-                runId: 'pre-fix',
-                hypothesisId: 'chips-sync',
-                location: 'service/Room.ts:settle',
-                message: 'support profit share applied',
-                data: {
-                  roomid: this.roomid,
-                  supporterToken: record.supporterToken,
-                  targetToken: record.targetToken,
-                  amount: record.amount,
-                  sharePercent: record.sharePercent,
-                  profitShare,
-                  targetStackAfter: targetUser.stack,
-                  supporterStackAfter: supporterUser.stack,
-                },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion
-          }
+        if (!targetUser.isWinner || potWin <= 0) {
+          return;
         }
+
+        const denominator = Math.max(1, record.targetTotalBet);
+        const grossReturn = Math.floor((potWin * record.amount) / denominator);
+        const payout = Math.max(0, Math.min(grossReturn, targetUser.stack));
+        if (payout <= 0) {
+          return;
+        }
+
+        // 从目标扣除返还额（本金+分成），返给支持者
+        targetUser.stack -= payout;
+        targetUser.profits -= payout;
+        supporterUser.stack += payout;
+        supporterUser.profits += payout;
+
+        const principal = Math.min(record.amount, payout);
+        const share = Math.max(0, payout - principal);
+        supportLogs.push(
+          `${supporterUser.nickname || supporterUser.name} 支持 ${targetUser.nickname || targetUser.name} 返还 ${payout} 🌟（本金${principal} + 分成${share}）`
+        );
       });
 
       if (supportLogs.length > 0) {
         publishLog2all(this.roomid, ["🤝 支持分成:", ...supportLogs]);
       }
 
-      // 分红后，重新同步积分榜中的筹码（以最新 stack 为准）
-      roomForSupport.chipsRecords.forEach((cr) => {
-        const token = roomForSupport.users.find(
-          (t) => userMap[t].chipsRecordID === cr.id
-        );
-        if (token) {
-          cr.chips = userMap[token].stack;
-        }
-      });
-
       // 清空支持记录，避免重复处理
       roomForSupport.supportRecords = [];
     }
+
+    // 所有结算逻辑（含支持分成）完成后，再统一同步积分榜
+    crs.forEach((cr) => {
+      const token = this.sortedUsers.find((t) => userMap[t].chipsRecordID === cr.id);
+      if (token) {
+        cr.chips = userMap[token].stack;
+      }
+    });
 
     publishLog2all(this.roomid, logs);
 
@@ -606,12 +583,18 @@ export class Game {
    * 4. 是否有未弃牌玩家可以被支持
    */
   enterSupportPhaseOrSettle(): void {
-    const room = roomMap[this.roomid];
-
-    // 检查支持功能是否开启
-    if (!room.supportEnabled) {
-      this.settle();
+    if (this.tryStartSupportPhase("beforeSettle")) {
       return;
+    }
+    this.settle();
+  }
+
+  private tryStartSupportPhase(
+    phaseContext: "beforeRunout" | "beforeSettle"
+  ): boolean {
+    const room = roomMap[this.roomid];
+    if (!room.supportEnabled || room.isSupportPhase || room.supportPhaseDoneThisHand) {
+      return false;
     }
 
     // 计算总奖池
@@ -622,8 +605,7 @@ export class Game {
 
     // 检查奖池是否达到阈值
     if (totalPot < room.supportMinPot) {
-      this.settle();
-      return;
+      return false;
     }
 
     // 找出所有弃牌且有余额的玩家（可以支持别人）
@@ -644,12 +626,13 @@ export class Game {
 
     // 没有支持者或没有目标，直接结算
     if (potentialSupporters.length === 0 || supportableTargets.length === 0) {
-      this.settle();
-      return;
+      return false;
     }
 
     // 进入支持阶段
     room.isSupportPhase = true;
+    room.supportPhaseContext = phaseContext;
+    room.supportPhaseDoneThisHand = true;
     room.pendingSupportRequests = [];
     room.supportRecords = [];
 
@@ -690,6 +673,7 @@ export class Game {
       supportersCount: potentialSupporters.length,
       targetsCount: supportableTargets.length,
     });
+    return true;
   }
 
   /**
@@ -715,6 +699,8 @@ export class Game {
     });
 
     room.pendingSupportRequests = [];
+    // 清空所有客户端上的待处理支持请求弹窗
+    send2all(this.roomid, { supportRequests: [] });
     room.isSupportPhase = false;
 
     // 广播支持阶段结束
@@ -722,6 +708,17 @@ export class Game {
       type: "supportPhaseEnded",
       acceptedCount: room.supportRecords.length,
     });
+
+    const shouldResumeRunout =
+      room.supportPhaseContext === "beforeRunout" && this.round < GameRound.River;
+    room.supportPhaseContext = "beforeSettle";
+
+    if (shouldResumeRunout) {
+      delayTry(() => {
+        this.nextRound();
+      }, 300);
+      return;
+    }
 
     // 进入正常结算
     this.settle();
@@ -768,23 +765,36 @@ export class Game {
     const activeUsers = this.sortedUsers.filter(
       (t) => !userMap[t].isFolded && !userMap[t].isAllIn
     );
+    const aliveUsers = this.sortedUsers.filter(
+      (t) => !userMap[t].isFolded && userMap[t].isInCurrentGame
+    );
 
     console.log("nextRound", activeUsers);
 
     // only one or zero user need act
     if (activeUsers.length <= 1) {
-      // avaiable user show all show hand
-      this.sortedUsers.forEach((t) => {
-        const user = userMap[t];
-        if (user.isInCurrentGame && !user.isFolded) {
-          user.shouldShowHand = true;
+      // all-in 场景：支持阶段要早于亮手牌，避免支持者看到手牌后再做决定。
+      if (aliveUsers.length > 1 && this.round < GameRound.River) {
+        if (this.tryStartSupportPhase("beforeRunout")) {
+          return;
         }
-      });
+      }
+
+      // 支持阶段结束后（或无需支持），先亮牌，再补公共牌。
+      if (aliveUsers.length > 1 && !this.allInRunoutHandsRevealed) {
+        aliveUsers.forEach((t) => {
+          userMap[t].shouldShowHand = true;
+        });
+        this.allInRunoutHandsRevealed = true;
+        publish2all(this.roomid);
+        delayTry(() => {
+          this.nextRound();
+        }, 800);
+        return;
+      }
 
       console.log("only one or zero active user, auto deal next round");
-
-      // 牌没发完，继续自动发牌，不进入支持阶段
-      // 等到River轮结束才会触发支持阶段
+      // all-in 自动补牌流程：支持阶段 -> 亮手牌 -> 补公共牌 -> River 比牌结算。
     }
 
     // 默认只发一次
@@ -989,6 +999,10 @@ class Room {
   redPacketResultTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
   /** 支持阶段：弃牌玩家可以支持尚未弃牌的玩家 */
   isSupportPhase: boolean = false;
+  /** 支持阶段触发时机：beforeRunout(补牌前) / beforeSettle(结算前) */
+  supportPhaseContext: "beforeRunout" | "beforeSettle" = "beforeSettle";
+  /** 当前手牌是否已触发过支持阶段（避免同一手重复触发） */
+  supportPhaseDoneThisHand: boolean = false;
   /** 支持请求列表 */
   pendingSupportRequests: {
     requestId: string;
@@ -1001,9 +1015,17 @@ class Room {
     supporterToken: Token;
     targetToken: Token;
     amount: number;
-    sharePercent: number;
+    /** 目标玩家本局总下注（用于结算时按占比分成） */
+    targetTotalBet: number;
   }[] = [];
   supportPhaseTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
+  /** 存储用户临时token与用户名、昵称的对应关系，用于玩家退出房间后的数据修复 */
+  userInfoMap: {
+    [token: string]: {
+      name: string;
+      nickname: string;
+    }
+  } = {};
 
   constructor(
     id: string,
@@ -1055,6 +1077,8 @@ class Room {
     this.pendingSupportRequests = [];
     this.supportRecords = [];
     this.isSupportPhase = false;
+    this.supportPhaseContext = "beforeSettle";
+    this.supportPhaseDoneThisHand = false;
     clearTimeout(this.supportPhaseTimer);
     send2all(this.id, { seeHandRequests: [], supportRequests: [] });
 
@@ -1095,6 +1119,12 @@ class Room {
   addUser(token: Token): boolean {
     if (this.users.findIndex((t) => t == token) == -1) {
       this.users.push(token);
+
+      // 存储用户UUID、用户名和昵称的对应关系
+      this.userInfoMap[token] = {
+        name: userMap[token].name,
+        nickname: userMap[token].nickname || userMap[token].name
+      };
 
       // 检查是否已有相同用户名的记录（积分榜中的记录）
       const existingRecord = this.chipsRecords.find(cr => cr.name === userMap[token].name);

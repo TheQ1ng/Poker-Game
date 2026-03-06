@@ -2,8 +2,8 @@ import { message } from "antd";
 import { ActionType } from "../ApiType";
 import { setChipsRecord } from "../features/chipsrecord/chipsRecordSlice";
 import { clearCreateRoomID } from "../features/createroom/createRoomSlice";
-import { addLogs } from "../features/gamehistory/gameHistorySlice";
-import { addMessage } from "../features/chat/chatSlice";
+import { addLogs, replaceLogs, setHistoryRoom } from "../features/gamehistory/gameHistorySlice";
+import { addMessage, setChatRoom } from "../features/chat/chatSlice";
 import { roominfo } from "../features/home/homeAPI";
 import { clearRoomID } from "../features/home/homeSlice";
 import {
@@ -90,6 +90,8 @@ export const connect2server =
             }
           }
           if (data.room) {
+            dispatch(setHistoryRoom(data.room.roomid || ""));
+            dispatch(setChatRoom(data.room.roomid || ""));
             dispatch(setRoom(data.room));
           }
           if (data.game) {
@@ -122,12 +124,21 @@ export const connect2server =
             dispatch(clearCreateRoomID(""));
             dispatch(clearRevealedHandsForMe());
             dispatch(clearSeeHandRequest());
+            dispatch(setHistoryRoom(""));
+            dispatch(setChatRoom(""));
             if (data.message) {
               message.error(data.message);
             }
           }
           if (data.logs) {
-            dispatch(addLogs(data.logs));
+            if (data.roomid) {
+              dispatch(setHistoryRoom(data.roomid));
+            }
+            if (data.logsSnapshot) {
+              dispatch(replaceLogs(data.logs));
+            } else {
+              dispatch(addLogs(data.logs));
+            }
           }
           if (data.selectSettleTimes === 1) {
             dispatch(setSelectSettleTimes(true));

@@ -6,7 +6,8 @@ import Room, { RoomID } from "./Room";
 export type Token = string;
 
 class User {
-  token: Token = ""; // uuid
+  token: Token = ""; // JWT token
+  uuid: string = ""; // 数据库UUID
   name: string = ""; // string
   nickname: string = ""; // 玩家昵称
   positon: string = ""; //
@@ -46,10 +47,11 @@ class User {
   /** 本手牌已使用「+30s」次数，每手牌最多 3 次 */
   addTimeUsed: number = 0;
 
-  constructor(token: Token, name: string, avatar: string) {
+  constructor(token: Token, name: string, avatar: string, uuid: string = "") {
     this.token = token;
     this.name = name;
     this.avatar = avatar;
+    this.uuid = uuid;
   }
   leftStack(): number {
     return this.stack - this.bets.reduce((a, b) => a + b, 0);

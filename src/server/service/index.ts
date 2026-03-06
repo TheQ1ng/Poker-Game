@@ -38,7 +38,7 @@ function genRoomID(): string {
   return id;
 }
 
-export function createUser(token: Token, name: string, avatar: string): User {
+export function createUser(token: Token, name: string, avatar: string, uuid: string = ""): User {
   if (!token || !name) {
     throw "should have token & name";
   }
@@ -47,10 +47,11 @@ export function createUser(token: Token, name: string, avatar: string): User {
     // 更新用户信息
     userMap[token].name = name;
     userMap[token].avatar = avatar;
+    userMap[token].uuid = uuid;
     return userMap[token];
   }
   // 创建新用户
-  const user = new User(token, name, avatar);
+  const user = new User(token, name, avatar, uuid);
   userMap[token] = user;
   return user;
 }
@@ -351,7 +352,7 @@ export function userEnterRoom(token: Token, roomid: RoomID) {
   try {
     const historyLogs = getRoomLogs(roomid);
     if (historyLogs.length > 0) {
-      send2user(token, { logs: historyLogs });
+      send2user(token, { roomid, logs: historyLogs, logsSnapshot: true });
     }
   } catch (e) {
     console.error("加载房间历史日志失败:", e);
@@ -718,7 +719,13 @@ export function userRequestSupport(token: Token, targetId: string, amount: numbe
 
   // 计算目标当前总下注额
   const targetTotalBet = targetUser.bets.reduce((a, b) => a + b, 0);
+  if (targetTotalBet <= 0) {
+    throw "该玩家当前不可被支持";
+  }
   const maxSupport = Math.floor(targetTotalBet * room.supportMaxPercent / 100);
+  if (maxSupport < 1) {
+    throw "当前支持上限过低，暂不可支持";
+  }
 
   // 验证金额
   if (amount <= 0 || amount > maxSupport) {
@@ -748,7 +755,6 @@ export function userRequestSupport(token: Token, targetId: string, amount: numbe
   });
 
   // 通知目标玩家有新请求（类似看牌请求格式）
-  const supporterName = user.nickname || user.name;
   send2user(target, {
     supportRequests: room.pendingSupportRequests
       .filter((r) => r.targetToken === target)
@@ -780,6 +786,9 @@ export function userRespondSupport(token: Token, requestId: string, accept: bool
   if (!isInRoom(token, roomid)) {
     throw "invalid room";
   }
+  if (!room.isSupportPhase) {
+    throw "当前不在支持阶段";
+  }
 
   // 查找请求
   const idx = room.pendingSupportRequests.findIndex(
@@ -809,6 +818,31 @@ export function userRespondSupport(token: Token, requestId: string, accept: bool
   const supporter = userMap[pending.supporterToken];
   const targetUser = userMap[pending.targetToken];
   const amount = pending.amount;
+  if (!supporter || !targetUser) {
+    throw "玩家状态异常";
+  }
+  if (!supporter.isFolded || !supporter.isInCurrentGame) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: targetUser.chipsRecordID,
+      targetName: targetUser.nickname || targetUser.name,
+      requestId,
+      reason: "支持者状态已变化",
+    });
+    sendSupportRequestsToTarget(room, token);
+    return;
+  }
+  if (targetUser.isFolded || !targetUser.isInCurrentGame) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: targetUser.chipsRecordID,
+      targetName: targetUser.nickname || targetUser.name,
+      requestId,
+      reason: "目标玩家状态已变化",
+    });
+    sendSupportRequestsToTarget(room, token);
+    return;
+  }
 
   // 检查支持者余额
   const supporterStack = supporter.stack - supporter.bets.reduce((a, b) => a + b, 0);
@@ -830,44 +864,21 @@ export function userRespondSupport(token: Token, requestId: string, accept: bool
   // 加到目标玩家账户
   targetUser.stack += amount;
 
-  // 更新筹码记录
-  room.chipsRecords.forEach((cr) => {
-    if (cr.id === supporter.chipsRecordID) {
-      cr.chips = supporter.stack;
-    }
-    if (cr.id === targetUser.chipsRecordID) {
-      cr.chips = targetUser.stack;
-    }
-  });
-
-  // #region agent log: support-accept
-  fetch('http://127.0.0.1:7804/ingest/6ab4a1e7-b028-42d3-9c9e-0b441d29976b', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': '90cdf1',
-    },
-    body: JSON.stringify({
-      sessionId: '90cdf1',
-      runId: 'pre-fix',
-      hypothesisId: 'chips-sync',
-      location: 'service/index.ts:userRespondSupport',
-      message: 'support accepted, stacks updated',
-      data: {
-        roomid,
-        supporterToken: pending.supporterToken,
-        targetToken: pending.targetToken,
-        amount,
-        supporterStackAfter: supporter.stack,
-        targetStackAfter: targetUser.stack,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
   // 计算分成比例
   const targetTotalBet = targetUser.bets.reduce((a, b) => a + b, 0);
+  if (targetTotalBet <= 0) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: targetUser.chipsRecordID,
+      targetName: targetUser.nickname || targetUser.name,
+      requestId,
+      reason: "目标下注信息异常",
+    });
+    supporter.stack += amount;
+    targetUser.stack -= amount;
+    sendSupportRequestsToTarget(room, token);
+    return;
+  }
   const sharePercent = amount / targetTotalBet;
 
   // 记录支持关系
@@ -875,7 +886,7 @@ export function userRespondSupport(token: Token, requestId: string, accept: bool
     supporterToken: pending.supporterToken,
     targetToken: pending.targetToken,
     amount,
-    sharePercent,
+    targetTotalBet,
   });
 
   // 通知双方
@@ -938,13 +949,6 @@ export function userSendMessage(token: Token, message: string) {
     },
   };
   send2all(roomid, payload);
-  const displayName = user.nickname || user.name;
-  publishLog2all(roomid, [`<strong>${displayName}</strong>: ${trimmed
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/ /g, "&nbsp;")
-  }`]);
 }
 
 // ========================================

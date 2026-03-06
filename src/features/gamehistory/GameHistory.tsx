@@ -106,6 +106,11 @@ type ParsedLogLine =
       chips: number;
     }
   | {
+      kind: "showHand";
+      player: string;
+      cards: Card[];
+    }
+  | {
       kind: "chat";
       player: string;
       text: string;
@@ -182,6 +187,15 @@ function parseLogLine(line: string): ParsedLogLine {
     };
   }
 
+  const showHandMatch = trimmed.match(/^(.+?)亮牌【([0-9cdhs]+)】$/);
+  if (showHandMatch) {
+    return {
+      kind: "showHand",
+      player: showHandMatch[1],
+      cards: parseCompactCards(showHandMatch[2]),
+    };
+  }
+
   const chatMatch = trimmed.match(/^<strong[^>]*>(.*?)<\/strong>:\s*(.*)$/);
   if (chatMatch) {
     return {
@@ -200,7 +214,12 @@ function parseLogLine(line: string): ParsedLogLine {
 
 function isKeyEventLine(line: string): boolean {
   const parsed = parseLogLine(line);
-  if (parsed.kind === "settle" || parsed.kind === "seeHand" || parsed.kind === "warning") {
+  if (
+    parsed.kind === "settle" ||
+    parsed.kind === "seeHand" ||
+    parsed.kind === "showHand" ||
+    parsed.kind === "warning"
+  ) {
     return true;
   }
   if (parsed.kind === "action") {
@@ -325,12 +344,9 @@ function BlockRow({ line }: { line: string }) {
     return (
       <div className="game-history-line game-history-line-street">
         <span className="gh-pill gh-pill-street">{parsed.phase}</span>
-        <div className="gh-cards-wrap">
+        <div className="gh-poker-cards">
           {parsed.cards.map((card, idx) => (
-            <span key={`${card.num}-${card.suit}-${idx}`} className={`gh-card gh-suit-${card.suit}`}>
-              {cardNumLabel(card.num)}
-              {suitLabel(card.suit)}
-            </span>
+            <PokerStyledCard key={`${card.num}-${card.suit}-${idx}`} card={card} />
           ))}
         </div>
       </div>
@@ -403,6 +419,20 @@ function BlockRow({ line }: { line: string }) {
     );
   }
 
+  if (parsed.kind === "showHand") {
+    return (
+      <div className="game-history-line game-history-line-seehand">
+        <span className="gh-pill gh-pill-meta">亮牌</span>
+        <span className="gh-player">{parsed.player}</span>
+        <div className="gh-poker-cards">
+          {parsed.cards.map((card, idx) => (
+            <PokerStyledCard key={`show-${card.num}-${card.suit}-${idx}`} card={card} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   // 战况不显示玩家聊天内容
   if (parsed.kind === "chat") {
     return null;
@@ -452,8 +482,13 @@ export default function GameHistory() {
       const blocks = groupLogsByFlow(currentGameLogs);
       gameGroups.push({ id: gameGroups.length, blocks });
     }
-    
-    return gameGroups.reverse();
+
+    return gameGroups.reverse().map((game) => ({
+      ...game,
+      blocks: [...game.blocks]
+        .reverse()
+        .map((block) => ({ ...block, lines: [...block.lines].reverse() })),
+    }));
   }, [logs]);
 
   const displayGames = useMemo(() => {

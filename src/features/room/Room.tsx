@@ -72,6 +72,8 @@ function Room() {
   const [disclaimerModalVisible, setDisclaimerModalVisible] = useState(false);
   const [redPacketSendVisible, setRedPacketSendVisible] = useState(false);
   const [redPacketAmount, setRedPacketAmount] = useState<number>(0);
+  const [supportAmounts, setSupportAmounts] = useState<Record<string, number>>({});
+  const [supportPhaseRemain, setSupportPhaseRemain] = useState(0);
 
   // 清除缓存和localStorage
   const handleClearCache = () => {
@@ -116,10 +118,10 @@ function Room() {
     try {
       // 构建积分榜数据
       const chipsRecordData = chipsRecords.map(record => {
-        const user = room?.users?.find(u => u.id === record.id);
         return {
-          username: user?.name || record.id,
-          nickname: user?.nickname || user?.name || record.id,
+          id: record.id,
+          username: record.name,
+          nickname: record.nickname || record.name,
           chips: record.chips,
           buyIn: record.buyIn,
           profit: record.chips - record.buyIn
@@ -212,9 +214,20 @@ function Room() {
   const totalShowdown = showdownPlayers.length;
   const [settleRevealStep, setSettleRevealStep] = useState(0);
   const settleAnimatingRef = useRef(false);
+  const [countdownLocked, setCountdownLocked] = useState(false);
   /** 读条等待阶段（胜者展示结束后的 7/12 秒）：用于 SB/BB/D 滑动到下一家；若无人摊牌（全员弃牌决出胜负），直接进入倒计时 */
-  const isSettlingCountdown =
+  const rawIsSettlingCountdown =
     isSettling && (totalShowdown === 0 || settleRevealStep > 2 * totalShowdown);
+  const isSettlingCountdown = isSettling && (rawIsSettlingCountdown || countdownLocked);
+  useEffect(() => {
+    if (!isSettling) {
+      setCountdownLocked(false);
+      return;
+    }
+    if (rawIsSettlingCountdown && !countdownLocked) {
+      setCountdownLocked(true);
+    }
+  }, [isSettling, rawIsSettlingCountdown, countdownLocked]);
   const nextPositionUserIds = useMemo(() => {
     if (!isSettlingCountdown || !room?.users?.length) return { SB: null, BB: null, D: null };
     const orderedIds = users as string[];
@@ -364,6 +377,37 @@ function Room() {
     const t = setInterval(() => setTick((n) => n + 1), 200);
     return () => clearInterval(t);
   }, [activeRedPacket?.id, activeRedPacket?.status, activeRedPacket?.openDeadline, activeRedPacket?.resultDeadline]);
+
+  useEffect(() => {
+    if (!supportPhase?.isActive) {
+      setSupportAmounts({});
+      setSupportPhaseRemain(0);
+      return;
+    }
+    const initial = Math.max(0, supportPhase.time || 15);
+    setSupportPhaseRemain(initial);
+    setSupportAmounts((prev) => {
+      const next: Record<string, number> = {};
+      supportPhase.targets.forEach((target) => {
+        const max = Math.max(0, Math.min(target.maxSupport, supportPhase.myStack));
+        if (max <= 0) {
+          next[target.id] = 0;
+          return;
+        }
+        const before = prev[target.id];
+        next[target.id] = Number.isFinite(before)
+          ? Math.max(1, Math.min(max, Number(before)))
+          : max;
+      });
+      return next;
+    });
+    const startAt = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startAt) / 1000);
+      setSupportPhaseRemain(Math.max(0, initial - elapsed));
+    }, 200);
+    return () => clearInterval(timer);
+  }, [supportPhase?.isActive, supportPhase?.time, supportPhase?.myStack, supportPhase?.targets]);
 
   useEffect(() => {
     if (!redPacketSendVisible) return;
@@ -694,7 +738,7 @@ function Room() {
                 >
                   <div
                     style={{
-                      width: `${Math.max(0, Math.min(100, (supportPhase.time / 15) * 100))}%`,
+                      width: `${Math.max(0, Math.min(100, (supportPhaseRemain / 15) * 100))}%`,
                       height: "100%",
                       background: "linear-gradient(90deg, #ffd700, #ff8c00)",
                       transition: "width 0.3s linear",
@@ -702,78 +746,90 @@ function Room() {
                   />
                 </div>
                 <div style={{ color: "#fff", fontSize: 12, marginTop: 4, textAlign: "right" }}>
-                  剩余 {supportPhase.time}s
+                  剩余 {supportPhaseRemain}s
                 </div>
               </div>
               <p style={{ color: "white", textAlign: "center", marginBottom: "16px" }}>
                 选择一位玩家并输入支持金额
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {supportPhase.targets.map((target) => (
-                  <div
-                    key={target.id}
-                    style={{
-                      background: "rgba(255, 255, 255, 0.1)",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: "#ffd700", fontWeight: "bold" }}>{target.name}</div>
-                      <div style={{ color: "#aaa", fontSize: "12px", marginBottom: 4 }}>
-                        下注: {target.totalBet} | 最多支持: {target.maxSupport}
+                {supportPhase.targets.map((target) => {
+                  const maxForTarget = Math.max(
+                    0,
+                    Math.min(target.maxSupport, supportPhase.myStack)
+                  );
+                  const amount = Math.max(
+                    0,
+                    Math.min(maxForTarget, supportAmounts[target.id] ?? maxForTarget)
+                  );
+                  const ratio =
+                    target.totalBet > 0
+                      ? ((amount / target.totalBet) * 100).toFixed(2)
+                      : "0.00";
+                  return (
+                    <div
+                      key={target.id}
+                      style={{
+                        background: "rgba(255, 255, 255, 0.1)",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ color: "#ffd700", fontWeight: "bold" }}>{target.name}</div>
+                        <div style={{ color: "#aaa", fontSize: "12px", marginBottom: 4 }}>
+                          下注: {target.totalBet} | 最多支持: {target.maxSupport}
+                        </div>
+                        <div style={{ color: "#82f7b3", fontSize: 12, marginBottom: 6 }}>
+                          当前占比 {ratio}%（返还公式：赢得筹码 × 占比）
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ color: "#ccc", fontSize: 12 }}>支持金额</span>
+                          <InputNumber
+                            min={1}
+                            max={Math.max(1, maxForTarget)}
+                            value={amount > 0 ? amount : undefined}
+                            style={{ width: 100 }}
+                            size="small"
+                            controls={false}
+                            disabled={maxForTarget <= 0}
+                            onChange={(v) => {
+                              const next = Number(v || 0);
+                              setSupportAmounts((prev) => ({
+                                ...prev,
+                                [target.id]:
+                                  maxForTarget <= 0
+                                    ? 0
+                                    : Math.max(1, Math.min(maxForTarget, next)),
+                              }));
+                            }}
+                          />
+                          <span style={{ color: "#ffd700", fontSize: 12 }}>🌟 (你当前 {supportPhase.myStack})</span>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ color: "#ccc", fontSize: 12 }}>支持金额</span>
-                        {/* 这里先用浏览器原生输入，后续如果你愿意可以换成 antd InputNumber */}
-                        <input
-                          type="number"
-                          min={1}
-                          max={Math.min(target.maxSupport, supportPhase.myStack)}
-                          defaultValue={Math.min(target.maxSupport, supportPhase.myStack)}
-                          style={{
-                            width: 80,
-                            background: "rgba(0,0,0,0.4)",
-                            border: "1px solid rgba(255,255,255,0.3)",
-                            borderRadius: 4,
-                            color: "#fff",
-                            padding: "2px 6px",
+                      <div>
+                        <Button
+                          type="primary"
+                          size="small"
+                          onClick={() => {
+                            if (maxForTarget <= 0) {
+                              message.warning("可支持金额不足");
+                              return;
+                            }
+                            const finalAmount = Math.max(1, Math.min(maxForTarget, amount));
+                            ws_requestSupport(target.id, finalAmount);
                           }}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => {
-                            const v = Number(e.target.value) || 0;
-                            if (v < 0) e.target.value = "0";
-                          }}
-                          id={`support-amount-${target.id}`}
-                        />
-                        <span style={{ color: "#ffd700", fontSize: 12 }}>🌟 (你当前 {supportPhase.myStack})</span>
+                          disabled={supportPhase.myStack <= 0 || maxForTarget <= 0}
+                        >
+                          支持
+                        </Button>
                       </div>
                     </div>
-                    <div>
-                      <Button
-                        type="primary"
-                        size="small"
-                        onClick={() => {
-                          const input = document.getElementById(
-                            `support-amount-${target.id}`
-                          ) as HTMLInputElement | null;
-                          const raw = input ? Number(input.value) || 0 : 0;
-                          const max = Math.min(target.maxSupport, supportPhase.myStack);
-                          const amount = Math.max(1, Math.min(max, raw));
-                          if (amount > 0) {
-                            ws_requestSupport(target.id, amount);
-                          }
-                        }}
-                        disabled={supportPhase.myStack <= 0}
-                      >
-                        支持
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

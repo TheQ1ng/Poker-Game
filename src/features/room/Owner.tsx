@@ -137,12 +137,30 @@ export function Owner({
   }, [self?.id, roomChatBubbles[self?.id || ""]?.at, dispatch]);
 
   const selfAsUser = room?.users.find((u) => u.id == self?.id);
+  const stack = self?.stack || 0;
+  const isSettling = game?.isSettling || false;
 
   const chipsRecordSelf =
     room?.roomid && chipsRecordState?.roomid === room.roomid && self?.id
       ? chipsRecordState.chipsRecords.find((r) => r.id === self.id)
       : undefined;
-  const netProfitSelf = chipsRecordSelf != null ? chipsRecordSelf.chips - chipsRecordSelf.buyIn : undefined;
+  const stackBeforeSettleRef = useRef(stack);
+  useEffect(() => {
+    if (!isSettling) {
+      stackBeforeSettleRef.current = self?.stack || 0;
+    }
+  }, [isSettling, self?.stack]);
+  const delaySettleStack =
+    isSettling &&
+    !isSettlingCountdown &&
+    totalShowdown > 0 &&
+    settleRevealStep < 2 * totalShowdown;
+  const displayStack = delaySettleStack ? stackBeforeSettleRef.current : stack;
+  const chipsForProfit = delaySettleStack
+    ? displayStack
+    : chipsRecordSelf?.chips ?? displayStack;
+  const netProfitSelf =
+    chipsRecordSelf != null ? chipsForProfit - chipsRecordSelf.buyIn : undefined;
   const stackBarStyleSelf =
     netProfitSelf === undefined
       ? { background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)" as const }
@@ -158,7 +176,6 @@ export function Owner({
   const pots = game?.pots || 0;
   const bb = game?.bb || 0;
   const reBuyLimit = game?.reBuyLimit || 1;
-  const isSettling = game?.isSettling || false;
 
   const myShowdownIndex = totalShowdown > 0 && self?.id ? showdownOrder.indexOf(self.id) : -1;
   const showHolePhase = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && settleRevealStep === myShowdownIndex * 2;
@@ -166,7 +183,7 @@ export function Owner({
   const winnerPhase = isSettling && totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
   const settleDone = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
   const showAsWinner = (winnerPhase || settleDone) && !!self?.isWinner;
-  const usePhasedSettle = isSettling && totalShowdown > 0;
+  const usePhasedSettle = isSettling && totalShowdown > 0 && !isSettlingCountdown;
   const showPhasedCards = usePhasedSettle && (showHolePhase || showMax5Phase || showAsWinner);
 
   const name = self?.name || "";
@@ -174,7 +191,6 @@ export function Owner({
   const nickname = localStorage.getItem("nickname") || name;
   // 获取头像
   const avatar = localStorage.getItem("avatar") || "";
-  const stack = self?.stack || 0;
   const bet = self?.bet || 0;
   const isActing = self?.isActing || false;
   const isWaiting =
@@ -578,7 +594,7 @@ export function Owner({
             boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
           }}>
             <span className="coins">🌟</span>
-            <RollingNumber value={stack} style={{ fontSize: "12px", fontWeight: "bold" }} />
+            <RollingNumber value={displayStack} style={{ fontSize: "12px", fontWeight: "bold" }} />
           </div>
           {stack + bet < reBuyLimit * bb &&
           (game?.isSettling || !self?.isInCurrentGame || self.isFoled) ? (
@@ -867,26 +883,28 @@ export function Owner({
                       showHand={isSettling && !selfAsUser?.hands?.[i]}
                       isSelected={false}
                       size="medium"
-                      // 亮牌按钮只在胜者动画阶段显示，避免干扰分阶段比牌动画
-                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn && isWinnerPhase}
+                      // 亮牌按钮只在下一局倒计时环节显示
+                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn && isSettlingCountdown}
                     />
                   ))}
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      marginLeft: "10px",
-                      ...(self?.handsType && handTypeRanks[self.handsType] >= 4
-                        ? {
-                            color: "#ffd700",
-                            textShadow: "0 0 15px rgba(255, 215, 0, 0.8)",
-                            animation:
-                              "handTypeGlow 1.5s ease-in-out infinite alternate",
-                          }
-                        : { color: "white" }),
-                    }}
-                  >
-                    {self?.handsType}
-                  </div>
+                  {!isSettlingCountdown && (
+                    <div
+                      style={{
+                        fontWeight: "bold",
+                        marginLeft: "10px",
+                        ...(self?.handsType && handTypeRanks[self.handsType] >= 4
+                          ? {
+                              color: "#ffd700",
+                              textShadow: "0 0 15px rgba(255, 215, 0, 0.8)",
+                              animation:
+                                "handTypeGlow 1.5s ease-in-out infinite alternate",
+                            }
+                          : { color: "white" }),
+                      }}
+                    >
+                      {self?.handsType}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -896,8 +914,8 @@ export function Owner({
                     showHand={isSettling && !selfAsUser?.hands[0]}
                     isSelected={false}
                     size="medium"
-                    // 亮牌按钮只在胜者动画阶段显示，避免干扰分阶段比牌动画
-                    showShowHandButton={!selfAsUser?.isAllIn && isWinnerPhase}
+                    // 亮牌按钮只在下一局倒计时环节显示
+                    showShowHandButton={!selfAsUser?.isAllIn && isSettlingCountdown}
                   />
                   <Poker
                     card={self?.hands[1] || null}
@@ -907,24 +925,26 @@ export function Owner({
                     size="medium"
                     showShowHandButton={false}
                   />
-                  <div
-                    style={{
-                      fontWeight: "bold",
-                      marginLeft: "10px",
-                      ...(self?.handsType &&
-                      handTypeRanks[self.handsType] >= 4
-                        ? {
-                            color: "#ffd700",
-                            textShadow:
-                              "0 0 15px rgba(255, 215, 0, 0.8)",
-                            animation:
-                              "handTypeGlow 1.5s ease-in-out infinite alternate",
-                          }
-                        : { color: "white" }),
-                    }}
-                  >
-                    {self?.handsType}
-                  </div>
+                  {!isSettlingCountdown && (
+                    <div
+                      style={{
+                        fontWeight: "bold",
+                        marginLeft: "10px",
+                        ...(self?.handsType &&
+                        handTypeRanks[self.handsType] >= 4
+                          ? {
+                              color: "#ffd700",
+                              textShadow:
+                                "0 0 15px rgba(255, 215, 0, 0.8)",
+                              animation:
+                                "handTypeGlow 1.5s ease-in-out infinite alternate",
+                            }
+                          : { color: "white" }),
+                      }}
+                    >
+                      {self?.handsType}
+                    </div>
+                  )}
                 </>
               )}
             </>

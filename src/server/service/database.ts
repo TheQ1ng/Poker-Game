@@ -24,6 +24,7 @@ export function initDatabase() {
       nickname TEXT DEFAULT '',
       avatar TEXT DEFAULT '',
       admin INTEGER DEFAULT 0,
+      uuid TEXT DEFAULT '',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
@@ -35,6 +36,7 @@ export function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       room_id TEXT NOT NULL,
       username TEXT NOT NULL,
+      uuid TEXT NOT NULL,
       profit INTEGER NOT NULL,
       final_hand TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -47,6 +49,7 @@ export function initDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       game_record_id INTEGER NOT NULL,
       username TEXT NOT NULL,
+      uuid TEXT NOT NULL,
       nickname TEXT NOT NULL,
       chips INTEGER NOT NULL,
       buy_in INTEGER NOT NULL,
@@ -68,6 +71,45 @@ export function initDatabase() {
     console.error("迁移 admin 列失败:", e);
   }
 
+  // 检查并添加 uuid 列（兼容旧数据库）
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(users)").all() as Array<{name: string}>;
+    const hasUuidColumn = tableInfo.some(col => col.name === 'uuid');
+    if (!hasUuidColumn) {
+      console.log("检测到旧数据库，添加 uuid 列...");
+      db.exec("ALTER TABLE users ADD COLUMN uuid TEXT DEFAULT ''");
+      console.log("uuid 列添加成功");
+    }
+  } catch (e) {
+    console.error("迁移 uuid 列失败:", e);
+  }
+
+  // 检查并添加 game_records 表的 uuid 列（兼容旧数据库）
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(game_records)").all() as Array<{name: string}>;
+    const hasUuidColumn = tableInfo.some(col => col.name === 'uuid');
+    if (!hasUuidColumn) {
+      console.log("检测到旧数据库，添加 game_records.uuid 列...");
+      db.exec("ALTER TABLE game_records ADD COLUMN uuid TEXT DEFAULT ''");
+      console.log("game_records.uuid 列添加成功");
+    }
+  } catch (e) {
+    console.error("迁移 game_records.uuid 列失败:", e);
+  }
+
+  // 检查并添加 player_records 表的 uuid 列（兼容旧数据库）
+  try {
+    const tableInfo = db.prepare("PRAGMA table_info(player_records)").all() as Array<{name: string}>;
+    const hasUuidColumn = tableInfo.some(col => col.name === 'uuid');
+    if (!hasUuidColumn) {
+      console.log("检测到旧数据库，添加 player_records.uuid 列...");
+      db.exec("ALTER TABLE player_records ADD COLUMN uuid TEXT DEFAULT ''");
+      console.log("player_records.uuid 列添加成功");
+    }
+  } catch (e) {
+    console.error("迁移 player_records.uuid 列失败:", e);
+  }
+
   // 房间战况日志表
   db.exec(`
     CREATE TABLE IF NOT EXISTS room_logs (
@@ -87,40 +129,41 @@ export function initDatabase() {
 }
 
 // 获取用户信息
-export function getUser(username: string): { password: string; nickname: string; avatar: string; admin: number } | undefined {
-  const stmt = db.prepare("SELECT password, nickname, avatar, admin FROM users WHERE username = ?");
-  const row = stmt.get(username) as { password: string; nickname: string; avatar: string; admin: number } | undefined;
+export function getUser(username: string): { password: string; nickname: string; avatar: string; admin: number; uuid: string } | undefined {
+  const stmt = db.prepare("SELECT password, nickname, avatar, admin, uuid FROM users WHERE username = ?");
+  const row = stmt.get(username) as { password: string; nickname: string; avatar: string; admin: number; uuid: string } | undefined;
   return row;
 }
 
 // 创建或更新用户
-export function saveUser(username: string, password: string, nickname: string = "", avatar: string = "", admin: number = 0) {
+export function saveUser(username: string, password: string, nickname: string = "", avatar: string = "", admin: number = 0, uuid: string = "") {
   const stmt = db.prepare(`
-    INSERT INTO users (username, password, nickname, avatar, admin, updated_at)
-    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO users (username, password, nickname, avatar, admin, uuid, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     ON CONFLICT(username) DO UPDATE SET
       password = excluded.password,
       nickname = excluded.nickname,
       avatar = excluded.avatar,
       admin = excluded.admin,
+      uuid = excluded.uuid,
       updated_at = CURRENT_TIMESTAMP
   `);
-  stmt.run(username, password, nickname, avatar, admin);
+  stmt.run(username, password, nickname, avatar, admin, uuid);
 }
 
 // 更新用户资料
-export function updateUserProfile(username: string, nickname: string, avatar: string, admin: number = 0) {
+export function updateUserProfile(username: string, nickname: string, avatar: string, admin: number = 0, uuid: string = "") {
   const stmt = db.prepare(`
-    UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
+    UPDATE users SET nickname = ?, avatar = ?, admin = ?, uuid = ?, updated_at = CURRENT_TIMESTAMP
     WHERE username = ?
   `);
-  stmt.run(nickname, avatar, admin, username);
+  stmt.run(nickname, avatar, admin, uuid, username);
 }
 
 // 获取用户资料
-export function getUserProfile(username: string): { nickname: string; avatar: string; admin: number } | undefined {
-  const stmt = db.prepare("SELECT nickname, avatar, admin FROM users WHERE username = ?");
-  return stmt.get(username) as { nickname: string; avatar: string; admin: number } | undefined;
+export function getUserProfile(username: string): { nickname: string; avatar: string; admin: number; uuid: string } | undefined {
+  const stmt = db.prepare("SELECT nickname, avatar, admin, uuid FROM users WHERE username = ?");
+  return stmt.get(username) as { nickname: string; avatar: string; admin: number; uuid: string } | undefined;
 }
 
 // 检查昵称是否已存在
@@ -133,12 +176,12 @@ export function isNicknameExists(nickname: string, excludeUsername: string = "")
 }
 
 // 保存游戏记录
-export function saveGameRecord(roomId: string, username: string, profit: number, finalHand: string) {
+export function saveGameRecord(roomId: string, username: string, uuid: string, profit: number, finalHand: string) {
   const stmt = db.prepare(`
-    INSERT INTO game_records (room_id, username, profit, final_hand)
-    VALUES (?, ?, ?, ?)
+    INSERT INTO game_records (room_id, username, uuid, profit, final_hand)
+    VALUES (?, ?, ?, ?, ?)
   `);
-  stmt.run(roomId, username, profit, finalHand);
+  stmt.run(roomId, username, uuid, profit, finalHand);
 }
 
 // 获取用户的游戏记录
@@ -218,6 +261,12 @@ export function cleanupOldRoomLogs(roomId: string, keepCount: number = 500) {
     `);
     deleteStmt.run(roomId, count - keepCount);
   }
+}
+
+// 通过uuid获取用户信息
+export function getUserByUuid(uuid: string): { username: string; nickname: string; avatar: string; admin: number } | undefined {
+  const stmt = db.prepare("SELECT username, nickname, avatar, admin FROM users WHERE uuid = ?");
+  return stmt.get(uuid) as { username: string; nickname: string; avatar: string; admin: number } | undefined;
 }
 
 export default db;

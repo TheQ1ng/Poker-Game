@@ -9,7 +9,7 @@ import { AllIn, BigBlind, Dealer, SmallBlind } from "./Symbol";
 import { card2html } from "../gamehistory/GameHistory";
 import { soundManager } from "../../utils/soundManager";
 import { BeautifulPokerCard } from "../../components/BeautifulPokerCard";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe, selectRoomChatBubbles, selectSupportedTargetId } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
@@ -180,13 +180,29 @@ export function User({
   const settleDone = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
   const showAsWinner = (winnerPhase || settleDone) && !!user?.isWinner;
   const hideCardsInSettle = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && !showHolePhase && !showMax5Phase && !showAsWinner;
-  const usePhasedSettle = isSettling && totalShowdown > 0;
+  const usePhasedSettle = isSettling && totalShowdown > 0 && !isSettlingCountdown;
   const isOmahaGame = !!(room?.isOmaha || game?.isOmaha);
+
+  const stackBeforeSettleRef = useRef(stack);
+  useEffect(() => {
+    if (!isSettling) {
+      stackBeforeSettleRef.current = user?.stack || 0;
+    }
+  }, [isSettling, user?.stack]);
+  const delaySettleStack =
+    isSettling &&
+    !isSettlingCountdown &&
+    totalShowdown > 0 &&
+    settleRevealStep < 2 * totalShowdown;
+  const displayStack = delaySettleStack ? stackBeforeSettleRef.current : stack;
 
   const chipsRecord = room?.roomid && chipsRecordState?.roomid === room.roomid
     ? chipsRecordState.chipsRecords.find((r) => r.id === id)
     : undefined;
-  const netProfit = chipsRecord != null ? chipsRecord.chips - chipsRecord.buyIn : undefined;
+  const chipsForProfit = delaySettleStack
+    ? displayStack
+    : chipsRecord?.chips ?? displayStack;
+  const netProfit = chipsRecord != null ? chipsForProfit - chipsRecord.buyIn : undefined;
   const stackBarStyle =
     netProfit === undefined
       ? { background: "linear-gradient(135deg, #ffd700 0%, #ff8c00 100%)" as const }
@@ -594,7 +610,7 @@ export function User({
           boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
         }}>
           <span className="coins">🌟</span>
-          <RollingNumber value={stack} style={{ fontSize: "inherit", fontWeight: "inherit" }} />
+          <RollingNumber value={displayStack} style={{ fontSize: "inherit", fontWeight: "inherit" }} />
         </div>
       </div>
       {isActing ? (
@@ -679,21 +695,23 @@ export function User({
               showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe && isWinnerPhase}
             />
           ))}
-          <div
-            className="handstype"
-            style={{
-              ...(handsTypeToShow && handTypeRanks[handsTypeToShow] >= 4 ? {
-                color: '#ffd700',
-                textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
-                animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
-              } : {
-                color: 'white',
-                textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
-              })
-            }}
-          >
-            {handsTypeToShow}
-          </div>
+          {!isSettlingCountdown && (
+            <div
+              className="handstype"
+              style={{
+                ...(handsTypeToShow && handTypeRanks[handsTypeToShow] >= 4 ? {
+                  color: '#ffd700',
+                  textShadow: '0 0 15px rgba(255, 215, 0, 0.8)',
+                  animation: 'handTypeGlow 1.5s ease-in-out infinite alternate'
+                } : {
+                  color: 'white',
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.8)'
+                })
+              }}
+            >
+              {handsTypeToShow}
+            </div>
+          )}
         </div>
       ) : null}
 

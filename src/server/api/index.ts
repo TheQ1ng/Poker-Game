@@ -2,9 +2,10 @@ import Router from "@koa/router";
 import * as jwt from "jsonwebtoken";
 import { secret } from "../config";
 import { createRoom, roomMap, userEnterRoom, userMap, getAllRooms, createUser } from "../service";
-import { getUserProfile, updateUserProfile, saveUser, getUser, isNicknameExists } from "../service/database";
+import { getUserProfile, updateUserProfile, saveUser, getUser, isNicknameExists, getUserByUuid } from "../service/database";
 import db from "../service/database";
 import User from "../service/User";
+import { v4 as uuidv4 } from "uuid";
 
 const router = new Router();
 export default router;
@@ -75,8 +76,16 @@ router.post("/register", (ctx) => {
     // 密码正确，生成token返回
     const token = jwt.sign(name + "@" + password, secret);
     const isAdminValue = existingUser.admin === 1;
+    
+    // 检查并更新uuid
+    if (!existingUser.uuid) {
+      const uuid = uuidv4();
+      updateUserProfile(name, existingUser.nickname || "", finalAvatar, isAdminValue ? 1 : 0, uuid);
+      console.log('[DEBUG] Generated uuid for existing user:', uuid);
+    }
+    
     if (!userMap[token]) {
-      const user = createUser(token, name, finalAvatar);
+      const user = createUser(token, name, finalAvatar, existingUser.uuid);
       user.nickname = existingUser.nickname;
       user.isAdmin = isAdminValue;
     } else {
@@ -85,9 +94,10 @@ router.post("/register", (ctx) => {
       userMap[token].avatar = finalAvatar;
       userMap[token].nickname = existingUser.nickname;
       userMap[token].isAdmin = isAdminValue;
+      userMap[token].uuid = existingUser.uuid;
     }
     ctx.data = { token, isAdmin: isAdminValue };
-    console.log('[DEBUG] Existing user login success, token:', token?.substring(0, 10) + '...', 'isAdmin:', isAdminValue);
+    console.log('[DEBUG] Existing user login success, token:', token?.substring(0, 10) + '...', 'isAdmin:', isAdminValue, 'uuid:', existingUser.uuid);
   } else {
     // 用户不存在，创建新用户并保存到数据库
     let finalAvatar = avatar || "";
@@ -106,12 +116,14 @@ router.post("/register", (ctx) => {
       const randomIndex = Math.floor(Math.random() * defaultAvatars.length);
       finalAvatar = defaultAvatars[randomIndex];
     }
-    saveUser(name, password, "", finalAvatar, 0);
+    // 生成uuid
+    const uuid = uuidv4();
+    saveUser(name, password, "", finalAvatar, 0, uuid);
     const token = jwt.sign(name + "@" + password, secret);
     const user = createUser(token, name, finalAvatar);
     user.isAdmin = false;
     ctx.data = { token, isAdmin: false };
-    console.log('[DEBUG] New user register success, token:', token?.substring(0, 10) + '...');
+    console.log('[DEBUG] New user register success, token:', token?.substring(0, 10) + '...', 'uuid:', uuid);
   }
 });
 
@@ -285,7 +297,7 @@ router.post("/admin/user/update", (ctx) => {
     UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
     WHERE username = ?
   `);
-  stmt.run(nickname, avatar, admin, username);
+  stmt.run(nickname, avatar, admin ? 1 : 0, username);
   ctx.data = { success: true };
 });
 
@@ -385,23 +397,64 @@ router.post("/admin/save-chips-record", (ctx) => {
     db.exec('BEGIN TRANSACTION');
     
     // 插入游戏记录
+    // 从数据库获取用户的uuid
+    const userInfo = getUser(user.name);
+    const userUuid = userInfo?.uuid || user.token;
+    
     const gameRecordStmt = db.prepare(`
-      INSERT INTO game_records (room_id, username, profit, created_at)
-      VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+      INSERT INTO game_records (room_id, username, uuid, profit, created_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
     `);
-    const gameRecordResult = gameRecordStmt.run(roomId, user.name, 0);
+    const gameRecordResult = gameRecordStmt.run(roomId, user.name, userUuid, 0);
     const gameRecordId = gameRecordResult.lastInsertRowid;
     
     // 插入玩家记录
     const playerRecordStmt = db.prepare(`
-      INSERT INTO player_records (game_record_id, username, nickname, chips, buy_in, profit)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO player_records (game_record_id, username, uuid, nickname, chips, buy_in, profit)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     
-    chipsRecords.forEach(record => {
+    // 优先使用服务端房间内存中的积分榜，避免前端缓存或离线玩家导致用户名丢失
+    const recordsToSave =
+      room.chipsRecords.length > 0
+        ? room.chipsRecords.map((cr) => {
+            const mapped = room.userInfoMap?.[cr.token];
+            const username = mapped?.name || cr.name || "未知玩家";
+            const nickname = mapped?.nickname || cr.nickname || username;
+            const profile = getUser(username);
+            return {
+              username,
+              nickname,
+              chips: Number(cr.chips) || 0,
+              buyIn: Number(cr.buyIn) || 0,
+              profit: (Number(cr.chips) || 0) - (Number(cr.buyIn) || 0),
+              playerUuid: profile?.uuid || userMap[cr.token]?.uuid || cr.id || "",
+            };
+          })
+        : chipsRecords.map((record) => {
+            const rawId = String(record.id || "");
+            const mapped = room.userInfoMap?.[rawId];
+            const username = mapped?.name || record.username || "未知玩家";
+            const nickname = mapped?.nickname || record.nickname || username;
+            const profile = getUser(username);
+            return {
+              username,
+              nickname,
+              chips: Number(record.chips) || 0,
+              buyIn: Number(record.buyIn) || 0,
+              profit:
+                Number.isFinite(Number(record.profit))
+                  ? Number(record.profit)
+                  : (Number(record.chips) || 0) - (Number(record.buyIn) || 0),
+              playerUuid: profile?.uuid || rawId,
+            };
+          });
+
+    recordsToSave.forEach((record) => {
       playerRecordStmt.run(
         gameRecordId,
         record.username,
+        record.playerUuid,
         record.nickname,
         record.chips,
         record.buyIn,

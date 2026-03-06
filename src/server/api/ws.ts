@@ -450,6 +450,7 @@ export function publishLog2all(roomid: RoomID, logs: string[]) {
   saveRoomLogs(roomid, logs);
   // 再广播给所有客户端
   send2all(roomid, {
+    roomid,
     logs,
   });
 }

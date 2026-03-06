@@ -41,7 +41,7 @@
   color: #1f1f1f;
 }
 
-/* 滑动区域：只保留最近 200 条，纵向滚动 */
+/* 滑动区域：纵向滚动 */
 .game-history-scroll {
   flex: 1;
   overflow-y: auto;
