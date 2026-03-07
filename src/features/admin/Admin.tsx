@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Layout, Menu, Breadcrumb, Card, Typography } from 'antd';
+import { Layout, Menu, Breadcrumb, Typography } from 'antd';
+import { TeamOutlined, ReadOutlined, DesktopOutlined } from '@ant-design/icons';
 import UserManagement from './UserManagement';
 import GameRecordManagement from './GameRecordManagement';
 import GameProcessManagement from './GameProcessManagement';
+import './admin.css';
 
 const { Header, Content, Sider } = Layout;
 const { Title } = Typography;
@@ -11,24 +13,34 @@ const Admin: React.FC = () => {
   const [activeTab, setActiveTab] = useState('users');
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ background: '#001529', padding: 0, display: 'flex', alignItems: 'center', paddingLeft: 24 }}>
-        <Title level={4} style={{ color: 'white', margin: 0 }}>管理后台</Title>
+    <Layout className="admin-root-layout" style={{ minHeight: '100vh' }}>
+      <Header
+        style={{
+          background: 'linear-gradient(90deg, #001529 0%, #0f2d5c 100%)',
+          padding: '0 24px',
+          display: 'flex',
+          alignItems: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        }}
+      >
+        <Title level={4} style={{ color: 'white', margin: 0 }}>
+          德州后台管理
+        </Title>
       </Header>
       <Layout>
-        <Sider width={200} style={{ background: '#f0f2f5' }}>
+        <Sider width={220} style={{ background: '#fff', borderRight: '1px solid #f0f0f0' }}>
           <Menu
             mode="inline"
             selectedKeys={[activeTab]}
-            style={{ height: '100%', borderRight: 0 }}
+            style={{ height: '100%', borderRight: 0, paddingTop: 12 }}
             onSelect={({ key }) => setActiveTab(key)}
           >
-            <Menu.Item key="users">用户管理</Menu.Item>
-            <Menu.Item key="game-records">游戏记录</Menu.Item>
-            <Menu.Item key="game-processes">游戏进程管理</Menu.Item>
+            <Menu.Item key="users" icon={<TeamOutlined />}>用户管理</Menu.Item>
+            <Menu.Item key="game-records" icon={<ReadOutlined />}>游戏记录</Menu.Item>
+            <Menu.Item key="game-processes" icon={<DesktopOutlined />}>游戏进程管理</Menu.Item>
           </Menu>
         </Sider>
-        <Layout style={{ padding: '0 24px 24px' }}>
+        <Layout style={{ padding: '0 20px 20px' }}>
           <Breadcrumb style={{ margin: '16px 0' }}>
             <Breadcrumb.Item>管理后台</Breadcrumb.Item>
             <Breadcrumb.Item>
@@ -36,7 +48,7 @@ const Admin: React.FC = () => {
                activeTab === 'game-records' ? '游戏记录' : '游戏进程管理'}
             </Breadcrumb.Item>
           </Breadcrumb>
-          <Content style={{ background: 'white', padding: 24, margin: 0, minHeight: 280 }}>
+          <Content style={{ background: '#fff', padding: 20, margin: 0, minHeight: 280, borderRadius: 12 }}>
             {activeTab === 'users' ? <UserManagement /> : 
              activeTab === 'game-records' ? <GameRecordManagement /> : 
              <GameProcessManagement />}

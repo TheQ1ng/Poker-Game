@@ -1,5 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, Switch, message } from 'antd';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Switch,
+  message,
+  Card,
+  Space,
+  Tag,
+  InputNumber,
+  Typography,
+  Avatar,
+  Progress,
+} from 'antd';
+import { EditOutlined, DeleteOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
 
 interface User {
   username: string;
@@ -7,13 +23,18 @@ interface User {
   avatar: string;
   admin: number;
   created_at: string;
+  daily_buyin_used: number;
+  daily_buyin_remaining: number;
+  daily_buyin_day_key: string;
 }
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [modalDailyBuyInUsed, setModalDailyBuyInUsed] = useState(0);
   const [form] = Form.useForm();
 
   // 获取所有用户
@@ -51,7 +72,9 @@ const UserManagement: React.FC = () => {
       nickname: user.nickname,
       avatar: user.avatar,
       admin: user.admin === 1,
+      dailyBuyInUsed: user.daily_buyin_used ?? 0,
     });
+    setModalDailyBuyInUsed(user.daily_buyin_used ?? 0);
     setIsModalVisible(true);
   };
 
@@ -86,6 +109,7 @@ const UserManagement: React.FC = () => {
 
   // 保存编辑
   const handleSave = async () => {
+    setSaving(true);
     try {
       const values = await form.validateFields();
       const response = await fetch('/admin/user/update', {
@@ -99,6 +123,7 @@ const UserManagement: React.FC = () => {
           nickname: values.nickname,
           avatar: values.avatar,
           admin: values.admin ? 1 : 0,
+          dailyBuyInUsed: Number(values.dailyBuyInUsed ?? 0),
         }),
       });
       const data = await response.json();
@@ -112,33 +137,67 @@ const UserManagement: React.FC = () => {
     } catch (error) {
       console.error('Failed to update user:', error);
       message.error('更新用户失败');
+    } finally {
+      setSaving(false);
     }
   };
+
+  const stats = useMemo(() => {
+    const total = users.length;
+    const admins = users.filter((u) => u.admin === 1).length;
+    const exhausted = users.filter((u) => (u.daily_buyin_remaining ?? 0) <= 0).length;
+    return { total, admins, exhausted };
+  }, [users]);
 
   const columns = [
     {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
-    },
-    {
-      title: '昵称',
-      dataIndex: 'nickname',
-      key: 'nickname',
-    },
-    {
-      title: '头像',
-      dataIndex: 'avatar',
-      key: 'avatar',
-      render: (avatar: string) => (
-        <img src={`/static/media/${avatar}`} alt="avatar" style={{ width: 40, height: 40, borderRadius: '50%' }} />
+      render: (_: string, record: User) => (
+        <Space>
+          <Avatar
+            size={38}
+            icon={<UserOutlined />}
+            src={record.avatar ? `/static/media/${record.avatar}` : undefined}
+          />
+          <div>
+            <div style={{ fontWeight: 600 }}>{record.username}</div>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {record.nickname || '未设置昵称'}
+            </Typography.Text>
+          </div>
+        </Space>
       ),
     },
     {
       title: '管理员',
       dataIndex: 'admin',
       key: 'admin',
-      render: (admin: number) => (admin === 1 ? '是' : '否'),
+      render: (admin: number) =>
+        admin === 1 ? <Tag color="gold">管理员</Tag> : <Tag>普通用户</Tag>,
+    },
+    {
+      title: '买入次数',
+      key: 'buyin',
+      render: (_: unknown, record: User) => (
+        <div style={{ minWidth: 150 }}>
+          <Typography.Text style={{ fontSize: 12 }}>
+            已用 {record.daily_buyin_used ?? 0} / 5，剩余 {record.daily_buyin_remaining ?? 0}
+          </Typography.Text>
+          <Progress
+            percent={Math.min(100, Math.round(((record.daily_buyin_used ?? 0) / 5) * 100))}
+            size="small"
+            showInfo={false}
+            status={(record.daily_buyin_remaining ?? 0) <= 0 ? 'exception' : 'active'}
+          />
+        </div>
+      ),
+    },
+    {
+      title: '重置日键',
+      dataIndex: 'daily_buyin_day_key',
+      key: 'daily_buyin_day_key',
     },
     {
       title: '创建时间',
@@ -149,30 +208,73 @@ const UserManagement: React.FC = () => {
       title: '操作',
       key: 'action',
       render: (_: any, record: User) => (
-        <div>
-          <Button type="primary" size="small" onClick={() => handleEdit(record)} style={{ marginRight: 8 }}>
+        <Space>
+          <Button className="admin-action-btn" type="primary" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
-          <Button danger size="small" onClick={() => handleDelete(record.username)} disabled={record.username === 'admin'}>
+          <Button
+            className="admin-action-btn"
+            danger
+            size="small"
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.username)}
+            disabled={record.username === 'admin'}
+          >
             删除
           </Button>
-        </div>
+        </Space>
       ),
     },
   ];
 
   return (
-    <div>
-      <h2>用户管理</h2>
-      <Table columns={columns} dataSource={users} rowKey="username" loading={loading} />
+    <Card
+      className="admin-page-card"
+      bordered={false}
+      style={{ borderRadius: 12 }}
+      title={<Typography.Title level={4} style={{ margin: 0 }}>用户管理</Typography.Title>}
+      extra={
+        <Button className="admin-action-btn" icon={<ReloadOutlined />} onClick={fetchUsers} loading={loading}>
+          刷新
+        </Button>
+      }
+    >
+      <Space size={16} className="admin-stats">
+        <Tag color="blue">总用户：{stats.total}</Tag>
+        <Tag color="gold">管理员：{stats.admins}</Tag>
+        <Tag color={stats.exhausted > 0 ? 'red' : 'green'}>
+          买入耗尽：{stats.exhausted}
+        </Tag>
+      </Space>
+      <Table
+        columns={columns}
+        dataSource={users}
+        rowKey="username"
+        className="admin-table"
+        loading={loading}
+        pagination={{ pageSize: 15, showSizeChanger: true }}
+      />
 
       <Modal
         title={editingUser ? '编辑用户' : '添加用户'}
         visible={isModalVisible}
+        confirmLoading={saving}
+        className="admin-modal"
         onOk={handleSave}
-        onCancel={() => setIsModalVisible(false)}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setModalDailyBuyInUsed(0);
+        }}
       >
-        <Form form={form} layout="vertical">
+        <Form
+          form={form}
+          layout="vertical"
+          onValuesChange={(changedValues) => {
+            if (Object.prototype.hasOwnProperty.call(changedValues, 'dailyBuyInUsed')) {
+              setModalDailyBuyInUsed(Number(changedValues.dailyBuyInUsed || 0));
+            }
+          }}
+        >
           <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
             <Input disabled={!!editingUser} />
           </Form.Item>
@@ -185,9 +287,19 @@ const UserManagement: React.FC = () => {
           <Form.Item name="admin" label="管理员" valuePropName="checked">
             <Switch />
           </Form.Item>
+          <Form.Item
+            name="dailyBuyInUsed"
+            label="今日已用买入次数"
+            rules={[{ required: true, message: '请输入0~5' }]}
+          >
+            <InputNumber min={0} max={5} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Typography.Text type="secondary">
+            剩余买入次数：{Math.max(0, 5 - Number(modalDailyBuyInUsed ?? 0))}
+          </Typography.Text>
         </Form>
       </Modal>
-    </div>
+    </Card>
   );
 };
 

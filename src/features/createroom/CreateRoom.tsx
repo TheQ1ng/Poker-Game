@@ -116,7 +116,7 @@ function CreateRoom() {
   const [redPacketMaxPercent, setRedPacketMaxPercent] = useState(30);
   const [redPacketExpanded, setRedPacketExpanded] = useState(false);
   // 支持功能参数
-  const [supportEnabled, setSupportEnabled] = useState(false);
+  const [supportEnabled, setSupportEnabled] = useState(true);
   const [supportMinPot, setSupportMinPot] = useState(600);
   const [supportMaxPercent, setSupportMaxPercent] = useState(5);
   const [supportExpanded, setSupportExpanded] = useState(false);

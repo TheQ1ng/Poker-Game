@@ -199,9 +199,13 @@ export function User({
   const chipsRecord = room?.roomid && chipsRecordState?.roomid === room.roomid
     ? chipsRecordState.chipsRecords.find((r) => r.id === id)
     : undefined;
+  const chipsRecordOverflow = Number(chipsRecord?.overflow) || 0;
+  const totalChipsForProfit = (Number(chipsRecord?.chips) || 0) + chipsRecordOverflow;
   const chipsForProfit = delaySettleStack
-    ? displayStack
-    : chipsRecord?.chips ?? displayStack;
+    ? displayStack + chipsRecordOverflow
+    : chipsRecord
+      ? totalChipsForProfit
+      : displayStack;
   const netProfit = chipsRecord != null ? chipsForProfit - chipsRecord.buyIn : undefined;
   const stackBarStyle =
     netProfit === undefined

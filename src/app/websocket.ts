@@ -25,6 +25,8 @@ import {
   clearSupportPhase,
   setSupportedTargetId,
   clearSupportedTargetId,
+  setSupportSummary,
+  clearSupportSummary,
 } from "../features/room/roomSlice";
 import { AppThunk } from "./store";
 
@@ -169,6 +171,7 @@ export const connect2server =
             dispatch(setSupportRequests(data.supportRequests));
           }
           if (data.type === "supportPhase") {
+            dispatch(clearSupportSummary());
             dispatch(setSupportPhase({
               isActive: true,
               time: data.time || 15,
@@ -188,13 +191,25 @@ export const connect2server =
           }
           if (data.supportAccepted) {
             const name = data.targetName || "对方";
-            message.success(`${name} 同意了你的支持（支持金额 ${data.amount} 🌟）`);
+            if (data.autoFirst) {
+              message.success(`你第一个支持了 ${name}（${data.amount} 🌟）`);
+            } else {
+              message.success(`${name} 同意了你的支持（支持金额 ${data.amount} 🌟）`);
+            }
             // 记录当前我支持的目标玩家ID，并关闭支持弹窗
             if (data.targetId) {
               dispatch(setSupportedTargetId(data.targetId));
             }
             dispatch(clearSupportRequest());
             dispatch(clearSupportPhase());
+          }
+          if (data.supportConfirmed) {
+            const supporterName = data.supporterName || "有人";
+            if (data.autoFirst) {
+              message.success(`${supporterName} 第一个支持你（${data.amount} 🌟）`);
+            } else {
+              message.info(`${supporterName} 支持了你（${data.amount} 🌟）`);
+            }
           }
           if (data.type === "supportRejected") {
             const name = data.targetName || "对方";
@@ -204,6 +219,13 @@ export const connect2server =
           }
           if (data.type === "supportPhaseEnded") {
             dispatch(clearSupportPhase());
+          }
+          if (data.type === "supportSummary") {
+            dispatch(setSupportSummary({
+              isVisible: true,
+              duration: Math.max(1, Number(data.duration) || 3),
+              details: Array.isArray(data.details) ? data.details : [],
+            }));
           }
           if (data.roomChat) {
             dispatch(setRoomChatBubble({ userId: data.roomChat.userId, text: data.roomChat.message }));
@@ -405,5 +427,19 @@ export function ws_respondSupport(requestId: string, accept: boolean) {
     action: ActionType.RESPOND_SUPPORT,
     requestId,
     accept,
+  });
+}
+
+export function ws_setShortDeck(enable: boolean) {
+  send2server({
+    action: ActionType.SET_SHORT_DECK,
+    enable,
+  });
+}
+
+export function ws_transferRoomOwner(targetUserId: string) {
+  send2server({
+    action: ActionType.TRANSFER_ROOM_OWNER,
+    targetUserId,
   });
 }

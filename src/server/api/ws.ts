@@ -29,6 +29,8 @@ import {
   userOpenRedPacket,
   userRequestSupport,
   userRespondSupport,
+  userSetShortDeck,
+  transferRoomOwner,
 } from "../service";
 import { Token } from "../service/User";
 import Room, { Game, RoomID } from "../service/Room";
@@ -41,7 +43,8 @@ import {
   SimpleSelf,
   SimpleUser,
 } from "../../ApiType";
-import { getUser, saveRoomLogs, getRoomLogs } from "../service/database";
+import { getUser, saveRoomLogs, getRoomLogs, getDailyBuyInState } from "../service/database";
+import { getOverflow, normalizeChipsRecord } from "../service/chips";
 
 export interface PokerWebSocket extends ws {
   name?: string;
@@ -215,6 +218,12 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
     case ActionType.OPEN_RED_PACKET:
       userOpenRedPacket(token);
       return;
+    case ActionType.SET_SHORT_DECK:
+      userSetShortDeck(token, !!data.enable);
+      return;
+    case ActionType.TRANSFER_ROOM_OWNER:
+      transferRoomOwner(token, data.targetUserId);
+      return;
   }
   if (data.action !== ActionType.LEAVE) {
     publish(token, data, ws);
@@ -278,13 +287,17 @@ function getSimpleRoom(room: Room): SimpleRoom {
 function getSimpleChipsRecords(room: Room): SimpleRoomChipsRecords {
   return {
     roomid: room.id,
-    chipsRecords: room.chipsRecords.map((cr) => ({
-      id: cr.id,
-      name: cr.name,
-      nickname: cr.nickname,
-      chips: cr.chips,
-      buyIn: cr.buyIn,
-    })),
+    chipsRecords: room.chipsRecords.map((cr) => {
+      normalizeChipsRecord(cr);
+      return {
+        id: cr.id,
+        name: cr.name,
+        nickname: cr.nickname,
+        chips: cr.chips,
+        overflow: getOverflow(cr),
+        buyIn: cr.buyIn,
+      };
+    }),
   };
 }
 
@@ -333,6 +346,12 @@ function getSimpleGame(game: Game): SimpleGame {
 function getSimpleUser(token: Token): SimpleUser {
   const user = userMap[token];
   const room = roomMap[user.roomid];
+  const dailyState = getDailyBuyInState(user.name);
+  if (dailyState.persisted) {
+    user.dailyBuyInDayKey = dailyState.dayKey;
+    user.dailyBuyInUsed = dailyState.used;
+    user.dailyBuyInRemaining = dailyState.remaining;
+  }
   const hiddenHands = user.hands.map(() => null);
   const publicHands = user.shouldShowHand
     ? user.hands
@@ -367,6 +386,8 @@ function getSimpleUser(token: Token): SimpleUser {
     stack: user.stack - sum(user.bets),
     bet: room.game ? user.bets[room.game.round] : 0,
     addTimeUsed: user.addTimeUsed ?? 0,
+    dailyBuyInUsed: user.dailyBuyInUsed ?? 0,
+    dailyBuyInRemaining: user.dailyBuyInRemaining ?? 5,
   };
 }
 

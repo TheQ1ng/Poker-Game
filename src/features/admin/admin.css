@@ -1,0 +1,57 @@
+.admin-root-layout {
+  background: #f4f7fb;
+}
+
+.admin-page-card {
+  border-radius: 14px;
+  border: 1px solid #e9eef7;
+  box-shadow: 0 8px 24px rgba(21, 65, 146, 0.08);
+  background: #fff;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.admin-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-stats .ant-tag {
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.admin-table .ant-table-thead > tr > th {
+  background: #f5f8ff;
+  color: #1f2d4d;
+  font-weight: 600;
+  border-bottom: 1px solid #dce6fb;
+}
+
+.admin-table .ant-table-tbody > tr > td {
+  border-bottom-color: #edf2fb;
+}
+
+.admin-table .ant-table-tbody > tr:hover > td {
+  background: #f8fbff !important;
+}
+
+.admin-action-btn {
+  border-radius: 8px;
+}
+
+.admin-modal .ant-modal-content {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.admin-modal .ant-modal-header {
+  background: #f7faff;
+}

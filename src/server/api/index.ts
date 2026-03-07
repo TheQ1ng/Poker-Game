@@ -2,13 +2,37 @@ import Router from "@koa/router";
 import * as jwt from "jsonwebtoken";
 import { secret } from "../config";
 import { createRoom, roomMap, userEnterRoom, userMap, getAllRooms, createUser } from "../service";
-import { getUserProfile, updateUserProfile, saveUser, getUser, isNicknameExists, getUserByUuid } from "../service/database";
+import {
+  getUserProfile,
+  updateUserProfile,
+  saveUser,
+  getUser,
+  isNicknameExists,
+  getUserByUuid,
+  getDailyBuyInState,
+  getDailyBuyInDayKey,
+} from "../service/database";
 import db from "../service/database";
 import User from "../service/User";
 import { v4 as uuidv4 } from "uuid";
 
 const router = new Router();
 export default router;
+
+function syncGameRecordProfit(gameRecordId: number) {
+  const sumStmt = db.prepare(`
+    SELECT COALESCE(SUM(profit), 0) AS total_profit
+    FROM player_records
+    WHERE game_record_id = ?
+  `);
+  const row = sumStmt.get(gameRecordId) as { total_profit?: number } | undefined;
+  const totalProfit = Math.floor(Number(row?.total_profit) || 0);
+  db.prepare(`
+    UPDATE game_records
+    SET profit = ?
+    WHERE id = ?
+  `).run(totalProfit, gameRecordId);
+}
 
 router.get("/root", (ctx) => {
   ctx.body = "api root";
@@ -163,7 +187,7 @@ router.post("/createroom", (ctx) => {
     !!isOmaha,
     Number(redPacketThresholdMultiple ?? 1),
     Number(redPacketMaxPercent ?? 30),
-    !!supportEnabled,
+    supportEnabled == null ? true : !!supportEnabled,
     Number(supportMinPot ?? 600),
     Number(supportMaxPercent ?? 5)
   );
@@ -265,8 +289,26 @@ router.get("/admin/users", (ctx) => {
   if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
   
   // 从数据库获取所有用户
-  const stmt = db.prepare("SELECT username, nickname, avatar, admin, created_at FROM users");
-  const users = stmt.all();
+  const stmt = db.prepare(
+    "SELECT username, nickname, avatar, admin, created_at, daily_buyin_used, daily_buyin_day_key FROM users ORDER BY created_at DESC"
+  );
+  const users = (stmt.all() as Array<{
+    username: string;
+    nickname: string;
+    avatar: string;
+    admin: number;
+    created_at: string;
+    daily_buyin_used?: number;
+    daily_buyin_day_key?: string;
+  }>).map((u) => {
+    const state = getDailyBuyInState(u.username);
+    return {
+      ...u,
+      daily_buyin_used: state.used,
+      daily_buyin_remaining: state.remaining,
+      daily_buyin_day_key: state.dayKey,
+    };
+  });
   ctx.data = users;
 });
 
@@ -289,15 +331,59 @@ router.post("/admin/user/update", (ctx) => {
   if (!token) throw "need login";
   if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
   
-  const { username, nickname, avatar, admin } = ctx.request.body;
+  const { username, nickname, avatar, admin, dailyBuyInUsed } = ctx.request.body;
   if (!username) throw "username is required";
-  
-  // 更新用户信息
-  const stmt = db.prepare(`
-    UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
-    WHERE username = ?
-  `);
-  stmt.run(nickname, avatar, admin ? 1 : 0, username);
+
+  const normalizedUsed =
+    dailyBuyInUsed === undefined || dailyBuyInUsed === null
+      ? null
+      : Math.max(0, Math.min(5, Math.floor(Number(dailyBuyInUsed) || 0)));
+
+  // 更新用户信息（支持管理员手动调整每日买入次数）
+  if (normalizedUsed === null) {
+    const stmt = db.prepare(`
+      UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE username = ?
+    `);
+    stmt.run(nickname, avatar, admin ? 1 : 0, username);
+  } else {
+    const stmt = db.prepare(`
+      UPDATE users SET
+        nickname = ?,
+        avatar = ?,
+        admin = ?,
+        daily_buyin_used = ?,
+        daily_buyin_day_key = ?,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE username = ?
+    `);
+    stmt.run(
+      nickname,
+      avatar,
+      admin ? 1 : 0,
+      normalizedUsed,
+      getDailyBuyInDayKey(),
+      username
+    );
+  }
+
+  Object.values(userMap).forEach((onlineUser) => {
+    if (onlineUser.name !== username) return;
+    onlineUser.nickname = nickname;
+    onlineUser.avatar = avatar;
+    onlineUser.isAdmin = !!admin;
+    if (normalizedUsed !== null) {
+      onlineUser.dailyBuyInDayKey = getDailyBuyInDayKey();
+      onlineUser.dailyBuyInUsed = normalizedUsed;
+      onlineUser.dailyBuyInRemaining = Math.max(0, 5 - normalizedUsed);
+    } else {
+      const state = getDailyBuyInState(username);
+      onlineUser.dailyBuyInDayKey = state.dayKey;
+      onlineUser.dailyBuyInUsed = state.used;
+      onlineUser.dailyBuyInRemaining = state.remaining;
+    }
+  });
+
   ctx.data = { success: true };
 });
 
@@ -422,12 +508,13 @@ router.post("/admin/save-chips-record", (ctx) => {
             const username = mapped?.name || cr.name || "未知玩家";
             const nickname = mapped?.nickname || cr.nickname || username;
             const profile = getUser(username);
+            const totalChips = (Number(cr.chips) || 0) + (Number((cr as any).overflow) || 0);
             return {
               username,
               nickname,
-              chips: Number(cr.chips) || 0,
+              chips: totalChips,
               buyIn: Number(cr.buyIn) || 0,
-              profit: (Number(cr.chips) || 0) - (Number(cr.buyIn) || 0),
+              profit: totalChips - (Number(cr.buyIn) || 0),
               playerUuid: profile?.uuid || userMap[cr.token]?.uuid || cr.id || "",
             };
           })
@@ -437,15 +524,16 @@ router.post("/admin/save-chips-record", (ctx) => {
             const username = mapped?.name || record.username || "未知玩家";
             const nickname = mapped?.nickname || record.nickname || username;
             const profile = getUser(username);
+            const totalChips = (Number(record.chips) || 0) + (Number((record as any).overflow) || 0);
             return {
               username,
               nickname,
-              chips: Number(record.chips) || 0,
+              chips: totalChips,
               buyIn: Number(record.buyIn) || 0,
               profit:
                 Number.isFinite(Number(record.profit))
                   ? Number(record.profit)
-                  : (Number(record.chips) || 0) - (Number(record.buyIn) || 0),
+                  : totalChips - (Number(record.buyIn) || 0),
               playerUuid: profile?.uuid || rawId,
             };
           });
@@ -491,6 +579,134 @@ router.get("/admin/game-record/:id/players", (ctx) => {
   const playerRecords = stmt.all(gameRecordId);
   
   ctx.data = playerRecords;
+});
+
+// 管理员接口：新增或编辑玩家记录行
+router.post("/admin/game-record/player/save", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+
+  const { id, gameRecordId, username, nickname, uuid, chips, buyIn, profit } = ctx.request.body;
+  if (!gameRecordId) throw "gameRecordId is required";
+  if (!username) throw "username is required";
+  if (!nickname) throw "nickname is required";
+
+  const normalizedGameRecordId = Math.floor(Number(gameRecordId));
+  const normalizedChips = Math.floor(Number(chips) || 0);
+  const normalizedBuyIn = Math.floor(Number(buyIn) || 0);
+  const normalizedProfit =
+    profit === undefined || profit === null
+      ? normalizedChips - normalizedBuyIn
+      : Math.floor(Number(profit) || 0);
+
+  const profile = getUser(username);
+  const normalizedUuid = String(uuid || profile?.uuid || username);
+
+  const gameRecordExists = db
+    .prepare("SELECT id FROM game_records WHERE id = ?")
+    .get(normalizedGameRecordId) as { id: number } | undefined;
+  if (!gameRecordExists) {
+    throw "game record not found";
+  }
+
+  db.exec("BEGIN TRANSACTION");
+  try {
+    let savedId = 0;
+    if (id) {
+      const normalizedId = Math.floor(Number(id));
+      const updateStmt = db.prepare(`
+        UPDATE player_records
+        SET username = ?, uuid = ?, nickname = ?, chips = ?, buy_in = ?, profit = ?
+        WHERE id = ? AND game_record_id = ?
+      `);
+      const result = updateStmt.run(
+        username,
+        normalizedUuid,
+        nickname,
+        normalizedChips,
+        normalizedBuyIn,
+        normalizedProfit,
+        normalizedId,
+        normalizedGameRecordId
+      );
+      if (result.changes === 0) {
+        throw "player record not found";
+      }
+      savedId = normalizedId;
+    } else {
+      const insertStmt = db.prepare(`
+        INSERT INTO player_records (game_record_id, username, uuid, nickname, chips, buy_in, profit)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `);
+      const result = insertStmt.run(
+        normalizedGameRecordId,
+        username,
+        normalizedUuid,
+        nickname,
+        normalizedChips,
+        normalizedBuyIn,
+        normalizedProfit
+      );
+      savedId = Number(result.lastInsertRowid);
+    }
+
+    syncGameRecordProfit(normalizedGameRecordId);
+    db.exec("COMMIT");
+    ctx.data = { success: true, id: savedId };
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+});
+
+// 管理员接口：删除玩家记录行
+router.post("/admin/game-record/player/delete", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+
+  const { id } = ctx.request.body;
+  if (!id) throw "id is required";
+
+  const normalizedId = Math.floor(Number(id));
+  const row = db
+    .prepare("SELECT game_record_id FROM player_records WHERE id = ?")
+    .get(normalizedId) as { game_record_id: number } | undefined;
+  if (!row) throw "player record not found";
+
+  db.exec("BEGIN TRANSACTION");
+  try {
+    db.prepare("DELETE FROM player_records WHERE id = ?").run(normalizedId);
+    syncGameRecordProfit(row.game_record_id);
+    db.exec("COMMIT");
+    ctx.data = { success: true };
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+});
+
+// 管理员接口：删除整局游戏记录
+router.post("/admin/game-record/delete", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+
+  const { id } = ctx.request.body;
+  if (!id) throw "id is required";
+
+  const normalizedId = Math.floor(Number(id));
+  db.exec("BEGIN TRANSACTION");
+  try {
+    db.prepare("DELETE FROM player_records WHERE game_record_id = ?").run(normalizedId);
+    db.prepare("DELETE FROM game_records WHERE id = ?").run(normalizedId);
+    db.exec("COMMIT");
+    ctx.data = { success: true };
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 });
 
 // 管理员接口：获取汇总积分榜

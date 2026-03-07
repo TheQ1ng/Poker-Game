@@ -16,6 +16,17 @@ import {
 import { logGame } from "../tests/utils";
 import { publish2all, publishLog2all, send2user, send2all } from "../api/ws";
 import { Card } from "../../ApiType";
+import {
+  consumeDailyBuyInAttempt,
+  getDailyBuyInDayKey,
+  getDailyBuyInState,
+} from "./database";
+import {
+  applyTableStackToRecord,
+  applyTotalDelta,
+  getTotalChips,
+  normalizeChipsRecord,
+} from "./chips";
 
 export type RoomID = string;
 export enum GameRound {
@@ -129,6 +140,10 @@ export class Game {
   }
   nextGame() {
     if (!roomMap[this.roomid].isGaming) return;
+    roomMap[this.roomid].autoFallbackToLongDeckIfNeeded();
+    // 配置切换在下一局生效：这里在新一局开始前同步房间配置。
+    this.isShortDeck = !!roomMap[this.roomid].isShortDeck;
+    this.isOmaha = !!roomMap[this.roomid].isOmaha;
     // 若结算阶段期间被额外延长了下一局开始时间，则在时间未到时延后再检查一次
     if (this.nextGameTime && Date.now() < this.nextGameTime - 50) {
       const remain = this.nextGameTime - Date.now();
@@ -179,7 +194,8 @@ export class Game {
     });
     let balance = 0;
     roomMap[this.roomid].chipsRecords.forEach(cr => {
-      balance += cr.buyIn - cr.chips;
+      normalizeChipsRecord(cr);
+      balance += cr.buyIn - getTotalChips(cr);
     });
     console.log(`balance: ${balance}`);
     if (balance !== 0) {
@@ -406,125 +422,171 @@ export class Game {
     });
     // end log
 
-    const crs = roomMap[this.roomid].chipsRecords;
-    const logs: string[] = [];
-
-    const leaderIndex = this.sortedUsers.findIndex(
-      (t) => t === this.roundLeader
-    );
-    const actionOrder = [
-      ...this.sortedUsers.slice(leaderIndex),
-      ...this.sortedUsers.slice(0, leaderIndex),
-    ];
-    const winnerMap: { [x: string]: boolean } = {};
-    ps.forEach((p) => {
-      if (p.isWinner) {
-        winnerMap[p.id] = true;
-      }
-    });
-    let lastWinnerIndex = 0;
-    actionOrder.forEach((t, i) => {
-      if (winnerMap[t]) {
-        lastWinnerIndex = i;
-      }
-    });
-
-    ps.forEach((p) => {
-      const user = userMap[p.id];
-      const profits = p.profits! - subTotal(user.totalBets);
-      user.bets = [0, 0, 0, 0];
-      user.stack += profits;
-      user.profits = profits;
-      user.isWinner = p.isWinner || false;
-      user.maxCards = p.maxCards || [];
-      user.actionName = "";
-      const index = actionOrder.findIndex((t) => t === p.id);
-      user.shouldShowHand =
-        this.round === GameRound.River &&
-        availableUsers.length > 1 &&
-        (!user.isFolded || user.isAllIn);
-
-      let profitText = "";
-      if (profits !== 0) {
-        profitText = `${profits >= 0 ? "win💰" : "lose"} ${profits}`;
-      }
-      logs.push(
-        `${user.nickname || user.name} ${user.shouldShowHand
-          ? `【${user.hands
-            .map((c) => `${c.num}${c.suit}`)
-            .join("")}】${p.maxCards
-              ?.map((c) => `${c.num}${c.suit}`)
-              .join("")} ${user.handsType} `
-          : ""
-        }${profitText}`
-      );
-      if (user.stack < this.smallBlind * 2) {
-        user.isReady = false;
-      }
-    });
-
-    // 处理支持盈利分成：返还公式 = floor(本局赢得筹码数 * 支持金额 / 目标本局总下注)
-    // 当目标盈利时，返还值天然包含支持本金 + 按占比分成。
     const roomForSupport = roomMap[this.roomid];
-    if (roomForSupport.supportRecords.length > 0) {
-      const supportLogs: string[] = [];
+    const crs = roomForSupport.chipsRecords;
+    const settlementRows = ps.map((p) => {
+      const user = userMap[p.id];
+      return {
+        token: p.id,
+        shouldShowHand:
+          this.round === GameRound.River &&
+          availableUsers.length > 1 &&
+          (!user.isFolded || user.isAllIn),
+        maxCards: p.maxCards || [],
+        isWinner: !!p.isWinner,
+        profitDelta: (p.profits || 0) - subTotal(user.totalBets),
+      };
+    });
 
-      roomForSupport.supportRecords.forEach((record) => {
-        const targetUser = userMap[record.targetToken];
-        const supporterUser = userMap[record.supporterToken];
-        if (!targetUser || !supporterUser) return;
+    // 先下发亮牌所需信息；筹码/积分延后到 winner 阶段再更新，避免过早“剧透”。
+    settlementRows.forEach((row) => {
+      const user = userMap[row.token];
+      user.shouldShowHand = row.shouldShowHand;
+      user.maxCards = row.maxCards;
+      user.isWinner = row.isWinner;
+    });
 
-        const potWin = potWinMap[record.targetToken] || 0; // 本局赢得筹码数（含自己的下注）
-        if (!targetUser.isWinner || potWin <= 0) {
-          return;
+    let settlementApplied = false;
+    const applySettlement = () => {
+      if (settlementApplied) return;
+      settlementApplied = true;
+
+      const logs: string[] = [];
+      const baseProfitByToken: { [token: string]: number } = {};
+      const supportNetByToken: { [token: string]: number } = {};
+      const targetSupportReceived: { [token: string]: number } = {};
+      const targetSupportReturned: { [token: string]: number } = {};
+      const supporterSupportInvested: { [token: string]: number } = {};
+      const supporterSupportReturned: { [token: string]: number } = {};
+      settlementRows.forEach((row) => {
+        const user = userMap[row.token];
+        baseProfitByToken[row.token] = row.profitDelta;
+        supportNetByToken[row.token] = 0;
+        targetSupportReceived[row.token] = 0;
+        targetSupportReturned[row.token] = 0;
+        supporterSupportInvested[row.token] = 0;
+        supporterSupportReturned[row.token] = 0;
+        user.bets = [0, 0, 0, 0];
+        user.stack += row.profitDelta;
+        user.actionName = "";
+        if (user.stack < this.smallBlind * 2) {
+          user.isReady = false;
+        }
+      });
+
+      // 处理支持盈利分成：返还公式 = floor(本局赢得筹码数 * 支持金额 / 目标本局总下注)
+      // 当目标盈利时，返还值天然包含支持本金 + 按占比分成。
+      if (roomForSupport.supportRecords.length > 0) {
+        const supportLogs: string[] = [];
+
+        roomForSupport.supportRecords.forEach((record) => {
+          const targetUser = userMap[record.targetToken];
+          const supporterUser = userMap[record.supporterToken];
+          if (!targetUser || !supporterUser) return;
+          if (supportNetByToken[targetUser.token] === undefined) {
+            supportNetByToken[targetUser.token] = 0;
+          }
+          if (supportNetByToken[supporterUser.token] === undefined) {
+            supportNetByToken[supporterUser.token] = 0;
+          }
+
+          const potWin = potWinMap[record.targetToken] || 0; // 本局赢得筹码数（含自己的下注）
+          // 支持阶段已实时转移筹码：支持者 -amount，被支持者 +amount。
+          supportNetByToken[targetUser.token] += record.amount;
+          supportNetByToken[supporterUser.token] -= record.amount;
+          targetSupportReceived[targetUser.token] =
+            (targetSupportReceived[targetUser.token] || 0) + record.amount;
+          supporterSupportInvested[supporterUser.token] =
+            (supporterSupportInvested[supporterUser.token] || 0) + record.amount;
+
+          if (!targetUser.isWinner || potWin <= 0) {
+            return;
+          }
+
+          const denominator = Math.max(1, record.targetTotalBet);
+          const grossReturn = Math.floor((potWin * record.amount) / denominator);
+          const payout = Math.max(0, Math.min(grossReturn, targetUser.stack));
+          if (payout <= 0) {
+            return;
+          }
+
+          // 从目标扣除返还额（本金+分成），返给支持者
+          targetUser.stack -= payout;
+          supporterUser.stack += payout;
+          supportNetByToken[targetUser.token] -= payout;
+          supportNetByToken[supporterUser.token] += payout;
+          targetSupportReturned[targetUser.token] =
+            (targetSupportReturned[targetUser.token] || 0) + payout;
+          supporterSupportReturned[supporterUser.token] =
+            (supporterSupportReturned[supporterUser.token] || 0) + payout;
+
+          const principal = Math.min(record.amount, payout);
+          const share = Math.max(0, payout - principal);
+          supportLogs.push(
+            `${supporterUser.nickname || supporterUser.name} 支持 ${targetUser.nickname || targetUser.name} 返还 ${payout} 🌟（本金${principal} + 分成${share}）`
+          );
+        });
+
+        if (supportLogs.length > 0) {
+          publishLog2all(this.roomid, ["🤝 支持分成:", ...supportLogs]);
         }
 
-        const denominator = Math.max(1, record.targetTotalBet);
-        const grossReturn = Math.floor((potWin * record.amount) / denominator);
-        const payout = Math.max(0, Math.min(grossReturn, targetUser.stack));
-        if (payout <= 0) {
-          return;
+        // 清空支持记录，避免重复处理
+        roomForSupport.supportRecords = [];
+      }
+
+      settlementRows.forEach((row) => {
+        const user = userMap[row.token];
+        const base = baseProfitByToken[row.token] || 0;
+        const supportNet = supportNetByToken[row.token] || 0;
+        const total = base + supportNet;
+        user.profits = total;
+
+        const received = targetSupportReceived[row.token] || 0;
+        const returned = targetSupportReturned[row.token] || 0;
+        const invested = supporterSupportInvested[row.token] || 0;
+        const supporterReturned = supporterSupportReturned[row.token] || 0;
+        const supportInvolved =
+          received > 0 || returned > 0 || invested > 0 || supporterReturned > 0;
+        let profitText = `${total >= 0 ? "win💰" : "lose"} ${total}`;
+        if (supportInvolved) {
+          // 标准化支持字段，便于前端做结构化 UI 渲染（卡片+指标），避免纯文字堆叠。
+          profitText += ` | 支持{base=${base},net=${supportNet},recv=${received},pay=${returned},inv=${invested},back=${supporterReturned},total=${total}}`;
         }
-
-        // 从目标扣除返还额（本金+分成），返给支持者
-        targetUser.stack -= payout;
-        targetUser.profits -= payout;
-        supporterUser.stack += payout;
-        supporterUser.profits += payout;
-
-        const principal = Math.min(record.amount, payout);
-        const share = Math.max(0, payout - principal);
-        supportLogs.push(
-          `${supporterUser.nickname || supporterUser.name} 支持 ${targetUser.nickname || targetUser.name} 返还 ${payout} 🌟（本金${principal} + 分成${share}）`
+        logs.push(
+          `${user.nickname || user.name} ${user.shouldShowHand
+            ? `【${user.hands
+              .map((c) => `${c.num}${c.suit}`)
+              .join("")}】${row.maxCards
+                ?.map((c) => `${c.num}${c.suit}`)
+                .join("")} ${user.handsType} `
+            : ""
+          }${profitText}`
         );
       });
 
-      if (supportLogs.length > 0) {
-        publishLog2all(this.roomid, ["🤝 支持分成:", ...supportLogs]);
-      }
+      // 所有结算逻辑（含支持分成）完成后，再统一同步积分榜
+      crs.forEach((cr) => {
+        const token = this.sortedUsers.find((t) => userMap[t].chipsRecordID === cr.id);
+        if (!token) return;
+        const u = userMap[token];
+        applyTableStackToRecord(cr, u.stack);
+        u.stack = cr.chips;
+      });
 
-      // 清空支持记录，避免重复处理
-      roomForSupport.supportRecords = [];
-    }
+      publishLog2all(this.roomid, logs);
 
-    // 所有结算逻辑（含支持分成）完成后，再统一同步积分榜
-    crs.forEach((cr) => {
-      const token = this.sortedUsers.find((t) => userMap[t].chipsRecordID === cr.id);
-      if (token) {
-        cr.chips = userMap[token].stack;
-      }
-    });
-
-    publishLog2all(this.roomid, logs);
-
-    // just log
-    this.sortedUsers.forEach((t) => {
-      const user = userMap[t];
-      console.log(`${user.token}, Stack: ${user.stack}`);
-    });
-    // end log
+      // just log
+      this.sortedUsers.forEach((t) => {
+        const user = userMap[t];
+        console.log(`${user.token}, Stack: ${user.stack}`);
+      });
+      // end log
+      publish2all(this.roomid);
+    };
 
     if (++this.multiSettleIndex < this.multiSettleTimes) {
+      applySettlement();
       publishLog2all(this.roomid, [`第${this.multiSettleIndex + 1}轮`]);
       // new one
       this.round = this.multiSettleRound;
@@ -552,6 +614,7 @@ export class Game {
     const roomForSettle = roomMap[this.roomid];
     const hasPendingSeeHand = roomForSettle.pendingSeeHandRequests && roomForSettle.pendingSeeHandRequests.length > 0;
     const showdownCount = this.sortedUsers.filter((t) => userMap[t].shouldShowHand).length;
+    const chipApplyDelayMs = showdownCount > 0 ? Math.ceil(showdownCount * 5000) : 0;
     // 前端分阶段展示：每玩家 2*2.5s（两张+五张）+ 胜者阶段 3.5s；胜者动画播完后倒计时再开下一局
     const settleAnimationMs = Math.ceil(showdownCount * 5000 + 3500);
     // 展示胜者后固定 7 秒；有人申请看牌时 12 秒
@@ -559,6 +622,14 @@ export class Game {
     const delay = settleAnimationMs + countdownAfterWinnerMs;
     this.nextGameTime = Date.now() + delay;
     publish2all(this.roomid);
+
+    if (chipApplyDelayMs > 0) {
+      delayTry(() => {
+        applySettlement();
+      }, chipApplyDelayMs);
+    } else {
+      applySettlement();
+    }
     
     if (this.settleAfterRound) {
       // 结算后解散房间
@@ -682,6 +753,7 @@ export class Game {
   endSupportPhase(): void {
     const room = roomMap[this.roomid];
     if (!room.isSupportPhase) return;
+    const supportSummaryDurationMs = 3000;
 
     // 清理定时器
     clearTimeout(room.supportPhaseTimer);
@@ -709,6 +781,62 @@ export class Game {
       acceptedCount: room.supportRecords.length,
     });
 
+    const totalPot = this.sortedUsers.reduce(
+      (sum, t) => sum + userMap[t].bets.reduce((a, b) => a + b, 0),
+      0
+    );
+    const summaryMap: {
+      [targetToken: string]: {
+        targetId: string;
+        targetName: string;
+        targetTotalBet: number;
+        totalSupport: number;
+        estimatedTargetNetIfWin: number;
+        supporters: {
+          supporterId: string;
+          supporterName: string;
+          amount: number;
+          estimatedReturnIfWin: number;
+          estimatedProfitIfWin: number;
+        }[];
+      };
+    } = {};
+
+    room.supportRecords.forEach((record) => {
+      const target = userMap[record.targetToken];
+      const supporter = userMap[record.supporterToken];
+      if (!target || !supporter) return;
+      const denominator = Math.max(1, record.targetTotalBet);
+      const estimatedReturnIfWin = Math.floor((totalPot * record.amount) / denominator);
+      const estimatedProfitIfWin = estimatedReturnIfWin - record.amount;
+      if (!summaryMap[record.targetToken]) {
+        summaryMap[record.targetToken] = {
+          targetId: target.chipsRecordID,
+          targetName: target.nickname || target.name,
+          targetTotalBet: record.targetTotalBet,
+          totalSupport: 0,
+          estimatedTargetNetIfWin: 0,
+          supporters: [],
+        };
+      }
+      summaryMap[record.targetToken].totalSupport += record.amount;
+      summaryMap[record.targetToken].estimatedTargetNetIfWin +=
+        record.amount - estimatedReturnIfWin;
+      summaryMap[record.targetToken].supporters.push({
+        supporterId: supporter.chipsRecordID,
+        supporterName: supporter.nickname || supporter.name,
+        amount: record.amount,
+        estimatedReturnIfWin,
+        estimatedProfitIfWin,
+      });
+    });
+
+    send2all(this.roomid, {
+      type: "supportSummary",
+      duration: Math.floor(supportSummaryDurationMs / 1000),
+      details: Object.values(summaryMap),
+    });
+
     const shouldResumeRunout =
       room.supportPhaseContext === "beforeRunout" && this.round < GameRound.River;
     room.supportPhaseContext = "beforeSettle";
@@ -716,12 +844,14 @@ export class Game {
     if (shouldResumeRunout) {
       delayTry(() => {
         this.nextRound();
-      }, 300);
+      }, supportSummaryDurationMs);
       return;
     }
 
     // 进入正常结算
-    this.settle();
+    delayTry(() => {
+      this.settle();
+    }, supportSummaryDurationMs);
   }
 
   dealCards2User() {
@@ -938,7 +1068,8 @@ type ChipsRecord = {
   token: Token; // user
   name: string;
   nickname: string; // user nickname
-  chips: number; // total chips
+  chips: number; // table chips（封顶 1000）
+  overflow: number; // overflow chips（超出 1000 的部分）
   buyIn: number; // total buy in
 };
 
@@ -1036,7 +1167,7 @@ class Room {
     isOmaha: boolean = false,
     redPacketThresholdMultiple: number = 1,
     redPacketMaxPercent: number = 30,
-    supportEnabled: boolean = false,
+    supportEnabled: boolean = true,
     supportMinPot: number = 600,
     supportMaxPercent: number = 5
   ) {
@@ -1072,6 +1203,7 @@ class Room {
     if (readyUsers.length < 2) {
       throw "至少需要两名玩家准备";
     }
+    this.autoFallbackToLongDeckIfNeeded();
     this.isGaming = true;
     this.pendingSeeHandRequests = [];
     this.pendingSupportRequests = [];
@@ -1116,9 +1248,83 @@ class Room {
     publish2all(this.id);
   }
 
+  autoFallbackToLongDeckIfNeeded(): boolean {
+    if (!this.isShortDeck) return false;
+    const seatedCount = this.users.filter((t) => {
+      const u = userMap[t];
+      return !!u && !u.isSpectator;
+    }).length;
+    if (seatedCount <= 6) return false;
+    this.isShortDeck = false;
+    publishLog2all(this.id, [
+      `🎛️ 在座人数已达 ${seatedCount} 人，系统自动切回长牌（下一局生效）`,
+    ]);
+    publish2all(this.id);
+    return true;
+  }
+
+  private syncRuntimeBuyInState(token: Token) {
+    const user = userMap[token];
+    if (!user) return;
+    const dayKey = getDailyBuyInDayKey();
+    if (user.dailyBuyInDayKey !== dayKey) {
+      user.dailyBuyInDayKey = dayKey;
+      user.dailyBuyInUsed = 0;
+      user.dailyBuyInRemaining = 5;
+      return;
+    }
+    const used = Math.max(0, Math.floor(user.dailyBuyInUsed || 0));
+    user.dailyBuyInUsed = used;
+    user.dailyBuyInRemaining = Math.max(0, 5 - used);
+  }
+
+  private refreshBuyInState(token: Token) {
+    const user = userMap[token];
+    if (!user) return;
+    const dbState = getDailyBuyInState(user.name);
+    if (dbState.persisted) {
+      user.dailyBuyInDayKey = dbState.dayKey;
+      user.dailyBuyInUsed = dbState.used;
+      user.dailyBuyInRemaining = dbState.remaining;
+      return;
+    }
+    this.syncRuntimeBuyInState(token);
+  }
+
+  private consumeBuyInAttempt(token: Token): { isFifth: boolean } {
+    const user = userMap[token];
+    if (!user) {
+      throw "user not found";
+    }
+    try {
+      const dbState = consumeDailyBuyInAttempt(user.name);
+      if (dbState.persisted) {
+        user.dailyBuyInDayKey = dbState.dayKey;
+        user.dailyBuyInUsed = dbState.used;
+        user.dailyBuyInRemaining = dbState.remaining;
+        return { isFifth: dbState.isFifth };
+      }
+    } catch (e) {
+      if (String(e).includes("今日买入次数已用完")) {
+        throw "今日买入次数已用完，洗洗睡吧";
+      }
+      throw e;
+    }
+
+    // 测试环境/未入库用户走内存回退，避免破坏现有流程。
+    this.syncRuntimeBuyInState(token);
+    if (user.dailyBuyInUsed >= 5) {
+      throw "今日买入次数已用完，洗洗睡吧";
+    }
+    user.dailyBuyInUsed += 1;
+    user.dailyBuyInRemaining = Math.max(0, 5 - user.dailyBuyInUsed);
+    return { isFifth: user.dailyBuyInUsed === 5 };
+  }
+
   addUser(token: Token): boolean {
     if (this.users.findIndex((t) => t == token) == -1) {
       this.users.push(token);
+      this.refreshBuyInState(token);
 
       // 存储用户UUID、用户名和昵称的对应关系
       this.userInfoMap[token] = {
@@ -1130,6 +1336,7 @@ class Room {
       const existingRecord = this.chipsRecords.find(cr => cr.name === userMap[token].name);
       
       if (existingRecord) {
+        normalizeChipsRecord(existingRecord);
         // 继承已有记录并更新token
         userMap[token].chipsRecordID = existingRecord.id;
         userMap[token].stack = existingRecord.chips;
@@ -1138,21 +1345,28 @@ class Room {
         existingRecord.nickname = userMap[token].nickname || userMap[token].name;
         console.log(`User ${userMap[token].name} joined with existing chips from leaderboard: ${existingRecord.chips}`);
       } else {
+        const { isFifth } = this.consumeBuyInAttempt(token);
+        const initialChips = Math.max(1, this.buyIn - (isFifth ? 1 : 0));
         // 创建新记录
         const id = uuidv4();
         userMap[token].chipsRecordID = id;
-        userMap[token].stack = this.buyIn;
+        userMap[token].stack = initialChips;
 
         const chipsRecord = {
           id,
           token,
           name: userMap[token].name,
           nickname: userMap[token].nickname || userMap[token].name,
-          chips: this.buyIn,
-          buyIn: this.buyIn,
+          chips: 0,
+          overflow: 0,
+          buyIn: initialChips,
         };
+        applyTotalDelta(chipsRecord, initialChips);
+        userMap[token].stack = chipsRecord.chips;
         this.chipsRecords.push(chipsRecord);
-        console.log(`User ${userMap[token].name} joined with initial chips: ${this.buyIn}`);
+        console.log(
+          `User ${userMap[token].name} joined with initial chips: ${initialChips} (table=${chipsRecord.chips}, overflow=${chipsRecord.overflow})`
+        );
       }
       return true;
     }
@@ -1187,11 +1401,14 @@ class Room {
     if (user.stack > this.reBuyLimit * this.smallBlind * 2) {
       throw "cannot rebuy now";
     }
-    user.stack += this.buyIn;
+    const { isFifth } = this.consumeBuyInAttempt(token);
+    const rebuyChips = Math.max(1, this.buyIn - (isFifth ? 1 : 0));
+    user.stack += rebuyChips;
     this.chipsRecords.forEach((cr) => {
       if (cr.id == user.chipsRecordID) {
-        cr.buyIn += this.buyIn;
-        cr.chips += this.buyIn;
+        cr.buyIn += rebuyChips;
+        applyTableStackToRecord(cr, user.stack);
+        user.stack = cr.chips;
       }
     });
     // 重新初始后自动设置为准备状态

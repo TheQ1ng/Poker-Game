@@ -48,8 +48,13 @@ function acceptSupport(room: Room, supporterToken: string, targetToken: string, 
   });
 }
 
-function sumStacks(tokens: string[]): number {
-  return tokens.reduce((sum, t) => sum + userMap[t].stack, 0);
+function totalAssets(room: Room, token: string): number {
+  const rec = getChipsRecord(room, token);
+  return (Number(userMap[token].stack) || 0) + (Number((rec as any).overflow) || 0);
+}
+
+function sumStacks(room: Room, tokens: string[]): number {
+  return tokens.reduce((sum, t) => sum + totalAssets(room, t), 0);
 }
 
 function getChipsRecord(room: Room, token: string) {
@@ -64,10 +69,20 @@ function getChipsRecord(room: Room, token: string) {
 function settleWithoutTimers(game: Game) {
   const rawSetTimeout = global.setTimeout;
   const rawClearTimeout = global.clearTimeout;
-  (global as any).setTimeout = (() => ({}) as any) as unknown as typeof setTimeout;
+  const queued: Array<{ cb: Function; delay: number }> = [];
+  (global as any).setTimeout = ((cb: Function, delay: number = 0) => {
+    queued.push({ cb, delay: Number(delay) || 0 });
+    return queued.length as any;
+  }) as unknown as typeof setTimeout;
   (global as any).clearTimeout = (() => undefined) as unknown as typeof clearTimeout;
   try {
     game.settle();
+    if (queued.length > 0) {
+      const earliest = Math.min(...queued.map((t) => t.delay));
+      queued
+        .filter((t) => t.delay === earliest)
+        .forEach((t) => t.cb());
+    }
   } finally {
     global.setTimeout = rawSetTimeout;
     global.clearTimeout = rawClearTimeout;
@@ -88,16 +103,16 @@ describe("Support settlement simulation", () => {
     setPlayer("S", { stack: 1000, bet: 100, fold: true, cards: ["9c", "8c"] });
 
     acceptSupport(room, "S", "T", 20);
-    const totalBefore = sumStacks(tokens);
+    const totalBefore = sumStacks(room, tokens);
 
     settleWithoutTimers(game);
 
     // payout = floor(1000 * 20 / 300) = 66
-    assert.equal(userMap["T"].stack, 1654);
+    assert.equal(totalAssets(room, "T"), 1654);
     assert.equal(userMap["S"].stack, 946);
     assert.equal(userMap["A"].stack, 700);
     assert.equal(userMap["B"].stack, 700);
-    assert.equal(sumStacks(tokens), totalBefore);
+    assert.equal(sumStacks(room, tokens), totalBefore);
 
     tokens.forEach((t) => {
       assert.equal(getChipsRecord(room, t).chips, userMap[t].stack);
@@ -115,7 +130,7 @@ describe("Support settlement simulation", () => {
     setPlayer("S", { stack: 300, bet: 100, fold: true, cards: ["4c", "5c"] });
 
     acceptSupport(room, "S", "T", 20);
-    const totalBefore = sumStacks(tokens);
+    const totalBefore = sumStacks(room, tokens);
 
     settleWithoutTimers(game);
 
@@ -124,7 +139,7 @@ describe("Support settlement simulation", () => {
     assert.isAtLeast(userMap["A"].stack, 0);
     assert.isAtLeast(userMap["B"].stack, 0);
     assert.isAtLeast(userMap["S"].stack, 0);
-    assert.equal(sumStacks(tokens), totalBefore);
+    assert.equal(sumStacks(room, tokens), totalBefore);
 
     tokens.forEach((t) => {
       assert.equal(getChipsRecord(room, t).chips, userMap[t].stack);
@@ -144,7 +159,7 @@ describe("Support settlement simulation", () => {
 
     acceptSupport(room, "S1", "T", 17);
     acceptSupport(room, "S2", "T", 19);
-    const totalBefore = sumStacks(tokens);
+    const totalBefore = sumStacks(room, tokens);
 
     settleWithoutTimers(game);
 
@@ -152,8 +167,8 @@ describe("Support settlement simulation", () => {
     // payout2 = floor(1200 * 19 / 333) = 68
     assert.equal(userMap["S1"].stack, 943);
     assert.equal(userMap["S2"].stack, 949);
-    assert.equal(userMap["T"].stack, 1774);
-    assert.equal(sumStacks(tokens), totalBefore);
+    assert.equal(totalAssets(room, "T"), 1774);
+    assert.equal(sumStacks(room, tokens), totalBefore);
 
     tokens.forEach((t) => {
       assert.equal(getChipsRecord(room, t).chips, userMap[t].stack);

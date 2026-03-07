@@ -98,6 +98,15 @@ type ParsedLogLine =
       handType?: string;
       result: "win" | "lose";
       amount: number;
+      support?: {
+        base: number;
+        net: number;
+        recv: number;
+        pay: number;
+        inv: number;
+        back: number;
+        total: number;
+      };
     }
   | {
       kind: "seeHand";
@@ -123,6 +132,78 @@ type ParsedLogLine =
       kind: "plain";
       html: string;
     };
+
+function parseSupportMetrics(raw?: string) {
+  if (!raw) return undefined;
+  const ret = {
+    base: 0,
+    net: 0,
+    recv: 0,
+    pay: 0,
+    inv: 0,
+    back: 0,
+    total: 0,
+  };
+  const pairs = raw.split(",").map((item) => item.trim());
+  pairs.forEach((pair) => {
+    const [k, v] = pair.split("=");
+    if (!k || v == null) return;
+    const n = Number(v);
+    if (!Number.isFinite(n)) return;
+    if (k === "base") ret.base = n;
+    if (k === "net") ret.net = n;
+    if (k === "recv") ret.recv = n;
+    if (k === "pay") ret.pay = n;
+    if (k === "inv") ret.inv = n;
+    if (k === "back") ret.back = n;
+    if (k === "total") ret.total = n;
+  });
+  return ret;
+}
+
+function signedValueByTrend(trend: string, raw: string): number {
+  const n = Math.abs(Number(raw));
+  if (!Number.isFinite(n)) return 0;
+  return trend === "输" ? -n : n;
+}
+
+function parseLegacySupportDetails(raw?: string) {
+  const ret = {
+    recv: 0,
+    pay: 0,
+    inv: 0,
+    back: 0,
+  };
+  if (!raw) return ret;
+  raw
+    .split(/[，,]/)
+    .map((token) => token.trim())
+    .forEach((token) => {
+      const recvMatch = token.match(/^收到支持\s*(-?\d+)$/);
+      if (recvMatch) {
+        ret.recv = Math.abs(Number(recvMatch[1])) || 0;
+        return;
+      }
+      const invMatch = token.match(/^投入\s*(-?\d+)$/);
+      if (invMatch) {
+        ret.inv = Math.abs(Number(invMatch[1])) || 0;
+        return;
+      }
+      const backMatch = token.match(/^返还\s*(-?\d+)$/);
+      if (backMatch) {
+        ret.back = Math.abs(Number(backMatch[1])) || 0;
+      }
+    });
+  return ret;
+}
+
+function isSettleLineText(text: string): boolean {
+  return (
+    text.includes("win💰") ||
+    (text.includes("lose") && !text.includes("Fold")) ||
+    /原[赢输]\s*-?\d+.*总[赢输]\s*-?\d+/.test(text)
+  );
+}
 
 function parseLogLine(line: string): ParsedLogLine {
   const trimmed = line.trim();
@@ -161,9 +242,10 @@ function parseLogLine(line: string): ParsedLogLine {
   }
 
   const settleMatch = trimmed.match(
-    /^(.+?)\s+(?:【([0-9cdhs]+)】([0-9cdhs]+)\s+(.+?)\s+)?(win💰|lose)\s+(-?\d+)$/
+    /^(.+?)\s+(?:【([0-9cdhs]+)】([0-9cdhs]+)(?:\s+(.+?))?\s+)?(win💰|lose)\s+(-?\d+)(?:\s+\|\s+支持\{([^}]+)\})?$/
   );
   if (settleMatch) {
+    const support = parseSupportMetrics(settleMatch[7]);
     return {
       kind: "settle",
       player: settleMatch[1],
@@ -172,6 +254,42 @@ function parseLogLine(line: string): ParsedLogLine {
       handType: settleMatch[4],
       result: settleMatch[5] === "win💰" ? "win" : "lose",
       amount: Number(settleMatch[6]),
+      support,
+    };
+  }
+
+  const legacySettleMatch = trimmed.match(
+    /^(.+?)\s+(?:【([0-9cdhs]+)】([0-9cdhs]+)(?:\s+(.+?))?\s+)?原(赢|输)\s*(-?\d+)(?:[，,]\s*支持环节(赢|输|返还)\s*(-?\d+)(?:（([^）]+)）)?)?[，,]\s*总(赢|输)\s*(-?\d+)$/
+  );
+  if (legacySettleMatch) {
+    const base = signedValueByTrend(legacySettleMatch[5], legacySettleMatch[6]);
+    const total = signedValueByTrend(legacySettleMatch[10], legacySettleMatch[11]);
+    const supportAction = legacySettleMatch[7];
+    const supportValueRaw = legacySettleMatch[8];
+    const supportDetails = parseLegacySupportDetails(legacySettleMatch[9]);
+    let support;
+    if (supportAction && supportValueRaw != null) {
+      const abs = Math.abs(Number(supportValueRaw)) || 0;
+      const net = supportAction === "输" ? -abs : supportAction === "返还" ? -abs : abs;
+      support = {
+        base,
+        net,
+        recv: supportDetails.recv,
+        pay: supportAction === "返还" ? abs : 0,
+        inv: supportDetails.inv,
+        back: supportDetails.back,
+        total,
+      };
+    }
+    return {
+      kind: "settle",
+      player: legacySettleMatch[1],
+      holeCards: legacySettleMatch[2] ? parseCompactCards(legacySettleMatch[2]) : [],
+      bestCards: legacySettleMatch[3] ? parseCompactCards(legacySettleMatch[3]) : [],
+      handType: legacySettleMatch[4],
+      result: legacySettleMatch[10] === "赢" ? "win" : "lose",
+      amount: total,
+      support,
     };
   }
 
@@ -296,7 +414,7 @@ function groupLogsByFlow(logs: string[]): LogBlock[] {
       continue;
     }
 
-    const isSettle = t.includes("win💰") || (t.includes("lose") && !t.includes("Fold"));
+    const isSettle = isSettleLineText(t);
     const isSeeHand = /支付.*查看了.*手牌/.test(t);
     if (isSettle || isSeeHand) {
       pushCurrent();
@@ -304,7 +422,7 @@ function groupLogsByFlow(logs: string[]): LogBlock[] {
       i++;
       while (i < logs.length) {
         const next = logs[i].trim();
-        const nextSettle = next.includes("win💰") || (next.includes("lose") && !next.includes("Fold"));
+        const nextSettle = isSettleLineText(next);
         const nextSeeHand = /支付.*查看了.*手牌/.test(next);
         if (nextSettle || nextSeeHand) {
           settleLines.push(logs[i]);
@@ -340,6 +458,8 @@ function groupLogsByFlow(logs: string[]): LogBlock[] {
 
 function BlockRow({ line }: { line: string }) {
   const parsed = parseLogLine(line);
+  const valueText = (n: number) => `${n >= 0 ? "+" : "-"}${Math.abs(n)}`;
+  const trendClass = (n: number) => (n > 0 ? "gh-support-pos" : n < 0 ? "gh-support-neg" : "gh-support-zero");
   if (parsed.kind === "street") {
     return (
       <div className="game-history-line game-history-line-street">
@@ -400,6 +520,35 @@ function BlockRow({ line }: { line: string }) {
               </div>
             )}
             {parsed.handType && <span className="gh-handtype">{parsed.handType}</span>}
+          </div>
+        )}
+        {parsed.support && (
+          <div className="gh-support-panel">
+            <div className="gh-support-metrics">
+              <span className={`gh-support-chip ${trendClass(parsed.support.base)}`}>
+                原局 {valueText(parsed.support.base)}
+              </span>
+              <span className={`gh-support-chip ${trendClass(parsed.support.net)}`}>
+                支持 {valueText(parsed.support.net)}
+              </span>
+              <span className={`gh-support-chip gh-support-total ${trendClass(parsed.support.total)}`}>
+                总计 {valueText(parsed.support.total)}
+              </span>
+            </div>
+            <div className="gh-support-details">
+              {parsed.support.recv > 0 && (
+                <span className="gh-support-detail">收到支持 +{parsed.support.recv}</span>
+              )}
+              {parsed.support.pay > 0 && (
+                <span className="gh-support-detail">返还支持 -{parsed.support.pay}</span>
+              )}
+              {parsed.support.inv > 0 && (
+                <span className="gh-support-detail">投入支持 -{parsed.support.inv}</span>
+              )}
+              {parsed.support.back > 0 && (
+                <span className="gh-support-detail">返还到账 +{parsed.support.back}</span>
+              )}
+            </div>
           </div>
         )}
       </div>

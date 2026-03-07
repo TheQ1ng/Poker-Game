@@ -64,11 +64,18 @@ build_project() {
     
     cd $PROJECT_DIR
     
-    # 安装依赖
-    npm install --production
+    # 先安装完整依赖用于构建（含 TypeScript 类型与构建工具）
+    if [ -f package-lock.json ]; then
+        npm ci
+    else
+        npm install
+    fi
     
     # 构建
     npm run build
+
+    # 构建后裁剪为运行时依赖
+    npm prune --omit=dev
     
     echo -e "${GREEN}✓ 构建完成${NC}"
 }
@@ -126,4 +133,3 @@ main() {
 }
 
 main "$@"
-

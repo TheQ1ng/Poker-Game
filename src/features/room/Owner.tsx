@@ -156,9 +156,14 @@ export function Owner({
     totalShowdown > 0 &&
     settleRevealStep < 2 * totalShowdown;
   const displayStack = delaySettleStack ? stackBeforeSettleRef.current : stack;
+  const chipsRecordOverflowSelf = Number(chipsRecordSelf?.overflow) || 0;
+  const totalChipsForProfitSelf =
+    (Number(chipsRecordSelf?.chips) || 0) + chipsRecordOverflowSelf;
   const chipsForProfit = delaySettleStack
-    ? displayStack
-    : chipsRecordSelf?.chips ?? displayStack;
+    ? displayStack + chipsRecordOverflowSelf
+    : chipsRecordSelf
+      ? totalChipsForProfitSelf
+      : displayStack;
   const netProfitSelf =
     chipsRecordSelf != null ? chipsForProfit - chipsRecordSelf.buyIn : undefined;
   const stackBarStyleSelf =
@@ -176,6 +181,19 @@ export function Owner({
   const pots = game?.pots || 0;
   const bb = game?.bb || 0;
   const reBuyLimit = game?.reBuyLimit || 1;
+  const dailyBuyInUsed = self?.dailyBuyInUsed ?? 0;
+  const dailyBuyInRemaining = self?.dailyBuyInRemaining ?? 5;
+  const nextBuyInNo = dailyBuyInUsed + 1;
+  const nextRebuyLabel =
+    nextBuyInNo <= 2
+      ? "东山再起"
+      : nextBuyInNo === 3
+        ? "西山再起"
+        : nextBuyInNo === 4
+          ? "南山再起"
+        : nextBuyInNo === 5
+            ? "北山再起"
+            : "洗洗睡吧";
 
   const myShowdownIndex = totalShowdown > 0 && self?.id ? showdownOrder.indexOf(self.id) : -1;
   const showHolePhase = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && settleRevealStep === myShowdownIndex * 2;
@@ -192,6 +210,9 @@ export function Owner({
   // 获取头像
   const avatar = localStorage.getItem("avatar") || "";
   const bet = self?.bet || 0;
+  const showRebuyButton =
+    stack + bet < reBuyLimit * bb && (game?.isSettling || !self?.isInCurrentGame || self.isFoled);
+  const canRebuyNow = showRebuyButton && dailyBuyInRemaining > 0;
   const isActing = self?.isActing || false;
   const isWaiting =
     !self?.isActing &&
@@ -596,11 +617,18 @@ export function Owner({
             <span className="coins">🌟</span>
             <RollingNumber value={displayStack} style={{ fontSize: "12px", fontWeight: "bold" }} />
           </div>
-          {stack + bet < reBuyLimit * bb &&
-          (game?.isSettling || !self?.isInCurrentGame || self.isFoled) ? (
-            <Button type="primary" onClick={() => ws_userRebuy()}>
-              东山再起
-            </Button>
+          {showRebuyButton ? (
+            <Tooltip title={`今日剩余买入次数：${dailyBuyInRemaining}/5（北京时间12点重置）`}>
+              <Button
+                type="primary"
+                disabled={!canRebuyNow}
+                onClick={() => {
+                  if (canRebuyNow) ws_userRebuy();
+                }}
+              >
+                {canRebuyNow ? nextRebuyLabel : "洗洗睡吧"}
+              </Button>
+            </Tooltip>
           ) : null}
           {(() => {
             if (isSettlingCountdown && self?.id) {

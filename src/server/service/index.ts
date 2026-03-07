@@ -1,8 +1,25 @@
 import User, { Token } from "./User";
 import Room, { RoomID, RoomRedPacket } from "./Room";
 import { PokerWebSocket, publishLog2all, send2all, send2user, publish2all } from "../api/ws";
-import { getUser, saveUser, getUserProfile, updateUserProfile, initDatabase, getRoomLogs } from "./database";
+import {
+  getUser,
+  saveUser,
+  getUserProfile,
+  updateUserProfile,
+  initDatabase,
+  getRoomLogs,
+  getDailyBuyInState,
+} from "./database";
 import { v4 as uuidv4 } from "uuid";
+import {
+  applyTableStackToRecord,
+  applyTotalDelta,
+  getProfitCapTotal,
+  getRecordProfit,
+  getTotalChips,
+  normalizeChipsRecord,
+  SETTLE_PROFIT_CAP,
+} from "./chips";
 const RED_PACKET_WAIT_MS = 5000;
 const RED_PACKET_RESULT_MS = 3000;
 const RED_PACKET_FLOW_MS = RED_PACKET_WAIT_MS + RED_PACKET_RESULT_MS;
@@ -42,16 +59,23 @@ export function createUser(token: Token, name: string, avatar: string, uuid: str
   if (!token || !name) {
     throw "should have token & name";
   }
+  const dailyState = getDailyBuyInState(name);
   // 如果用户已经存在，返回现有的用户对象
   if (userMap[token]) {
     // 更新用户信息
     userMap[token].name = name;
     userMap[token].avatar = avatar;
     userMap[token].uuid = uuid;
+    userMap[token].dailyBuyInDayKey = dailyState.dayKey;
+    userMap[token].dailyBuyInUsed = dailyState.used;
+    userMap[token].dailyBuyInRemaining = dailyState.remaining;
     return userMap[token];
   }
   // 创建新用户
   const user = new User(token, name, avatar, uuid);
+  user.dailyBuyInDayKey = dailyState.dayKey;
+  user.dailyBuyInUsed = dailyState.used;
+  user.dailyBuyInRemaining = dailyState.remaining;
   userMap[token] = user;
   return user;
 }
@@ -75,7 +99,10 @@ export function getAllRooms(): Array<{
     maxPlayers: 12, // 房间最大人数上限 12 人
     ownerName:
       room.users.length > 0
-        ? userMap[room.users[0]]?.name || "未知"
+        ? (() => {
+          const ownerToken = room.users.find((t) => userMap[t]?.isRoomOwner);
+          return ownerToken ? userMap[ownerToken]?.name || "未知" : "未知";
+        })()
         : "未知",
     isShortDeck: !!room.isShortDeck,
     isOmaha: !!room.isOmaha,
@@ -93,7 +120,7 @@ export function createRoom(
   isOmaha: boolean = false,
   redPacketThresholdMultiple: number = 1,
   redPacketMaxPercent: number = 30,
-  supportEnabled: boolean = false,
+  supportEnabled: boolean = true,
   supportMinPot: number = 600,
   supportMaxPercent: number = 5
 ): Room {
@@ -125,23 +152,109 @@ function calcUserProfit(room: Room, token: Token): { profit: number; recordBuyIn
   if (!record) {
     throw "积分记录不存在";
   }
-  const currentChips = user.leftStack();
-  return { profit: currentChips - record.buyIn, recordBuyIn: record.buyIn };
+  normalizeChipsRecord(record);
+  return { profit: getRecordProfit(record), recordBuyIn: record.buyIn };
 }
 
-function splitLuckyAmount(totalAmount: number, count: number): number[] {
+function syncUserStackFromRecord(user: User, record: { chips: number }) {
+  const invested = user.bets.reduce((a, b) => a + b, 0);
+  user.stack = Math.max(invested, record.chips + invested);
+}
+
+function addToUserRecordTotal(
+  room: Room,
+  user: User,
+  delta: number,
+  options?: { preferOverflowOnNegative?: boolean }
+): { totalAfter: number } {
+  const record = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
+  if (!record) throw "积分记录不存在";
+  normalizeChipsRecord(record);
+  const totalAfter = applyTotalDelta(record, delta, options);
+  syncUserStackFromRecord(user, record);
+  return { totalAfter };
+}
+
+function splitLuckyAmount(totalAmount: number, count: number, allowZero = false): number[] {
   if (count <= 0) return [];
+  if (totalAmount <= 0) return new Array(count).fill(0);
   if (count === 1) return [totalAmount];
-  const cuts = new Set<number>();
-  while (cuts.size < count - 1) {
-    cuts.add(Math.floor(Math.random() * (totalAmount - 1)) + 1);
+
+  // 普通拼手气红包：每人至少 1；系统红包可允许 0（总额可能小于人数）。
+  if (!allowZero) {
+    if (totalAmount < count) {
+      return [];
+    }
+    const cuts = new Set<number>();
+    while (cuts.size < count - 1) {
+      cuts.add(Math.floor(Math.random() * (totalAmount - 1)) + 1);
+    }
+    const sorted = [0, ...Array.from(cuts).sort((a, b) => a - b), totalAmount];
+    const ret: number[] = [];
+    for (let i = 1; i < sorted.length; i++) {
+      ret.push(sorted[i] - sorted[i - 1]);
+    }
+    return ret;
   }
-  const sorted = [0, ...Array.from(cuts).sort((a, b) => a - b), totalAmount];
+
+  const cuts = new Array(count - 1)
+    .fill(0)
+    .map(() => Math.floor(Math.random() * (totalAmount + 1)));
+  const sorted = [0, ...cuts.sort((a, b) => a - b), totalAmount];
   const ret: number[] = [];
   for (let i = 1; i < sorted.length; i++) {
     ret.push(sorted[i] - sorted[i - 1]);
   }
   return ret;
+}
+
+function startLuckyRedPacket(
+  room: Room,
+  senderToken: Token,
+  senderName: string,
+  totalAmount: number,
+  recipients: Token[],
+  splits: number[],
+  logText: string
+) {
+  const now = Date.now();
+  const pausedNextGameRemainMs =
+    room.game?.nextGameTime && room.game.nextGameTime > now
+      ? room.game.nextGameTime - now
+      : 0;
+  if (pausedNextGameRemainMs > 0 && room.game) {
+    room.game.nextGameTime += RED_PACKET_FLOW_MS;
+  }
+
+  const packet: RoomRedPacket = {
+    id: uuidv4(),
+    status: "waiting",
+    senderToken,
+    senderName,
+    totalAmount,
+    pausedNextGameRemainMs,
+    recipients: recipients.map((t, idx) => ({
+      token: t,
+      amount: Math.max(0, Math.floor(splits[idx] || 0)),
+      opened: false,
+      openedAt: 0,
+      autoOpened: false,
+    })),
+    openDeadline: now + RED_PACKET_WAIT_MS,
+    resultDeadline: 0,
+    luckiestToken: "",
+  };
+  room.activeRedPacket = packet;
+  clearTimeout(room.redPacketOpenTimer);
+  clearTimeout(room.redPacketResultTimer);
+  room.redPacketOpenTimer = setTimeout(() => {
+    const r = roomMap[room.id];
+    if (!r || !r.activeRedPacket || r.activeRedPacket.id !== packet.id) return;
+    settleWaitingRedPacket(r, true);
+  }, RED_PACKET_WAIT_MS);
+
+  publishLog2all(room.id, [logText]);
+  publish2all(room.id);
 }
 
 function clearRoomRedPacket(room: Room) {
@@ -179,13 +292,10 @@ function settleWaitingRedPacket(room: Room, autoOpenRemaining: boolean) {
       if (entry.opened) return;
       const receiver = userMap[entry.token];
       if (!receiver) return;
-      const record = room.chipsRecords.find((cr) => cr.id === receiver.chipsRecordID);
-      if (!record) return;
       entry.opened = true;
       entry.openedAt = Date.now();
       entry.autoOpened = true;
-      receiver.stack += entry.amount;
-      record.chips += entry.amount;
+      addToUserRecordTotal(room, receiver, entry.amount);
     });
   }
 
@@ -244,57 +354,26 @@ export function userSendRedPacket(token: Token, amount: number) {
   if (!Number.isInteger(amount) || amount < minAmount || amount > maxAmount) {
     throw `红包金额范围为 ${minAmount} ~ ${maxAmount}`;
   }
-  if (user.leftStack() < amount) {
+  const senderRecord = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
+  if (!senderRecord) throw "积分记录不存在";
+  normalizeChipsRecord(senderRecord);
+  if (getTotalChips(senderRecord) < amount) {
     throw "筹码不足，无法发红包";
   }
 
-  const senderRecord = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
-  if (!senderRecord) throw "积分记录不存在";
-  user.stack -= amount;
-  senderRecord.chips -= amount;
+  addToUserRecordTotal(room, user, -amount, { preferOverflowOnNegative: true });
 
-  const splits = splitLuckyAmount(amount, underwaterTokens.length);
+  const splits = splitLuckyAmount(amount, underwaterTokens.length, false);
   const senderName = user.nickname || user.name;
-  const now = Date.now();
-  const pausedNextGameRemainMs =
-    room.game.nextGameTime && room.game.nextGameTime > now
-      ? room.game.nextGameTime - now
-      : 0;
-  if (pausedNextGameRemainMs > 0) {
-    room.game.nextGameTime += RED_PACKET_FLOW_MS;
-  }
-
-  const packet: RoomRedPacket = {
-    id: uuidv4(),
-    status: "waiting",
-    senderToken: token,
+  startLuckyRedPacket(
+    room,
+    token,
     senderName,
-    totalAmount: amount,
-    pausedNextGameRemainMs,
-    recipients: underwaterTokens.map((t, idx) => ({
-      token: t,
-      amount: splits[idx],
-      opened: false,
-      openedAt: 0,
-      autoOpened: false,
-    })),
-    openDeadline: now + RED_PACKET_WAIT_MS,
-    resultDeadline: 0,
-    luckiestToken: "",
-  };
-  room.activeRedPacket = packet;
-  clearTimeout(room.redPacketOpenTimer);
-  clearTimeout(room.redPacketResultTimer);
-  room.redPacketOpenTimer = setTimeout(() => {
-    const r = roomMap[room.id];
-    if (!r || !r.activeRedPacket || r.activeRedPacket.id !== packet.id) return;
-    settleWaitingRedPacket(r, true);
-  }, RED_PACKET_WAIT_MS);
-
-  publishLog2all(room.id, [
-    `🧧 ${senderName} 发了一个拼手气红包（${amount} 筹码）`,
-  ]);
-  publish2all(room.id);
+    amount,
+    underwaterTokens,
+    splits,
+    `🧧 ${senderName} 发了一个拼手气红包（${amount} 筹码）`
+  );
 }
 
 export function userOpenRedPacket(token: Token) {
@@ -318,14 +397,10 @@ export function userOpenRedPacket(token: Token) {
   if (entry.opened) {
     return;
   }
-  const record = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
-  if (!record) throw "积分记录不存在";
-
   entry.opened = true;
   entry.openedAt = Date.now();
   entry.autoOpened = false;
-  user.stack += entry.amount;
-  record.chips += entry.amount;
+  addToUserRecordTotal(room, user, entry.amount);
 
   settleWaitingRedPacket(room, false);
 }
@@ -400,6 +475,72 @@ export function startGame(token: Token) {
 export function pauseGame(token: Token) {
   const roomid = userMap[token].roomid;
   return roomMap[roomid].pauseGame(token);
+}
+
+export function userSetShortDeck(token: Token, enable: boolean) {
+  const user = userMap[token];
+  if (!user || !user.roomid) {
+    throw "not in any room";
+  }
+  const room = roomMap[user.roomid];
+  if (!room) {
+    throw "房间不存在";
+  }
+  if (!user.isRoomOwner) {
+    throw "只有房主可以切换长短牌";
+  }
+  if (room.isOmaha) {
+    throw "奥马哈模式下不可切换短牌";
+  }
+  const nextEnable = !!enable;
+  if (nextEnable) {
+    const seatedCount = room.users.filter((t) => {
+      const u = userMap[t];
+      return !!u && !u.isSpectator;
+    }).length;
+    if (seatedCount >= 7) {
+      throw "人数达到 7 人及以上时不可切换短牌";
+    }
+  }
+  if (room.isShortDeck === nextEnable) {
+    return;
+  }
+  room.isShortDeck = nextEnable;
+  publishLog2all(room.id, [
+    `🎛️ 房主已切换为${nextEnable ? "短牌" : "长牌"}模式（下一局生效）`,
+  ]);
+  publish2all(room.id);
+}
+
+export function transferRoomOwner(token: Token, targetUserId: string) {
+  const user = userMap[token];
+  if (!user || !user.roomid) {
+    throw "not in any room";
+  }
+  if (!user.isRoomOwner) {
+    throw "只有房主可以转移房主身份";
+  }
+  const room = roomMap[user.roomid];
+  if (!room) {
+    throw "房间不存在";
+  }
+  const targetToken = room.users.find((t) => userMap[t]?.chipsRecordID === targetUserId);
+  if (!targetToken) {
+    throw "目标玩家不在房间内";
+  }
+  if (targetToken === token) {
+    throw "不能转移给自己";
+  }
+  const targetUser = userMap[targetToken];
+  if (!targetUser) {
+    throw "目标玩家不存在";
+  }
+  user.isRoomOwner = false;
+  targetUser.isRoomOwner = true;
+  publishLog2all(room.id, [
+    `👑 房主已由 ${user.nickname || user.name} 移交给 ${targetUser.nickname || targetUser.name}`,
+  ]);
+  publish2all(room.id);
 }
 
 export function userReady(token: Token) {
@@ -641,10 +782,12 @@ export function userRespondSeeHand(token: Token, requestId: string, accept: bool
   targetUser.stack += chips;
   room.chipsRecords.forEach((cr) => {
     if (cr.id === requester.chipsRecordID) {
-      cr.chips = requester.stack;
+      applyTableStackToRecord(cr, requester.stack);
+      syncUserStackFromRecord(requester, cr);
     }
     if (cr.id === targetUser.chipsRecordID) {
-      cr.chips = targetUser.stack;
+      applyTableStackToRecord(cr, targetUser.stack);
+      syncUserStackFromRecord(targetUser, cr);
     }
   });
 
@@ -679,6 +822,114 @@ function sendSeeHandRequestsToTarget(room: Room, targetToken: Token) {
   send2user(targetToken, { seeHandRequests: list });
 }
 
+type PendingSupportRequest = {
+  requestId: string;
+  supporterToken: Token;
+  targetToken: Token;
+  amount: number;
+};
+
+function acceptSupportRequest(
+  room: Room,
+  pending: PendingSupportRequest,
+  options?: { autoFirst?: boolean }
+) {
+  const roomid = room.id;
+  const supporter = userMap[pending.supporterToken];
+  const targetUser = userMap[pending.targetToken];
+  const amount = pending.amount;
+  if (!supporter || !targetUser) {
+    throw "玩家状态异常";
+  }
+  if (!supporter.isFolded || !supporter.isInCurrentGame) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: targetUser.chipsRecordID,
+      targetName: targetUser.nickname || targetUser.name,
+      requestId: pending.requestId,
+      reason: "支持者状态已变化",
+    });
+    sendSupportRequestsToTarget(room, pending.targetToken);
+    return;
+  }
+  if (targetUser.isFolded || !targetUser.isInCurrentGame) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: targetUser.chipsRecordID,
+      targetName: targetUser.nickname || targetUser.name,
+      requestId: pending.requestId,
+      reason: "目标玩家状态已变化",
+    });
+    sendSupportRequestsToTarget(room, pending.targetToken);
+    return;
+  }
+
+  const supporterStack = supporter.stack - supporter.bets.reduce((a, b) => a + b, 0);
+  if (supporterStack < amount) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: targetUser.chipsRecordID,
+      targetName: targetUser.nickname || targetUser.name,
+      requestId: pending.requestId,
+      reason: "支持者余额不足",
+    });
+    sendSupportRequestsToTarget(room, pending.targetToken);
+    return;
+  }
+
+  supporter.stack -= amount;
+  targetUser.stack += amount;
+
+  const targetTotalBet = targetUser.bets.reduce((a, b) => a + b, 0);
+  if (targetTotalBet <= 0) {
+    send2user(pending.supporterToken, {
+      supportDeclined: true,
+      targetId: targetUser.chipsRecordID,
+      targetName: targetUser.nickname || targetUser.name,
+      requestId: pending.requestId,
+      reason: "目标下注信息异常",
+    });
+    supporter.stack += amount;
+    targetUser.stack -= amount;
+    sendSupportRequestsToTarget(room, pending.targetToken);
+    return;
+  }
+  const sharePercent = amount / targetTotalBet;
+
+  room.supportRecords.push({
+    supporterToken: pending.supporterToken,
+    targetToken: pending.targetToken,
+    amount,
+    targetTotalBet,
+  });
+
+  const autoFirst = !!options?.autoFirst;
+  send2user(pending.supporterToken, {
+    supportAccepted: true,
+    targetId: targetUser.chipsRecordID,
+    targetName: targetUser.nickname || targetUser.name,
+    amount,
+    sharePercent: Math.round(sharePercent * 10000) / 100,
+    autoFirst,
+  });
+
+  send2user(pending.targetToken, {
+    supportConfirmed: true,
+    supporterId: supporter.chipsRecordID,
+    supporterName: supporter.nickname || supporter.name,
+    amount,
+    newStack: targetUser.stack,
+    autoFirst,
+  });
+
+  publishLog2all(roomid, [
+    autoFirst
+      ? `${supporter.nickname || supporter.name} 第一个支持 ${targetUser.nickname || targetUser.name} ${amount} 🌟（免同意）`
+      : `${supporter.nickname || supporter.name} 支持 ${targetUser.nickname || targetUser.name} ${amount} 🌟`,
+  ]);
+  sendSupportRequestsToTarget(room, pending.targetToken);
+}
+
 /**
  * 弃牌玩家申请支持目标玩家
  * @param token 申请者（支持者）token
@@ -693,8 +944,6 @@ export function userRequestSupport(token: Token, targetId: string, amount: numbe
   if (!isInRoom(token, roomid)) {
     throw "invalid room";
   }
-
-  const game = room.game;
 
   // 检查是否处于支持阶段
   if (!room.isSupportPhase) {
@@ -735,24 +984,37 @@ export function userRequestSupport(token: Token, targetId: string, amount: numbe
     throw "余额不足";
   }
 
-  // 检查是否已经申请过支持该目标
+  // 检查是否已经申请/支持过该目标
   const alreadyRequested = room.pendingSupportRequests.some(
     (r) => r.supporterToken === token && r.targetToken === target
   );
-  if (alreadyRequested) {
+  const alreadySupported = room.supportRecords.some(
+    (r) => r.supporterToken === token && r.targetToken === target
+  );
+  if (alreadyRequested || alreadySupported) {
     throw "你已经申请过支持该玩家";
   }
 
   // 生成请求ID
   const requestId = uuidv4();
-
-  // 记录待处理请求
-  room.pendingSupportRequests.push({
+  const pending: PendingSupportRequest = {
     requestId,
     supporterToken: token,
     targetToken: target,
     amount,
-  });
+  };
+
+  // 每个被支持者的第一个支持自动通过（无需目标玩家同意）
+  const hasTargetSupportOrPending =
+    room.supportRecords.some((r) => r.targetToken === target) ||
+    room.pendingSupportRequests.some((r) => r.targetToken === target);
+  if (!hasTargetSupportOrPending) {
+    acceptSupportRequest(room, pending, { autoFirst: true });
+    return;
+  }
+
+  // 记录待处理请求
+  room.pendingSupportRequests.push(pending);
 
   // 通知目标玩家有新请求（类似看牌请求格式）
   send2user(target, {
@@ -815,103 +1077,7 @@ export function userRespondSupport(token: Token, requestId: string, accept: bool
   }
 
   // 接受：执行资金流转
-  const supporter = userMap[pending.supporterToken];
-  const targetUser = userMap[pending.targetToken];
-  const amount = pending.amount;
-  if (!supporter || !targetUser) {
-    throw "玩家状态异常";
-  }
-  if (!supporter.isFolded || !supporter.isInCurrentGame) {
-    send2user(pending.supporterToken, {
-      supportDeclined: true,
-      targetId: targetUser.chipsRecordID,
-      targetName: targetUser.nickname || targetUser.name,
-      requestId,
-      reason: "支持者状态已变化",
-    });
-    sendSupportRequestsToTarget(room, token);
-    return;
-  }
-  if (targetUser.isFolded || !targetUser.isInCurrentGame) {
-    send2user(pending.supporterToken, {
-      supportDeclined: true,
-      targetId: targetUser.chipsRecordID,
-      targetName: targetUser.nickname || targetUser.name,
-      requestId,
-      reason: "目标玩家状态已变化",
-    });
-    sendSupportRequestsToTarget(room, token);
-    return;
-  }
-
-  // 检查支持者余额
-  const supporterStack = supporter.stack - supporter.bets.reduce((a, b) => a + b, 0);
-  if (supporterStack < amount) {
-    send2user(pending.supporterToken, {
-      supportDeclined: true,
-      targetId: user.chipsRecordID,
-      targetName: user.nickname || user.name,
-      requestId,
-      reason: "支持者余额不足",
-    });
-    sendSupportRequestsToTarget(room, token);
-    return;
-  }
-
-  // 扣除支持者筹码
-  supporter.stack -= amount;
-
-  // 加到目标玩家账户
-  targetUser.stack += amount;
-
-  // 计算分成比例
-  const targetTotalBet = targetUser.bets.reduce((a, b) => a + b, 0);
-  if (targetTotalBet <= 0) {
-    send2user(pending.supporterToken, {
-      supportDeclined: true,
-      targetId: targetUser.chipsRecordID,
-      targetName: targetUser.nickname || targetUser.name,
-      requestId,
-      reason: "目标下注信息异常",
-    });
-    supporter.stack += amount;
-    targetUser.stack -= amount;
-    sendSupportRequestsToTarget(room, token);
-    return;
-  }
-  const sharePercent = amount / targetTotalBet;
-
-  // 记录支持关系
-  room.supportRecords.push({
-    supporterToken: pending.supporterToken,
-    targetToken: pending.targetToken,
-    amount,
-    targetTotalBet,
-  });
-
-  // 通知双方
-  send2user(pending.supporterToken, {
-    supportAccepted: true,
-    targetId: targetUser.chipsRecordID,
-    targetName: targetUser.nickname || targetUser.name,
-    amount,
-    sharePercent: Math.round(sharePercent * 10000) / 100, // 保留2位小数
-  });
-
-  send2user(token, {
-    supportConfirmed: true,
-    supporterId: supporter.chipsRecordID,
-    amount,
-    newStack: targetUser.stack,
-  });
-
-  // 广播支持成功
-  publishLog2all(roomid, [
-    `${supporter.nickname || supporter.name} 支持 ${targetUser.nickname || targetUser.name} ${amount} 🌟`,
-  ]);
-
-  // 更新目标玩家的待处理列表
-  sendSupportRequestsToTarget(room, token);
+  acceptSupportRequest(room, pending, { autoFirst: false });
 }
 
 function sendSupportRequestsToTarget(room: Room, targetToken: Token) {
@@ -1158,18 +1324,81 @@ export function settleGame(token: Token) {
   if (!room) {
     throw "房间不存在";
   }
-  
-  // 如果游戏正在进行中，标记为结算后解散
-  if (room.isGaming && room.game) {
-    room.game.settleAfterRound = true;
-    send2all(roomid, {
-      type: "game",
-      action: "settleRequested",
-    });
-  } else {
-    // 直接结算并解散房间
-    settleAndDissolveRoom(roomid);
+
+  if (room.activeRedPacket) {
+    throw "当前已有红包流程，请等待结束后再操作";
   }
+
+  // 避免手牌进行中改分导致账不一致
+  if (room.isGaming && room.game && !room.game.isSettling) {
+    throw "请在本局结算阶段或暂停后使用该功能";
+  }
+
+  const overflowRecords = room.chipsRecords
+    .map((cr) => {
+      normalizeChipsRecord(cr);
+      const total = getTotalChips(cr);
+      const capTotal = getProfitCapTotal(cr);
+      return {
+        record: cr,
+        overflow: Math.max(0, total - capTotal),
+        capTotal,
+      };
+    })
+    .filter((x) => x.overflow > 0);
+
+  if (overflowRecords.length === 0) {
+    throw `当前没有玩家积分超过 ${SETTLE_PROFIT_CAP}`;
+  }
+
+  const underwaterTokens = room.users.filter((t) => {
+    const u = userMap[t];
+    if (!u || u.isSpectator) return false;
+    const rec = room.chipsRecords.find((cr) => cr.id === u.chipsRecordID);
+    if (!rec) return false;
+    normalizeChipsRecord(rec);
+    return getRecordProfit(rec) < 0;
+  });
+  if (underwaterTokens.length === 0) {
+    throw "当前没有水下玩家可抢红包";
+  }
+
+  const totalOverflow = overflowRecords.reduce((sum, x) => sum + x.overflow, 0);
+  if (totalOverflow <= 0) {
+    throw "没有可分发的溢出筹码";
+  }
+
+  overflowRecords.forEach(({ record, capTotal }) => {
+    applyTotalDelta(record, capTotal - getTotalChips(record), {
+      preferOverflowOnNegative: true,
+    });
+    const holder = userMap[record.token];
+    if (holder && holder.chipsRecordID === record.id) {
+      syncUserStackFromRecord(holder, record);
+    }
+  });
+
+  // 同步在场玩家堆栈，保证前后端积分榜一致（离场玩家下次入场时会继承 chipsRecord）
+  room.users.forEach((t) => {
+    const u = userMap[t];
+    if (!u) return;
+    const rec = room.chipsRecords.find((cr) => cr.id === u.chipsRecordID);
+    if (rec) {
+      normalizeChipsRecord(rec);
+      syncUserStackFromRecord(u, rec);
+    }
+  });
+
+  const splits = splitLuckyAmount(totalOverflow, underwaterTokens.length, true);
+  startLuckyRedPacket(
+    room,
+    token,
+    `${user.nickname || user.name}（积分结算）`,
+    totalOverflow,
+    underwaterTokens,
+    splits,
+    `🧧 积分结算已封顶盈利 ${SETTLE_PROFIT_CAP}，共回收溢出 ${totalOverflow} 筹码并发出拼手气红包`
+  );
 }
 
 // 结算并解散房间

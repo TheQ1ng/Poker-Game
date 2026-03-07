@@ -4,6 +4,7 @@ import './styles/poker-styles.css';
 import './styles/responsive.css';
 import { soundManager } from './utils/soundManager';
 import { SyncOutlined } from '@ant-design/icons';
+import { message } from 'antd';
 import Loading from './components/Loading';
 
 // 懒加载组件
@@ -64,6 +65,45 @@ function App() {
     return () => {
       document.removeEventListener('click', initAndResumeAudio);
       document.removeEventListener('keydown', initAndResumeAudio);
+    };
+  }, []);
+
+  useEffect(() => {
+    let currentVersion = "";
+    let isRefreshing = false;
+    const checkVersion = async () => {
+      if (isRefreshing) return;
+      try {
+        const rsp = await fetch("/version.json", { cache: "no-store" });
+        if (!rsp.ok) return;
+        const data = await rsp.json();
+        const nextVersion = String(data?.version || "");
+        if (!nextVersion) return;
+        if (!currentVersion) {
+          currentVersion = nextVersion;
+          return;
+        }
+        if (nextVersion !== currentVersion) {
+          isRefreshing = true;
+          message.info("检测到新版本，正在自动更新…");
+          setTimeout(() => window.location.reload(), 800);
+        }
+      } catch (e) {
+        // 忽略轮询异常，避免影响游戏主流程
+      }
+    };
+
+    checkVersion();
+    const timer = setInterval(checkVersion, 60 * 1000);
+    const onVisible = () => {
+      if (!document.hidden) {
+        checkVersion();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
   

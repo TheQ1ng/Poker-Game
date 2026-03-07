@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, List, Avatar, message } from 'antd';
-import { DeleteOutlined, EyeOutlined } from '@ant-design/icons';
+import { Table, Button, Modal, List, Avatar, message, Card, Space, Tag, Typography } from 'antd';
+import { DeleteOutlined, EyeOutlined, ReloadOutlined, CrownOutlined } from '@ant-design/icons';
 
 interface RoomInfo {
   id: string;
@@ -125,7 +125,8 @@ const GameProcessManagement: React.FC = () => {
     {
       title: '状态',
       key: 'status',
-      render: (_: any, record: RoomInfo) => record.isActive ? '进行中' : '未开始',
+      render: (_: any, record: RoomInfo) =>
+        record.isActive ? <Tag color="green">进行中</Tag> : <Tag>未开始</Tag>,
     },
     {
       title: '操作',
@@ -133,6 +134,7 @@ const GameProcessManagement: React.FC = () => {
       render: (_: any, record: RoomInfo) => (
         <div>
           <Button
+            className="admin-action-btn"
             type="primary"
             icon={<EyeOutlined />}
             style={{ marginRight: 8 }}
@@ -141,6 +143,7 @@ const GameProcessManagement: React.FC = () => {
             查看玩家
           </Button>
           <Button
+            className="admin-action-btn"
             danger
             icon={<DeleteOutlined />}
             onClick={() => dissolveRoom(record.id)}
@@ -153,18 +156,27 @@ const GameProcessManagement: React.FC = () => {
   ];
 
   return (
-    <div>
-      <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2>游戏进程管理</h2>
-        <Button type="primary" onClick={fetchRooms} loading={loading}>
+    <Card
+      className="admin-page-card"
+      bordered={false}
+      style={{ borderRadius: 12 }}
+      title={<Typography.Title level={4} style={{ margin: 0 }}>游戏进程管理</Typography.Title>}
+      extra={
+        <Button className="admin-action-btn" type="primary" icon={<ReloadOutlined />} onClick={fetchRooms} loading={loading}>
           刷新房间列表
         </Button>
-      </div>
+      }
+    >
+      <Space size={12} className="admin-stats">
+        <Tag color="blue">房间总数：{rooms.length}</Tag>
+        <Tag color="green">进行中：{rooms.filter((r) => r.isActive).length}</Tag>
+      </Space>
 
       <Table
         columns={columns}
         dataSource={rooms}
         rowKey="id"
+        className="admin-table"
         loading={loading}
         pagination={{ pageSize: 10 }}
       />
@@ -173,6 +185,7 @@ const GameProcessManagement: React.FC = () => {
       <Modal
         title={`房间 ${selectedRoom?.id} 的玩家列表`}
         visible={playerModalVisible}
+        className="admin-modal"
         onCancel={() => setPlayerModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setPlayerModalVisible(false)}>
@@ -191,7 +204,11 @@ const GameProcessManagement: React.FC = () => {
                   title={
                     <div>
                       {player.nickname || player.name}
-                      {player.isOwner && <span style={{ marginLeft: 8, color: '#1890ff' }}>(房主)</span>}
+                      {player.isOwner && (
+                        <Tag color="gold" icon={<CrownOutlined />} style={{ marginLeft: 8 }}>
+                          房主
+                        </Tag>
+                      )}
                     </div>
                   }
                   description={`积分: ${player.stack}`}
@@ -202,7 +219,7 @@ const GameProcessManagement: React.FC = () => {
           />
         )}
       </Modal>
-    </div>
+    </Card>
   );
 };
 

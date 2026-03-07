@@ -22,7 +22,7 @@ export async function createroom(
   isOmaha: boolean,
   redPacketThresholdMultiple: number,
   redPacketMaxPercent: number,
-  supportEnabled: boolean = false,
+  supportEnabled: boolean = true,
   supportMinPot: number = 600,
   supportMaxPercent: number = 5
 ): Promise<ApiRsp> {

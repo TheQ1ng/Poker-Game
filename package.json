@@ -49,6 +49,8 @@
     "test:dao": "./node_modules/mocha/bin/mocha -r ts-node/register ./src/server/tests/dao.test.ts",
     "test:room": "./node_modules/mocha/bin/mocha -r ts-node/register ./src/server/tests/room.user.test.ts",
     "test:support": "./node_modules/mocha/bin/mocha -r ts-node/register ./src/server/tests/support.settle.test.ts --exit",
+    "test:buyin": "./node_modules/mocha/bin/mocha -r ts-node/register ./src/server/tests/daily-buyin.test.ts --exit",
+    "test:settle-overflow": "./node_modules/mocha/bin/mocha -r ts-node/register ./src/server/tests/settle-overflow-redpacket.test.ts --exit",
     "test:autoplay": "./node_modules/mocha/bin/mocha -r ts-node/register ./src/server/tests/autoplay.test.ts",
     "test:autoplay-single": "./node_modules/mocha/bin/mocha -r ts-node/register ./src/server/tests/autoplay-single.ts",
     "watch-server": "nodemon --watch './src/server/***/*.ts' -e ts,tsx --exec 'ts-node' ./src/server/app-server.ts"

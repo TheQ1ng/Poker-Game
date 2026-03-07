@@ -93,6 +93,10 @@ export interface SimpleUser {
   bet: number;
   /** 本手牌已使用 +30s 次数（0～3） */
   addTimeUsed?: number;
+  /** 当天已买入次数（北京时间12点重置，初始买入也计入） */
+  dailyBuyInUsed?: number;
+  /** 当天剩余买入次数（上限5次） */
+  dailyBuyInRemaining?: number;
 }
 
 export interface SimpleRoomSupportConfig {
@@ -129,8 +133,11 @@ export interface SimpleChipsRecord {
   id: string;
   name: string;
   nickname: string;
+  /** 桌上欢乐豆（封顶 1000） */
   chips: number;
   buyIn: number;
+  /** 溢出欢乐豆（超出 1000 的部分） */
+  overflow?: number;
 }
 
 export interface SimpleRoomChipsRecords {
@@ -163,4 +170,6 @@ export enum ActionType {
   OPEN_RED_PACKET = "OPEN_RED_PACKET",
   REQUEST_SUPPORT = "REQUEST_SUPPORT",
   RESPOND_SUPPORT = "RESPOND_SUPPORT",
+  SET_SHORT_DECK = "SET_SHORT_DECK",
+  TRANSFER_ROOM_OWNER = "TRANSFER_ROOM_OWNER",
 }

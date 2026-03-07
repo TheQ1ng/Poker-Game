@@ -1,4 +1,5 @@
-import { Button, Popconfirm, Tooltip, Modal, message, InputNumber, Progress } from "antd";
+/* eslint-disable react-hooks/rules-of-hooks */
+import { Button, Popconfirm, Tooltip, Modal, message, InputNumber, Progress, Select } from "antd";
 import { Card as PokerCard } from "../../ApiType";
 import {
   LoginOutlined,
@@ -17,6 +18,7 @@ import {
   MessageOutlined,
   DeleteOutlined,
   SaveOutlined,
+  SwapOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { User } from "./User";
@@ -36,6 +38,8 @@ import {
   selectPendingSupportRequests,
   selectSupportPhase,
   clearSupportPhase,
+  selectSupportSummary,
+  clearSupportSummary,
 } from "./roomSlice";
 import {
   ws_pauseGame,
@@ -51,6 +55,8 @@ import {
   ws_openRedPacket,
   ws_requestSupport,
   ws_respondSupport,
+  ws_setShortDeck,
+  ws_transferRoomOwner,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -74,86 +80,12 @@ function Room() {
   const [redPacketAmount, setRedPacketAmount] = useState<number>(0);
   const [supportAmounts, setSupportAmounts] = useState<Record<string, number>>({});
   const [supportPhaseRemain, setSupportPhaseRemain] = useState(0);
+  const [supportSummaryRemain, setSupportSummaryRemain] = useState(0);
+  const [transferOwnerVisible, setTransferOwnerVisible] = useState(false);
+  const [transferOwnerTarget, setTransferOwnerTarget] = useState<string>("");
 
-  // 清除缓存和localStorage
-  const handleClearCache = () => {
-    try {
-      // 保存登录相关数据
-      const token = localStorage.getItem('token');
-      const isAdmin = localStorage.getItem('isAdmin');
-      const name = localStorage.getItem('name');
-      // 清除localStorage
-      localStorage.clear();
-      // 恢复登录相关数据
-      if (token) {
-        localStorage.setItem('token', token);
-      }
-      if (isAdmin) {
-        localStorage.setItem('isAdmin', isAdmin);
-      }
-      if (name) {
-        localStorage.setItem('name', name);
-      }
-      // 清除缓存
-      if ('caches' in window) {
-        caches.keys().then((cacheNames) => {
-          cacheNames.forEach((cacheName) => {
-            caches.delete(cacheName);
-          });
-        });
-      }
-      message.success('缓存和本地存储已清除');
-      // 刷新页面
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-    } catch (error) {
-      message.error('清除缓存失败');
-      console.error('清除缓存失败:', error);
-    }
-  };
-
-  // 保存积分榜到数据库
-  const handleSaveChipsRecord = async () => {
-    try {
-      // 构建积分榜数据
-      const chipsRecordData = chipsRecords.map(record => {
-        return {
-          id: record.id,
-          username: record.name,
-          nickname: record.nickname || record.name,
-          chips: record.chips,
-          buyIn: record.buyIn,
-          profit: record.chips - record.buyIn
-        };
-      });
-
-      // 发送到服务器
-      const response = await fetch('/admin/save-chips-record', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: localStorage.getItem('token') || '',
-        },
-        body: JSON.stringify({
-          roomId: roomid,
-          chipsRecords: chipsRecordData
-        }),
-      });
-
-      const data = await response.json();
-      if (data.code === 0) {
-        message.success('积分榜保存成功');
-      } else {
-        message.error(data.error || '保存失败');
-      }
-    } catch (error) {
-      message.error('保存积分榜失败');
-      console.error('保存积分榜失败:', error);
-    }
-  };
   const roomid = useAppSelector(selectRoomID);
-  const users = useAppSelector(selectUsers) || [];
+  const users = useAppSelector(selectUsers);
   const room = useAppSelector(selectRoom);
   const self = useAppSelector(selectSelf);
   const chipsRecordState = useAppSelector(selectChipsRecord);
@@ -163,6 +95,7 @@ function Room() {
   const pendingSeeHandRequests = useAppSelector(selectPendingSeeHandRequests);
   const pendingSupportRequests = useAppSelector(selectPendingSupportRequests);
   const supportPhase = useAppSelector(selectSupportPhase);
+  const supportSummary = useAppSelector(selectSupportSummary);
   const isSettling = game?.isSettling || false;
   // 使用服务端时间偏移来计算下一局开始的剩余秒数，避免不同客户端本地时间差异
   const serverNowForNextGame = Date.now() + serverTimeOffset;
@@ -175,14 +108,17 @@ function Room() {
       ? chipsRecordState.chipsRecords
       : [];
   const selfRecord = self?.id ? chipsRecords.find((cr) => cr.id === self.id) : undefined;
-  const selfProfit = selfRecord ? selfRecord.chips - selfRecord.buyIn : 0;
+  const selfTotalChips = selfRecord
+    ? (Number(selfRecord.chips) || 0) + (Number(selfRecord.overflow) || 0)
+    : 0;
+  const selfProfit = selfTotalChips - (selfRecord?.buyIn || 0);
   const redPacketThresholdMultiple = room?.redPacketConfig?.thresholdMultiple ?? 1;
   const redPacketMaxPercent = room?.redPacketConfig?.maxPercent ?? 30;
   const underwaterUsers = (room?.users || []).filter((u) => {
     if (u.isSpectator) return false;
     if (u.id === self?.id) return false;
     const cr = chipsRecords.find((item) => item.id === u.id);
-    return !!cr && cr.chips < cr.buyIn;
+    return !!cr && ((Number(cr.chips) || 0) + (Number(cr.overflow) || 0) < cr.buyIn);
   });
   const underwaterCount = underwaterUsers.length;
   const minRedPacketAmount = underwaterCount;
@@ -190,11 +126,16 @@ function Room() {
     0,
     Math.min(
       Math.floor((Math.max(0, selfProfit) * redPacketMaxPercent) / 100),
-      Math.floor(self?.stack || 0)
+      Math.floor(selfTotalChips)
     )
   );
   const senderThresholdProfit = Math.floor((selfRecord?.buyIn || 0) * redPacketThresholdMultiple);
   const activeRedPacket = room?.redPacket || null;
+  const isShortDeckConfigured = !!room?.isShortDeck;
+  const seatedPlayerCount = (room?.users || []).filter((u) => !u.isSpectator).length;
+  const canEnableShortDeck = !room?.isOmaha && seatedPlayerCount < 7;
+  const shortDeckToggleDisabled = !isShortDeckConfigured && !canEnableShortDeck;
+  const transferOwnerCandidates = (room?.users || []).filter((u) => u.id !== self?.id);
   const canSendRedPacket =
     !!self &&
     !!selfRecord &&
@@ -410,6 +351,25 @@ function Room() {
   }, [supportPhase?.isActive, supportPhase?.time, supportPhase?.myStack, supportPhase?.targets]);
 
   useEffect(() => {
+    if (!supportSummary?.isVisible) {
+      setSupportSummaryRemain(0);
+      return;
+    }
+    const duration = Math.max(1, supportSummary.duration || 3);
+    setSupportSummaryRemain(duration);
+    const startAt = Date.now();
+    const timer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startAt) / 1000);
+      const remain = Math.max(0, duration - elapsed);
+      setSupportSummaryRemain(remain);
+      if (remain <= 0) {
+        dispatch(clearSupportSummary());
+      }
+    }, 200);
+    return () => clearInterval(timer);
+  }, [dispatch, supportSummary?.isVisible, supportSummary?.duration]);
+
+  useEffect(() => {
     if (!redPacketSendVisible) return;
     setRedPacketAmount((prev) => {
       if (minRedPacketAmount <= 0) return prev;
@@ -454,6 +414,76 @@ function Room() {
     handleResize();
   }, []);
 
+  function handleClearCache() {
+    try {
+      const token = localStorage.getItem("token");
+      const isAdmin = localStorage.getItem("isAdmin");
+      const name = localStorage.getItem("name");
+      localStorage.clear();
+      if (token) {
+        localStorage.setItem("token", token);
+      }
+      if (isAdmin) {
+        localStorage.setItem("isAdmin", isAdmin);
+      }
+      if (name) {
+        localStorage.setItem("name", name);
+      }
+      if ("caches" in window) {
+        caches.keys().then((cacheNames) => {
+          cacheNames.forEach((cacheName) => {
+            caches.delete(cacheName);
+          });
+        });
+      }
+      message.success("缓存和本地存储已清除");
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      message.error("清除缓存失败");
+      console.error("清除缓存失败:", error);
+    }
+  }
+
+  async function handleSaveChipsRecord() {
+    try {
+      const chipsRecordData = chipsRecords.map((record) => {
+        const totalChips = (Number(record.chips) || 0) + (Number(record.overflow) || 0);
+        return {
+          id: record.id,
+          username: record.name,
+          nickname: record.nickname || record.name,
+          chips: totalChips,
+          overflow: Number(record.overflow) || 0,
+          buyIn: record.buyIn,
+          profit: totalChips - record.buyIn,
+        };
+      });
+      const response = await fetch("/admin/save-chips-record", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: localStorage.getItem("token") || "",
+        },
+        body: JSON.stringify({
+          roomId: roomid,
+          chipsRecords: chipsRecordData,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.code === 0) {
+        message.success("积分榜保存成功");
+      } else {
+        message.error(data.error || "保存失败");
+      }
+    } catch (error) {
+      message.error("保存积分榜失败");
+      console.error("保存积分榜失败:", error);
+    }
+  }
+
   return (
     <div
       ref={centerRef}
@@ -463,6 +493,7 @@ function Room() {
         flex: 1,
         overflow: "hidden",
         height: "100vh",
+        width: "100vw",
         padding: "10px",
       }}
     >
@@ -595,7 +626,6 @@ function Room() {
           flex: 1,
           position: "relative",
           margin: "0 auto",
-          maxWidth: "1400px",
           background: "linear-gradient(145deg, #1a3d28 0%, #0f2518 100%)",
           borderRadius: "60px",
           border: "15px solid #4a2c17",
@@ -830,6 +860,92 @@ function Room() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          </div>
+        )}
+        {supportSummary?.isVisible && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0, 0, 0, 0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1001,
+            }}
+          >
+            <div
+              style={{
+                background: "linear-gradient(145deg, #2c1f06 0%, #120d03 100%)",
+                padding: "20px 22px",
+                borderRadius: "14px",
+                border: "2px solid rgba(255, 199, 84, 0.55)",
+                maxWidth: "560px",
+                width: "92%",
+                boxShadow: "0 10px 28px rgba(0,0,0,0.5)",
+              }}
+            >
+              <div style={{ color: "#ffd67e", fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+                📋 支持详情（预计）
+              </div>
+              <div style={{ color: "rgba(255,255,255,0.72)", fontSize: 12, marginBottom: 10 }}>
+                预计值按“若被支持者最终获胜”测算，3秒后自动进入下一阶段
+              </div>
+              <div
+                style={{
+                  height: 5,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.14)",
+                  overflow: "hidden",
+                  marginBottom: 12,
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.max(0, Math.min(100, (supportSummaryRemain / Math.max(1, supportSummary.duration || 3)) * 100))}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg, #ffda76, #ffa640)",
+                    transition: "width 0.25s linear",
+                  }}
+                />
+              </div>
+              <div style={{ maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+                {supportSummary.details.length === 0 ? (
+                  <div style={{ color: "rgba(255,255,255,0.85)", textAlign: "center", padding: "10px 0" }}>
+                    本轮暂无有效支持
+                  </div>
+                ) : (
+                  supportSummary.details.map((item: any) => (
+                    <div
+                      key={item.targetId}
+                      style={{
+                        background: "rgba(255,255,255,0.08)",
+                        border: "1px solid rgba(255,255,255,0.14)",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                      }}
+                    >
+                      <div style={{ color: "#ffe39d", fontWeight: 700, marginBottom: 6 }}>
+                        被支持者：{item.targetName}（共支持 {item.totalSupport}）
+                      </div>
+                      <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 12, marginBottom: 6 }}>
+                        其下注 {item.targetTotalBet}，若最终获胜，支持环节预计净{item.estimatedTargetNetIfWin >= 0 ? "赚" : "输"}{Math.abs(item.estimatedTargetNetIfWin)}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {(item.supporters || []).map((s: any) => (
+                          <div key={s.supporterId} style={{ color: "rgba(255,255,255,0.92)", fontSize: 12 }}>
+                            {s.supporterName} 支持 {s.amount}，预计返还 {s.estimatedReturnIfWin}，预计净{s.estimatedProfitIfWin >= 0 ? "赚" : "输"}{Math.abs(s.estimatedProfitIfWin)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -1132,7 +1248,7 @@ function Room() {
             ) : null}
             {/* 结算按钮 - 仅房主可见 */}
             {self?.isRoomOwner && roomid && (
-              <Tooltip title="结算游戏">
+              <Tooltip title="盈利封顶到1999并发放溢出红包（欢乐豆封顶1000，超出计入溢出）">
                 <Button
                   className="room-action-btn"
                   type="primary"
@@ -1149,6 +1265,39 @@ function Room() {
                   type="primary"
                   icon={<SaveOutlined />}
                   onClick={handleSaveChipsRecord}
+                />
+              </Tooltip>
+            )}
+            {self?.isRoomOwner && roomid && !room?.isOmaha && (
+              <Tooltip
+                title={
+                  isShortDeckConfigured
+                    ? "切回长牌（下一局生效）"
+                    : canEnableShortDeck
+                      ? "切换短牌（下一局生效）"
+                      : "人数达到7人时不可切换短牌"
+                }
+              >
+                <Button
+                  className="room-action-btn"
+                  type={isShortDeckConfigured ? "primary" : "default"}
+                  onClick={() => ws_setShortDeck(!isShortDeckConfigured)}
+                  disabled={shortDeckToggleDisabled}
+                >
+                  {isShortDeckConfigured ? "短牌" : "长牌"}
+                </Button>
+              </Tooltip>
+            )}
+            {self?.isRoomOwner && roomid && transferOwnerCandidates.length > 0 && (
+              <Tooltip title="转移房主给房间内玩家">
+                <Button
+                  className="room-action-btn"
+                  icon={<SwapOutlined />}
+                  onClick={() => {
+                    const defaultTarget = transferOwnerCandidates[0]?.id || "";
+                    setTransferOwnerTarget(defaultTarget);
+                    setTransferOwnerVisible(true);
+                  }}
                 />
               </Tooltip>
             )}
@@ -1394,6 +1543,36 @@ function Room() {
       </div>
 
       {/* 发红包弹窗 */}
+      <Modal
+        title={<span style={{ color: "#f7d777" }}>👑 转移房主</span>}
+        visible={transferOwnerVisible}
+        onCancel={() => setTransferOwnerVisible(false)}
+        onOk={() => {
+          if (!transferOwnerTarget) {
+            message.warning("请选择一名玩家");
+            return;
+          }
+          ws_transferRoomOwner(transferOwnerTarget);
+          setTransferOwnerVisible(false);
+        }}
+        okText="确认移交"
+        cancelText="取消"
+      >
+        <div style={{ color: "rgba(255,255,255,0.8)", marginBottom: 10 }}>
+          选择房间内一名玩家，房主身份将立即生效。
+        </div>
+        <Select
+          style={{ width: "100%" }}
+          value={transferOwnerTarget || undefined}
+          onChange={(v) => setTransferOwnerTarget(v)}
+          placeholder="请选择目标玩家"
+          options={transferOwnerCandidates.map((u) => ({
+            value: u.id,
+            label: `${u.nickname || u.name}${u.isSpectator ? "（观战）" : ""}`,
+          }))}
+        />
+      </Modal>
+
       <Modal
         title={<span style={{ color: "#f7d777" }}>🧧 发送拼手气红包</span>}
         visible={redPacketSendVisible}

@@ -44,6 +44,29 @@ export interface SupportPhasePayload {
   myStack: number;
 }
 
+export interface SupportSummarySupporter {
+  supporterId: string;
+  supporterName: string;
+  amount: number;
+  estimatedReturnIfWin: number;
+  estimatedProfitIfWin: number;
+}
+
+export interface SupportSummaryItem {
+  targetId: string;
+  targetName: string;
+  targetTotalBet: number;
+  totalSupport: number;
+  estimatedTargetNetIfWin: number;
+  supporters: SupportSummarySupporter[];
+}
+
+export interface SupportSummaryPayload {
+  isVisible: boolean;
+  duration: number;
+  details: SupportSummaryItem[];
+}
+
 export interface RoomState {
   room: SimpleRoom | null;
   game: SimpleGame | null;
@@ -63,6 +86,8 @@ export interface RoomState {
   supportPhase: SupportPhasePayload | null;
   /** 我当前支持的目标玩家ID（chipsRecordID），用于在其头像旁显示小红旗 */
   supportedTargetId: string | null;
+  /** 支持阶段结束后展示 3s 的支持详情弹窗 */
+  supportSummary: SupportSummaryPayload | null;
 }
 
 const initialState: RoomState = {
@@ -77,6 +102,7 @@ const initialState: RoomState = {
   pendingSupportRequests: [],
   supportPhase: null,
   supportedTargetId: null,
+  supportSummary: null,
 };
 
 export const roomSlice = createSlice({
@@ -170,6 +196,12 @@ export const roomSlice = createSlice({
     clearSupportedTargetId(state) {
       state.supportedTargetId = null;
     },
+    setSupportSummary(state, action: PayloadAction<SupportSummaryPayload | null>) {
+      state.supportSummary = action.payload;
+    },
+    clearSupportSummary(state) {
+      state.supportSummary = null;
+    },
   },
   extraReducers: (builder) => {},
 });
@@ -194,6 +226,8 @@ export const {
   clearSupportPhase,
   setSupportedTargetId,
   clearSupportedTargetId,
+  setSupportSummary,
+  clearSupportSummary,
 } = roomSlice.actions;
 export const selectRoomID = (state: RootState) => state.room.room?.roomid;
 export const selectServerTimeOffset = (state: RootState) => state.room.serverTimeOffset;
@@ -244,5 +278,8 @@ export const selectSupportPhase = (state: RootState) =>
 
 export const selectSupportedTargetId = (state: RootState) =>
   state.room.supportedTargetId;
+
+export const selectSupportSummary = (state: RootState) =>
+  state.room.supportSummary;
 
 export default roomSlice.reducer;

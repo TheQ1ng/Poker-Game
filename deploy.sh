@@ -29,10 +29,8 @@ check_local() {
         exit 1
     fi
     
-    if [ ! -d "build" ]; then
-        echo -e "${YELLOW}构建生产版本...${NC}"
-        npm run build
-    fi
+    echo -e "${YELLOW}构建生产版本（前端+服务端）...${NC}"
+    npm run build
     
     echo -e "${GREEN}✓ 本地检查完成${NC}"
 }
@@ -117,13 +115,19 @@ deploy_server() {
     $SSH_CMD $SERVER_USER@$SERVER_IP << 'ENDSSH'
         cd /home/ubuntu/poker
         
-        # 安装依赖
-        echo "安装依赖..."
-        npm install --production
-        
-        # 构建服务器项目
-        echo "构建服务器项目..."
-        npm run build:server
+        # 安装运行时依赖（部署包内已包含本地构建好的 dist）
+        echo "安装运行时依赖..."
+        if [ -f package-lock.json ]; then
+            npm ci --omit=dev
+        else
+            npm install --omit=dev
+        fi
+
+        # 校验构建产物是否存在，避免空部署
+        if [ ! -f dist/src/server/app-server.js ]; then
+            echo "错误: 未找到 dist/src/server/app-server.js，请先在本地执行 npm run build"
+            exit 1
+        fi
         
         # 重启 PM2
         echo "重启服务..."
@@ -191,4 +195,3 @@ main() {
 }
 
 main "$@"
-

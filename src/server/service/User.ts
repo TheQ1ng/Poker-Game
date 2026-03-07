@@ -46,6 +46,12 @@ class User {
   settleTimes: number = 0;
   /** 本手牌已使用「+30s」次数，每手牌最多 3 次 */
   addTimeUsed: number = 0;
+  /** 每日已使用买入次数（北京时间 12 点重置） */
+  dailyBuyInUsed: number = 0;
+  /** 每日剩余买入次数（上限 5 次） */
+  dailyBuyInRemaining: number = 5;
+  /** 每日买入计数的日键（北京时间中午分界） */
+  dailyBuyInDayKey: string = "";
 
   constructor(token: Token, name: string, avatar: string, uuid: string = "") {
     this.token = token;
