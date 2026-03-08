@@ -199,6 +199,12 @@ export class Game {
     });
     console.log(`balance: ${balance}`);
     if (balance !== 0) {
+      roomMap[this.roomid].chipsRecords.forEach((cr) => {
+        console.warn(
+          `[balance-check] room=${this.roomid} record=${cr.id} name=${cr.nickname || cr.name
+          } buyIn=${cr.buyIn} chips=${cr.chips} overflow=${cr.overflow || 0} total=${getTotalChips(cr)}`
+        );
+      });
       publishLog2all(this.roomid, [`<strong style="color: red;">⚠️注意，帐不平，差异${balance}。游戏无法继续，请核算，并将日志保留。</strong>`]);
       return false;
     }
@@ -565,11 +571,22 @@ export class Game {
         );
       });
 
-      // 所有结算逻辑（含支持分成）完成后，再统一同步积分榜
-      crs.forEach((cr) => {
-        const token = this.sortedUsers.find((t) => userMap[t].chipsRecordID === cr.id);
-        if (!token) return;
-        const u = userMap[token];
+      // 所有结算逻辑（含支持分成）完成后，再统一同步积分榜。
+      // 不能依赖 this.sortedUsers：结算动画期间玩家可离开房间，sortedUsers 会被移除，
+      // 但本手牌的结算结果仍必须落到 chipsRecords，否则会触发“账不平”。
+      settlementRows.forEach((row) => {
+        const u = userMap[row.token];
+        if (!u) {
+          console.warn(`[settle] user not found while syncing record, token=${row.token}`);
+          return;
+        }
+        const cr = crs.find((item) => item.id === u.chipsRecordID);
+        if (!cr) {
+          console.warn(
+            `[settle] chips record missing while syncing, token=${row.token}, recordId=${u.chipsRecordID}`
+          );
+          return;
+        }
         applyTableStackToRecord(cr, u.stack);
         u.stack = cr.chips;
       });

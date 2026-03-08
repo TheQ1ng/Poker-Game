@@ -443,3 +443,9 @@ export function ws_transferRoomOwner(targetUserId: string) {
     targetUserId,
   });
 }
+
+export function ws_repairRoomBalance() {
+  send2server({
+    action: ActionType.REPAIR_ROOM_BALANCE,
+  });
+}

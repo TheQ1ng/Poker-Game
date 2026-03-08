@@ -19,6 +19,7 @@ import {
   DeleteOutlined,
   SaveOutlined,
   SwapOutlined,
+  BugOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { User } from "./User";
@@ -57,6 +58,7 @@ import {
   ws_respondSupport,
   ws_setShortDeck,
   ws_transferRoomOwner,
+  ws_repairRoomBalance,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -107,6 +109,14 @@ function Room() {
     room?.roomid && chipsRecordState?.roomid === room.roomid
       ? chipsRecordState.chipsRecords
       : [];
+  const roomBalanceDiff = useMemo(
+    () =>
+      chipsRecords.reduce((sum, cr) => {
+        const total = (Number(cr.chips) || 0) + (Number(cr.overflow) || 0);
+        return sum + (Number(cr.buyIn) || 0) - total;
+      }, 0),
+    [chipsRecords]
+  );
   const selfRecord = self?.id ? chipsRecords.find((cr) => cr.id === self.id) : undefined;
   const selfTotalChips = selfRecord
     ? (Number(selfRecord.chips) || 0) + (Number(selfRecord.overflow) || 0)
@@ -1267,6 +1277,34 @@ function Room() {
                   onClick={handleSaveChipsRecord}
                 />
               </Tooltip>
+            )}
+            {self?.isRoomOwner && roomid && (
+              <Popconfirm
+                title={
+                  roomBalanceDiff === 0
+                    ? "当前账目已平，无需修复"
+                    : `检测到差异 ${roomBalanceDiff}，是否自动修复并记录日志？`
+                }
+                okText="立即修复"
+                cancelText="取消"
+                onConfirm={ws_repairRoomBalance}
+                disabled={roomBalanceDiff === 0}
+              >
+                <Tooltip
+                  title={
+                    roomBalanceDiff === 0
+                      ? "账目已平"
+                      : `账不平差异 ${roomBalanceDiff}，点击修复`
+                  }
+                >
+                  <Button
+                    className="room-action-btn"
+                    danger={roomBalanceDiff !== 0}
+                    icon={<BugOutlined />}
+                    disabled={roomBalanceDiff === 0}
+                  />
+                </Tooltip>
+              </Popconfirm>
             )}
             {self?.isRoomOwner && roomid && !room?.isOmaha && (
               <Tooltip

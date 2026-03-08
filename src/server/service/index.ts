@@ -1312,6 +1312,110 @@ export function kickUser(token: Token, userId: string) {
   publish2all(roomid);
 }
 
+function calcRoomBalance(room: Room): number {
+  return room.chipsRecords.reduce((sum, cr) => {
+    normalizeChipsRecord(cr);
+    return sum + Number(cr.buyIn || 0) - getTotalChips(cr);
+  }, 0);
+}
+
+function findUserByRecord(room: Room, recordId: string, recordToken?: string): User | null {
+  const inRoomToken = room.users.find((t) => userMap[t]?.chipsRecordID === recordId);
+  if (inRoomToken) {
+    return userMap[inRoomToken];
+  }
+  if (recordToken && userMap[recordToken]?.chipsRecordID === recordId) {
+    return userMap[recordToken];
+  }
+  const anyToken = Object.keys(userMap).find((t) => userMap[t]?.chipsRecordID === recordId);
+  if (!anyToken) {
+    return null;
+  }
+  return userMap[anyToken];
+}
+
+export function repairRoomBalance(token: Token) {
+  const user = userMap[token];
+  if (!user || !user.isRoomOwner) {
+    throw "只有房主可以修复账目";
+  }
+
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+  if (!room) {
+    throw "房间不存在";
+  }
+
+  if (room.isGaming && room.game && !room.game.isSettling) {
+    throw "请在本局结算阶段或暂停后修复";
+  }
+
+  const beforeBalance = calcRoomBalance(room);
+  let syncedCount = 0;
+  const syncDetails: string[] = [];
+
+  room.chipsRecords.forEach((cr) => {
+    normalizeChipsRecord(cr);
+    const ownerUser = findUserByRecord(room, cr.id, cr.token);
+    if (!ownerUser) return;
+
+    const invested = ownerUser.bets.reduce((a, b) => a + b, 0);
+    const expectedTable = Math.max(0, Math.floor((Number(ownerUser.stack) || 0) - invested));
+    if (expectedTable === cr.chips) return;
+
+    const oldChips = cr.chips;
+    cr.chips = expectedTable;
+    normalizeChipsRecord(cr);
+    syncedCount += 1;
+    syncDetails.push(
+      `${cr.nickname || cr.name}: table ${oldChips} -> ${cr.chips} (by ${ownerUser.nickname || ownerUser.name})`
+    );
+  });
+
+  let balance = calcRoomBalance(room);
+  let fallbackAdjusted = 0;
+
+  // 兜底：仍不平时，按差异冲正到房主记录，确保对局可继续。
+  if (balance !== 0) {
+    const ownerRecord = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
+    if (!ownerRecord) {
+      throw "房主积分记录不存在，无法修复";
+    }
+    const beforeTotal = getTotalChips(ownerRecord);
+    applyTotalDelta(ownerRecord, balance, { preferOverflowOnNegative: true });
+    fallbackAdjusted = getTotalChips(ownerRecord) - beforeTotal;
+    balance = calcRoomBalance(room);
+  }
+
+  room.users.forEach((t) => {
+    const u = userMap[t];
+    if (!u) return;
+    const rec = room.chipsRecords.find((cr) => cr.id === u.chipsRecordID);
+    if (!rec) return;
+    normalizeChipsRecord(rec);
+    syncUserStackFromRecord(u, rec);
+  });
+
+  const logs: string[] = [
+    `🛠️ ${user.nickname || user.name} 发起账目修复：修复前差异 ${beforeBalance}`,
+    `修复后差异 ${balance}`,
+  ];
+  if (syncedCount > 0) {
+    logs.push(`自动对齐 ${syncedCount} 条记录`);
+    logs.push(...syncDetails.slice(0, 8));
+  }
+  if (fallbackAdjusted !== 0) {
+    logs.push(`兜底冲正（房主记录）${fallbackAdjusted > 0 ? "+" : ""}${fallbackAdjusted}`);
+  }
+  publishLog2all(roomid, logs);
+
+  if (balance !== 0) {
+    throw `自动修复后仍差异 ${balance}，请保留日志人工核算`;
+  }
+
+  publish2all(roomid);
+}
+
 // 结算游戏功能
 export function settleGame(token: Token) {
   const user = userMap[token];

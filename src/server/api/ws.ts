@@ -31,6 +31,7 @@ import {
   userRespondSupport,
   userSetShortDeck,
   transferRoomOwner,
+  repairRoomBalance,
 } from "../service";
 import { Token } from "../service/User";
 import Room, { Game, RoomID } from "../service/Room";
@@ -223,6 +224,9 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
       return;
     case ActionType.TRANSFER_ROOM_OWNER:
       transferRoomOwner(token, data.targetUserId);
+      return;
+    case ActionType.REPAIR_ROOM_BALANCE:
+      repairRoomBalance(token);
       return;
   }
   if (data.action !== ActionType.LEAVE) {
