@@ -1,50 +1,10 @@
-import React, { useEffect, useState, Suspense, lazy } from 'react';
+import React, { useEffect } from 'react';
 import './App.css';
 import './styles/poker-styles.css';
 import './styles/responsive.css';
 import { soundManager } from './utils/soundManager';
-import { SyncOutlined } from '@ant-design/icons';
 import { message } from 'antd';
-import Loading from './components/Loading';
-
-// 懒加载组件
-const Home = lazy(() => import('./features/home/Home'));
-
-// 竖屏提示组件
-function RotateDeviceOverlay() {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const checkOrientation = () => {
-      // 检查是否为移动设备且是竖屏
-      const isMobile = window.innerWidth <= 768;
-      const isPortrait = window.innerHeight > window.innerWidth;
-      setIsVisible(isMobile && isPortrait);
-    };
-
-    // 初始检查
-    checkOrientation();
-
-    // 监听窗口大小变化
-    window.addEventListener('resize', checkOrientation);
-    window.addEventListener('orientationchange', checkOrientation);
-
-    return () => {
-      window.removeEventListener('resize', checkOrientation);
-      window.removeEventListener('orientationchange', checkOrientation);
-    };
-  }, []);
-
-  if (!isVisible) return null;
-
-  return (
-    <div className="rotate-device-overlay">
-      <SyncOutlined className="rotate-icon" />
-      <div className="rotate-text">📱 请横屏使用</div>
-      <div className="rotate-hint">旋转您的设备以获得最佳游戏体验</div>
-    </div>
-  );
-}
+import Home from './features/home/Home';
 
 function App() {
   useEffect(() => {
@@ -106,13 +66,10 @@ function App() {
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
-  
+
   return (
     <div className="App">
-      <RotateDeviceOverlay />
-      <Suspense fallback={<Loading />}>
-        <Home/>
-      </Suspense>
+      <Home />
     </div>
   );
 }

@@ -1,0 +1,254 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Be+Vietnam+Pro:wght@600;700;800;900&display=swap");
+
+.markit-login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(560px, 1.05fr);
+  background: #ffffff;
+  color: #1a1c1c;
+}
+
+.markit-login-hero {
+  position: relative;
+  overflow: hidden;
+  background: #140404;
+}
+
+.markit-login-hero-artwork {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.markit-login-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 10, 15, 0.06) 0%, rgba(8, 10, 18, 0.75) 100%);
+}
+
+.markit-login-hero-copy {
+  position: absolute;
+  left: 64px;
+  right: 64px;
+  bottom: 56px;
+  z-index: 1;
+  color: #ffffff;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.markit-login-hero-copy h2 {
+  margin: 0 0 14px;
+  max-width: 420px;
+  font-family: "Be Vietnam Pro", "Inter", system-ui, sans-serif;
+  font-size: clamp(2.3rem, 3vw, 3.3rem);
+  line-height: 1.06;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.markit-login-hero-copy p {
+  margin: 0;
+  max-width: 470px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 1.05rem;
+  line-height: 1.62;
+}
+
+.markit-login-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+}
+
+.markit-login-panel-inner {
+  width: min(640px, 100%);
+  padding: 56px 72px;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.markit-login-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #666666;
+  font-size: 0.96rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.markit-login-back span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.markit-login-heading {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.markit-login-badge {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+
+.markit-login-heading-copy {
+  min-width: 0;
+}
+
+.markit-login-title {
+  margin: 0;
+  font-family: "Be Vietnam Pro", "Inter", system-ui, sans-serif;
+  font-size: clamp(2.4rem, 3vw, 3.4rem);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  color: #121212;
+}
+
+.markit-login-subtitle {
+  margin: 10px 0 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #666666;
+}
+
+.markit-login-form .ant-form-item {
+  margin-bottom: 24px;
+}
+
+.markit-login-form .ant-form-item-label {
+  padding-bottom: 10px;
+}
+
+.markit-login-form .ant-form-item-label > label {
+  height: auto;
+  color: #111111;
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.markit-login-form .ant-input,
+.markit-login-form .ant-input-affix-wrapper {
+  height: 74px;
+  border: 0;
+  border-radius: 24px;
+  background: #f5f5f5;
+  box-shadow: none;
+}
+
+.markit-login-form .ant-input {
+  padding: 0 26px;
+  font-size: 1rem;
+  background: transparent;
+}
+
+.markit-login-form .ant-input-affix-wrapper {
+  padding: 0 26px;
+}
+
+.markit-login-form .ant-input-affix-wrapper-focused,
+.markit-login-form .ant-input:focus,
+.markit-login-form .ant-input-focused {
+  box-shadow: 0 0 0 2px rgba(186, 0, 53, 0.14);
+}
+
+.markit-login-form .ant-input::placeholder {
+  color: #9a9a9a;
+}
+
+.markit-login-form .ant-input-suffix {
+  color: #7a7a7a;
+}
+
+.markit-login-error {
+  margin: -4px 0 16px;
+  color: #ba1a1a;
+  font-size: 0.95rem;
+}
+
+.markit-login-submit.ant-btn {
+  width: 100%;
+  height: 76px;
+  margin-top: 6px;
+  border: 0;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #c50039 0%, #ba0035 100%);
+  box-shadow: 0 20px 34px rgba(186, 0, 53, 0.18);
+  color: #ffffff;
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+.markit-login-submit.ant-btn:hover,
+.markit-login-submit.ant-btn:focus {
+  color: #ffffff;
+  background: linear-gradient(90deg, #d2003d 0%, #c50039 100%);
+}
+
+@media (max-width: 1180px) {
+  .markit-login-shell {
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  }
+
+  .markit-login-panel-inner {
+    padding: 44px 42px;
+  }
+
+  .markit-login-title {
+    font-size: 2.8rem;
+  }
+}
+
+@media (max-width: 900px) {
+  .markit-login-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .markit-login-hero {
+    display: none;
+  }
+
+  .markit-login-panel-inner {
+    width: min(100%, 600px);
+    padding: 32px 20px 40px;
+  }
+
+  .markit-login-back {
+    margin-bottom: 20px;
+  }
+
+  .markit-login-heading {
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .markit-login-badge {
+    width: 52px;
+    height: 52px;
+  }
+
+  .markit-login-title {
+    font-size: 2.2rem;
+  }
+
+  .markit-login-subtitle {
+    font-size: 1rem;
+  }
+
+  .markit-login-form .ant-input,
+  .markit-login-form .ant-input-affix-wrapper {
+    height: 64px;
+    border-radius: 20px;
+  }
+
+  .markit-login-submit.ant-btn {
+    height: 66px;
+  }
+}

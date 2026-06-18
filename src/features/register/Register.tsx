@@ -1,53 +1,117 @@
-import React, { useState } from 'react';
+import React from "react";
+import { Button, Form, Input } from "antd";
 
-import { useAppSelector, useAppDispatch } from '../../app/hooks';
-import { registerAsync, selectError } from './registerSlice';
-import { Form, Input, Button, Row, Col } from 'antd';
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import { MarkitBadge } from "../../components/MarkitBadge";
+import { MarkitArtwork } from "../../components/MarkitArtwork";
+import { registerAsync, selectError } from "./registerSlice";
+import "./markitLogin.css";
 
-function Register() {
+function Register({
+  onBackClick,
+}: {
+  onBackClick?: () => void;
+}) {
   const dispatch = useAppDispatch();
   const error = useAppSelector(selectError);
+  const loading = useAppSelector((state) => state.register.status === "loading");
 
-  const onFinish = (account: { name: string; password: string }) => {
-    console.log('[DEBUG] Form onFinish triggered:', account);
-    dispatch(registerAsync({ account, dispatch }));
+  const onFinish = (values: { name: string; password: string; code: string }) => {
+    if (String(values.code ?? "").trim() !== "MARK") {
+      return;
+    }
+
+    dispatch(
+      registerAsync({
+        account: {
+          name: values.name,
+          password: values.password,
+        },
+        dispatch,
+      })
+    );
   };
 
   return (
-    <div
-      className="flex flex-column flex-center flex1"
-      style={{ background: 'white' }}
-    >
-      <Form
-        name="basic"
-        labelCol={{ span: 8 }}
-        wrapperCol={{ span: 16 }}
-        initialValues={{ remember: true }}
-        autoComplete="off"
-        onFinish={onFinish}
-      >
-        <Form.Item
-          label="用户名"
-          name="name"
-          rules={[{ required: true, message: 'Please input your username!' }]}
-        >
-          <Input />
-        </Form.Item>
+    <div className="markit-login-shell">
+      <section className="markit-login-hero" aria-hidden="true">
+        <MarkitArtwork className="markit-login-hero-artwork" variant="hero-office" title="首页视觉图" />
+        <div className="markit-login-hero-overlay" />
+        <div className="markit-login-hero-copy">
+          <h2>发现身边正在发生的新鲜事。</h2>
+          <p>加入灵感与创意汇聚的社区，一起把日常过得更有意思。</p>
+        </div>
+      </section>
 
-        <Form.Item
-          label="密码"
-          name="password"
-          rules={[{ required: true, message: 'Please input your password!' }]}
-        >
-          <Input.Password />
-        </Form.Item>
+      <section className="markit-login-panel">
+        <div className="markit-login-panel-inner">
+          <button
+            className="markit-login-back"
+            type="button"
+            onClick={onBackClick ?? (() => window.history.replaceState({}, "", "/"))}
+            aria-label="返回首页"
+          >
+            <span aria-hidden="true">←</span>
+            返回首页
+          </button>
 
-        <Form.Item wrapperCol={{ offset: 8, span: 16 }}>
-          <Button type="primary" htmlType="submit">
-            登录即注册
-          </Button>
-        </Form.Item>
-      </Form>
+          <div className="markit-login-heading">
+            <MarkitBadge size={64} className="markit-login-badge" />
+            <div className="markit-login-heading-copy">
+              <h1 className="markit-login-title">欢迎回来</h1>
+              <p className="markit-login-subtitle">登录账号后继续使用。</p>
+            </div>
+          </div>
+
+          <Form
+            layout="vertical"
+            requiredMark={false}
+            className="markit-login-form"
+            autoComplete="off"
+            onFinish={onFinish}
+          >
+            <Form.Item
+              label="账号"
+              name="name"
+              rules={[{ required: true, message: "请输入账号" }]}
+            >
+              <Input placeholder="请输入账号" />
+            </Form.Item>
+
+            <Form.Item
+              label="密码"
+              name="password"
+              rules={[{ required: true, message: "请输入密码" }]}
+            >
+              <Input.Password placeholder="请输入密码" />
+            </Form.Item>
+
+            <Form.Item
+              label="注册码"
+              name="code"
+              rules={[
+                { required: true, message: "请输入注册码" },
+                {
+                  validator: (_, value) => {
+                    if (String(value ?? "").trim() === "MARK") {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error("注册码无效"));
+                  },
+                },
+              ]}
+            >
+              <Input placeholder="请输入注册码" maxLength={4} />
+            </Form.Item>
+
+            {error ? <div className="markit-login-error">{error}</div> : null}
+
+            <Button className="markit-login-submit" htmlType="submit" loading={loading}>
+              登录 / 注册
+            </Button>
+          </Form>
+        </div>
+      </section>
     </div>
   );
 }

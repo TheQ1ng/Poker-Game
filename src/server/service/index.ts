@@ -8,17 +8,14 @@ import {
   updateUserProfile,
   initDatabase,
   getRoomLogs,
-  getDailyBuyInState,
 } from "./database";
 import { v4 as uuidv4 } from "uuid";
 import {
   applyTableStackToRecord,
   applyTotalDelta,
-  getProfitCapTotal,
   getRecordProfit,
   getTotalChips,
   normalizeChipsRecord,
-  SETTLE_PROFIT_CAP,
 } from "./chips";
 const RED_PACKET_WAIT_MS = 5000;
 const RED_PACKET_RESULT_MS = 3000;
@@ -59,23 +56,16 @@ export function createUser(token: Token, name: string, avatar: string, uuid: str
   if (!token || !name) {
     throw "should have token & name";
   }
-  const dailyState = getDailyBuyInState(name);
   // 如果用户已经存在，返回现有的用户对象
   if (userMap[token]) {
     // 更新用户信息
     userMap[token].name = name;
     userMap[token].avatar = avatar;
     userMap[token].uuid = uuid;
-    userMap[token].dailyBuyInDayKey = dailyState.dayKey;
-    userMap[token].dailyBuyInUsed = dailyState.used;
-    userMap[token].dailyBuyInRemaining = dailyState.remaining;
     return userMap[token];
   }
   // 创建新用户
   const user = new User(token, name, avatar, uuid);
-  user.dailyBuyInDayKey = dailyState.dayKey;
-  user.dailyBuyInUsed = dailyState.used;
-  user.dailyBuyInRemaining = dailyState.remaining;
   userMap[token] = user;
   return user;
 }
@@ -115,14 +105,15 @@ export function createRoom(
   token: Token,
   sb: number,
   buyIn: number,
-  reBuyLimit: number = 1,
+  reBuyLimit: number = 500,
   isShortDeck: boolean = false,
   isOmaha: boolean = false,
   redPacketThresholdMultiple: number = 1,
   redPacketMaxPercent: number = 30,
-  supportEnabled: boolean = true,
+  supportEnabled: boolean = false,
   supportMinPot: number = 600,
-  supportMaxPercent: number = 5
+  supportMaxPercent: number = 5,
+  overtimeCost: number = 0
 ): Room {
   const user = userMap[token];
   const room = new Room(
@@ -136,7 +127,8 @@ export function createRoom(
     redPacketMaxPercent,
     supportEnabled,
     supportMinPot,
-    supportMaxPercent
+    supportMaxPercent,
+    overtimeCost
   );
   roomMap[room.id] = room;
   userEnterRoom(token, room.id);
@@ -157,20 +149,18 @@ function calcUserProfit(room: Room, token: Token): { profit: number; recordBuyIn
 }
 
 function syncUserStackFromRecord(user: User, record: { chips: number }) {
-  const invested = user.bets.reduce((a, b) => a + b, 0);
-  user.stack = Math.max(invested, record.chips + invested);
+  user.stack = Math.max(0, Math.floor(Number(record.chips) || 0));
 }
 
 function addToUserRecordTotal(
   room: Room,
   user: User,
-  delta: number,
-  options?: { preferOverflowOnNegative?: boolean }
+  delta: number
 ): { totalAfter: number } {
   const record = room.chipsRecords.find((cr) => cr.id === user.chipsRecordID);
   if (!record) throw "积分记录不存在";
   normalizeChipsRecord(record);
-  const totalAfter = applyTotalDelta(record, delta, options);
+  const totalAfter = applyTotalDelta(record, delta);
   syncUserStackFromRecord(user, record);
   return { totalAfter };
 }
@@ -361,7 +351,7 @@ export function userSendRedPacket(token: Token, amount: number) {
     throw "筹码不足，无法发红包";
   }
 
-  addToUserRecordTotal(room, user, -amount, { preferOverflowOnNegative: true });
+  addToUserRecordTotal(room, user, -amount);
 
   const splits = splitLuckyAmount(amount, underwaterTokens.length, false);
   const senderName = user.nickname || user.name;
@@ -583,7 +573,7 @@ export function userExtendActionTime(token: Token) {
   }
   const ok = roomMap[roomid].game.extendActionTime(token);
   if (!ok) {
-    throw "无法加时（非行动者或本手牌已用满 3 次）";
+    throw "无法加时（非行动者、本轮已用满 3 次或欢乐豆不足）";
   }
   publish2all(roomid);
 }
@@ -594,7 +584,22 @@ export function userReBuy(token: Token) {
   if (!isInRoom(token, roomid)) {
     throw "invalid room";
   }
-  return roomMap[roomid].reBuy(token);
+  const room = roomMap[roomid];
+  const result = room.reBuy(token);
+  publish2all(roomid);
+  return result;
+}
+
+export function userRepay(token: Token) {
+  const roomid = userMap[token].roomid;
+
+  if (!isInRoom(token, roomid)) {
+    throw "invalid room";
+  }
+  const room = roomMap[roomid];
+  const result = room.repay(token);
+  publish2all(roomid);
+  return result;
 }
 
 export function userHangup(token: Token) {
@@ -682,6 +687,23 @@ export function userShowHands(token: Token) {
   const displayName = user.nickname || user.name;
   const cardsText = user.hands.map((c) => `${c.num}${c.suit}`).join("");
   publishLog2all(roomid, [`${displayName}亮牌【${cardsText}】`]);
+  publish2all(roomid);
+}
+
+export function userRevealBoardCard(token: Token, boardIndex: number) {
+  const user = userMap[token];
+  const roomid = user.roomid;
+  const room = roomMap[roomid];
+  const game = room.game;
+
+  if (!isInRoom(token, roomid)) {
+    throw "invalid room";
+  }
+  if (!game.isSettling) {
+    throw "仅在本局结算阶段可查看未翻公牌";
+  }
+
+  game.revealFutureBoardCard(Number(boardIndex));
   publish2all(roomid);
 }
 
@@ -1359,8 +1381,7 @@ export function repairRoomBalance(token: Token) {
     const ownerUser = findUserByRecord(room, cr.id, cr.token);
     if (!ownerUser) return;
 
-    const invested = ownerUser.bets.reduce((a, b) => a + b, 0);
-    const expectedTable = Math.max(0, Math.floor((Number(ownerUser.stack) || 0) - invested));
+    const expectedTable = Math.max(0, Math.floor(Number(ownerUser.stack) || 0));
     if (expectedTable === cr.chips) return;
 
     const oldChips = cr.chips;
@@ -1382,7 +1403,7 @@ export function repairRoomBalance(token: Token) {
       throw "房主积分记录不存在，无法修复";
     }
     const beforeTotal = getTotalChips(ownerRecord);
-    applyTotalDelta(ownerRecord, balance, { preferOverflowOnNegative: true });
+    applyTotalDelta(ownerRecord, balance);
     fallbackAdjusted = getTotalChips(ownerRecord) - beforeTotal;
     balance = calcRoomBalance(room);
   }
@@ -1416,93 +1437,9 @@ export function repairRoomBalance(token: Token) {
   publish2all(roomid);
 }
 
-// 结算游戏功能
 export function settleGame(token: Token) {
-  const user = userMap[token];
-  if (!user || !user.isRoomOwner) {
-    throw "只有房主可以结算游戏";
-  }
-  
-  const roomid = user.roomid;
-  const room = roomMap[roomid];
-  if (!room) {
-    throw "房间不存在";
-  }
-
-  if (room.activeRedPacket) {
-    throw "当前已有红包流程，请等待结束后再操作";
-  }
-
-  // 避免手牌进行中改分导致账不一致
-  if (room.isGaming && room.game && !room.game.isSettling) {
-    throw "请在本局结算阶段或暂停后使用该功能";
-  }
-
-  const overflowRecords = room.chipsRecords
-    .map((cr) => {
-      normalizeChipsRecord(cr);
-      const total = getTotalChips(cr);
-      const capTotal = getProfitCapTotal(cr);
-      return {
-        record: cr,
-        overflow: Math.max(0, total - capTotal),
-        capTotal,
-      };
-    })
-    .filter((x) => x.overflow > 0);
-
-  if (overflowRecords.length === 0) {
-    throw `当前没有玩家积分超过 ${SETTLE_PROFIT_CAP}`;
-  }
-
-  const underwaterTokens = room.users.filter((t) => {
-    const u = userMap[t];
-    if (!u || u.isSpectator) return false;
-    const rec = room.chipsRecords.find((cr) => cr.id === u.chipsRecordID);
-    if (!rec) return false;
-    normalizeChipsRecord(rec);
-    return getRecordProfit(rec) < 0;
-  });
-  if (underwaterTokens.length === 0) {
-    throw "当前没有水下玩家可抢红包";
-  }
-
-  const totalOverflow = overflowRecords.reduce((sum, x) => sum + x.overflow, 0);
-  if (totalOverflow <= 0) {
-    throw "没有可分发的溢出筹码";
-  }
-
-  overflowRecords.forEach(({ record, capTotal }) => {
-    applyTotalDelta(record, capTotal - getTotalChips(record), {
-      preferOverflowOnNegative: true,
-    });
-    const holder = userMap[record.token];
-    if (holder && holder.chipsRecordID === record.id) {
-      syncUserStackFromRecord(holder, record);
-    }
-  });
-
-  // 同步在场玩家堆栈，保证前后端积分榜一致（离场玩家下次入场时会继承 chipsRecord）
-  room.users.forEach((t) => {
-    const u = userMap[t];
-    if (!u) return;
-    const rec = room.chipsRecords.find((cr) => cr.id === u.chipsRecordID);
-    if (rec) {
-      normalizeChipsRecord(rec);
-      syncUserStackFromRecord(u, rec);
-    }
-  });
-
-  const splits = splitLuckyAmount(totalOverflow, underwaterTokens.length, true);
-  startLuckyRedPacket(
-    room,
-    token,
-    `${user.nickname || user.name}（积分结算）`,
-    totalOverflow,
-    underwaterTokens,
-    splits,
-    `🧧 积分结算已封顶盈利 ${SETTLE_PROFIT_CAP}，共回收溢出 ${totalOverflow} 筹码并发出拼手气红包`
-  );
+  // 旧的“结算封顶并自动发红包”入口已移除，保留方法用于兼容旧客户端动作。
+  void token;
 }
 
 // 结算并解散房间

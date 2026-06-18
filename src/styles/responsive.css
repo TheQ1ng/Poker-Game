@@ -690,3 +690,166 @@
   }
 }
 
+/* ==================== Room 手机端（新版覆盖） ==================== */
+
+/* 不再强制竖屏遮罩，竖屏可直接操作 */
+.rotate-device-overlay {
+  display: none !important;
+}
+
+@media only screen and (max-width: 768px) {
+  .room-root {
+    padding: 6px !important;
+  }
+
+  .room-root .room-main-card {
+    border-radius: 28px !important;
+    border-width: 8px !important;
+  }
+
+  .room-root .room-sidebar {
+    max-width: 92vw !important;
+    z-index: 140 !important;
+  }
+
+  .room-root .sidebar-btn {
+    top: 8px !important;
+    z-index: 150 !important;
+  }
+
+  .room-root .room-disclaimer-btn {
+    top: 8px !important;
+    right: 8px !important;
+    z-index: 150 !important;
+  }
+
+  .room-root .room-top-actions {
+    position: static !important;
+    transform: none !important;
+    right: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    padding: 6px 44px !important;
+    margin: 2px 0 6px !important;
+    justify-content: flex-start !important;
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    border-radius: 12px !important;
+    background: rgba(0, 0, 0, 0.55) !important;
+    border: 1px solid rgba(201, 162, 39, 0.35) !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .room-root .room-top-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .room-root .room-id-chip {
+    flex: 0 0 auto;
+    margin-right: 2px !important;
+  }
+
+  .room-root .room-action-btn {
+    min-width: 36px !important;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    border-radius: 10px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 !important;
+  }
+
+  .room-root .room-action-btn .anticon {
+    font-size: 15px !important;
+  }
+
+  .room-root .room-seats-layout {
+    min-height: 0;
+  }
+
+  .room-root .room-seat-side {
+    max-width: 94px !important;
+  }
+
+  .room-root .room-top-seats {
+    justify-content: space-evenly !important;
+    gap: 4px !important;
+    padding: 0 8px !important;
+  }
+
+  .room-root .room-center-area {
+    padding: 0 4px;
+  }
+
+  .room-root .boards {
+    transform: scale(0.86) !important;
+    transform-origin: center center;
+  }
+
+  .room-root .room-pot-row {
+    max-width: 100% !important;
+    gap: 8px;
+    margin-bottom: 8px !important;
+  }
+
+  .room-root .room-center-disclaimer {
+    display: none !important;
+  }
+
+  .room-root .roominfo {
+    display: flex !important;
+  }
+
+  .room-root .user-actions {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 4px 6px !important;
+  }
+
+  .room-root .user-actions .main-btn {
+    width: 100% !important;
+    gap: 6px !important;
+  }
+
+  .room-root .user-actions .main-btn .ant-btn {
+    min-width: 0 !important;
+    flex: 1 1 calc(50% - 6px) !important;
+    max-width: none !important;
+  }
+}
+
+@media only screen and (max-width: 768px) and (orientation: portrait) {
+  .room-root .room-seat-side {
+    max-width: 82px !important;
+  }
+
+  .room-root .room-top-seats {
+    padding: 0 2px !important;
+  }
+
+  .room-root .boards {
+    transform: scale(0.78) !important;
+  }
+
+  .room-root .room-pot-row {
+    flex-direction: column !important;
+    align-items: center !important;
+    margin-bottom: 4px !important;
+  }
+
+  .room-root .room-top-actions {
+    padding: 6px 40px !important;
+  }
+
+  /* 覆盖旧规则：竖屏也显示核心操作区 */
+  .room-root .roominfo,
+  .room-root .user-actions {
+    display: flex !important;
+  }
+}

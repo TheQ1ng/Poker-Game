@@ -46,6 +46,7 @@ export interface SimpleRoomRedPacket {
 
 export interface SimpleGame {
   boardCards: Card[];
+  displayBoardCards: (Card | null)[];
   pots: number;
   acting: string; // user's uuid in room, not token
   raiseUser: string;
@@ -91,12 +92,8 @@ export interface SimpleUser {
 
   stack: number;
   bet: number;
-  /** 本手牌已使用 +30s 次数（0～3） */
+  /** 本轮已使用 +45s 次数（0～3） */
   addTimeUsed?: number;
-  /** 当天已买入次数（北京时间12点重置，初始买入也计入） */
-  dailyBuyInUsed?: number;
-  /** 当天剩余买入次数（上限5次） */
-  dailyBuyInRemaining?: number;
 }
 
 export interface SimpleRoomSupportConfig {
@@ -107,6 +104,9 @@ export interface SimpleRoomSupportConfig {
 
 export interface SimpleRoom {
   roomid: RoomID;
+  smallBlind: number;
+  buyIn: number;
+  reBuyLimit: number;
   isGaming: boolean;
   users: SimpleUser[];
   /** 是否短牌 */
@@ -119,6 +119,8 @@ export interface SimpleRoom {
   redPacket?: SimpleRoomRedPacket | null;
   /** 支持功能配置 */
   supportConfig?: SimpleRoomSupportConfig;
+  /** 加时费用（每次 +45s 需要支付的欢乐豆） */
+  overtimeCost: number;
 }
 
 export interface SimpleSelf {
@@ -136,13 +138,67 @@ export interface SimpleChipsRecord {
   /** 桌上欢乐豆（封顶 1000） */
   chips: number;
   buyIn: number;
-  /** 溢出欢乐豆（超出 1000 的部分） */
-  overflow?: number;
 }
 
 export interface SimpleRoomChipsRecords {
   roomid: string;
   chipsRecords: SimpleChipsRecord[];
+}
+
+export interface OwnerPlayerState {
+  id: string;
+  name: string;
+  nickname: string;
+  avatar: string;
+  hasCards: boolean;
+  isRoomOwner: boolean;
+  isOffline: boolean;
+  isReady: boolean;
+  isFoled: boolean;
+  isAllIn: boolean;
+  isActing: boolean;
+  isWinner: boolean;
+  isInCurrentGame: boolean;
+  isSpectator: boolean;
+  actionEndTime: number;
+  actionStartTime?: number;
+  actionName: string;
+  hands: Card[];
+  maxCards: Card[];
+  profits: number;
+  position: string;
+  shouldShowHand: boolean;
+  stack: number;
+  bet: number;
+  addTimeUsed?: number;
+}
+
+export interface OwnerRoomState {
+  roomid: RoomID;
+  buyIn: number;
+  reBuyLimit: number;
+  smallBlind: number;
+  isGaming: boolean;
+  isShortDeck?: boolean;
+  isOmaha?: boolean;
+  gameRound: number;
+  nextGameTime: number;
+  pots: number;
+  acting: string;
+  preBet: number;
+  bb: number;
+  raiseUser: string;
+  raiseBet: number;
+  raiseBetDiff: number;
+  userCount: number;
+  boardCards: Card[];
+  futureBoardCards: Card[];
+  users: OwnerPlayerState[];
+}
+
+export interface OwnerSnapshot {
+  serverTime: number;
+  rooms: OwnerRoomState[];
 }
 
 export enum ActionType {
@@ -155,8 +211,10 @@ export enum ActionType {
   FOLD = "FOLD",
   OVERTIME = "OVERTIME",
   REBUY = "REBUY",
+  REPAY = "REPAY",
   LEAVE = "LEAVE",
   SHOW_HANDS = "SHOW_HANDS",
+  REVEAL_BOARD_CARD = "REVEAL_BOARD_CARD",
   WATCH = "WATCH",
   SET_SETTLE_TIMES = "SET_SETTLE_TIMES",
   SEND_MESSAGE = "SEND_MESSAGE",

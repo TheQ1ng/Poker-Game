@@ -107,16 +107,17 @@ function NumberPad({ onComplete }: { onComplete: (value: string) => void }) {
 function CreateRoom() {
   const dispatch = useAppDispatch();
 
-  const [smallBlind, setSmallBlind] = useState(1);
-  const [buyIn, setBuyIn] = useState(400);
-  const [reBuyLimit, setReBuyLimit] = useState(50);
+  const [smallBlind, setSmallBlind] = useState(10);
+  const buyIn = smallBlind * 200;
+  const reBuyLimit = 0;
   const [isShortDeck, setIsShortDeck] = useState(false);
   const [isOmaha, setIsOmaha] = useState(false);
   const [redPacketThresholdMultiple, setRedPacketThresholdMultiple] = useState(1);
   const [redPacketMaxPercent, setRedPacketMaxPercent] = useState(30);
   const [redPacketExpanded, setRedPacketExpanded] = useState(false);
+  const [overtimeCost, setOvertimeCost] = useState(20);
   // 支持功能参数
-  const [supportEnabled, setSupportEnabled] = useState(true);
+  const [supportEnabled, setSupportEnabled] = useState(false);
   const [supportMinPot, setSupportMinPot] = useState(600);
   const [supportMaxPercent, setSupportMaxPercent] = useState(5);
   const [supportExpanded, setSupportExpanded] = useState(false);
@@ -150,10 +151,6 @@ function CreateRoom() {
       refreshRooms();
     }
   }, [activeTab, refreshRooms]);
-
-  useEffect(() => {
-    setBuyIn(smallBlind * 400);
-  }, [smallBlind]);
 
   // 页面加载时获取用户资料
   useEffect(() => {
@@ -331,19 +328,24 @@ function CreateRoom() {
                   <InputNumber
                     min={1}
                     value={buyIn}
-                    onChange={(v) => setBuyIn(v!)}
+                    disabled={true}
                     className="poker-input buyin-input"
                   />
+                  <span className="label-text">小弟 x 200</span>
                 </div>
                 <div className="poker-form-group">
-                  <span className="label">低于</span>
+                  <span className="label">东山再起</span>
+                  <span className="label-text">按场上最高欢乐豆 - (100倍大盲 - 1) 动态判定</span>
+                </div>
+                <div className="poker-form-group">
+                  <span className="label">加时费</span>
                   <InputNumber
-                    min={1}
-                    value={reBuyLimit}
-                    onChange={(v) => setReBuyLimit(v!)}
+                    min={0}
+                    value={overtimeCost}
+                    onChange={(v) => setOvertimeCost(Math.max(0, Number(v || 0)))}
                     className="poker-input rebuy-input"
                   />
-                  <span className="label-text">大哥允许东山再起</span>
+                  <span className="label-text">每次 +45s 支付</span>
                 </div>
                 <div className="poker-form-group">
                   <label style={{ display: "flex", alignItems: "center", cursor: "pointer", margin: 0 }}>
@@ -484,6 +486,7 @@ function CreateRoom() {
                           supportEnabled,
                           supportMinPot,
                           supportMaxPercent,
+                          overtimeCost,
                         })
                       )
                     }

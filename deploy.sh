@@ -20,6 +20,29 @@ NC='\033[0m'
 
 echo -e "${GREEN}=== 欢乐积分王训练系统游戏部署脚本 ===${NC}"
 
+build_ssh_cmd() {
+    printf 'ssh -p %q -o StrictHostKeyChecking=no' "$SERVER_PORT"
+}
+
+run_ssh() {
+    local cmd="$1"
+    local ssh_args=(-p "$SERVER_PORT" -o StrictHostKeyChecking=no)
+    if [ -n "$SERVER_PASSWORD" ]; then
+        sshpass -p "$SERVER_PASSWORD" ssh "${ssh_args[@]}" "$SERVER_USER@$SERVER_IP" "$cmd"
+    else
+        ssh "${ssh_args[@]}" "$SERVER_USER@$SERVER_IP" "$cmd"
+    fi
+}
+
+remote_exec() {
+    local ssh_args=(-p "$SERVER_PORT" -o StrictHostKeyChecking=no)
+    if [ -n "$SERVER_PASSWORD" ]; then
+        sshpass -p "$SERVER_PASSWORD" ssh "${ssh_args[@]}" "$SERVER_USER@$SERVER_IP" "$@"
+    else
+        ssh "${ssh_args[@]}" "$SERVER_USER@$SERVER_IP" "$@"
+    fi
+}
+
 # 检查本地环境
 check_local() {
     echo -e "${YELLOW}[1/6] 检查本地环境...${NC}"
@@ -49,23 +72,16 @@ check_server() {
         fi
     fi
     
-    # SSH 命令前缀
-    if [ ! -z "$SERVER_PASSWORD" ]; then
-        SSH_CMD="sshpass -p $SERVER_PASSWORD ssh -o StrictHostKeyChecking=no"
-    else
-        SSH_CMD="ssh -o StrictHostKeyChecking=no"
-    fi
-    
     # 检查 Node.js
-    if ! $SSH_CMD $SERVER_USER@$SERVER_IP "command -v node &> /dev/null"; then
+    if ! run_ssh "command -v node &> /dev/null"; then
         echo -e "${YELLOW}安装 Node.js 18...${NC}"
-        $SSH_CMD $SERVER_USER@$SERVER_IP "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs"
+        run_ssh "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs"
     fi
     
     # 检查 PM2
-    if ! $SSH_CMD $SERVER_USER@$SERVER_IP "command -v pm2 &> /dev/null"; then
+    if ! run_ssh "command -v pm2 &> /dev/null"; then
         echo -e "${YELLOW}安装 PM2...${NC}"
-        $SSH_CMD $SERVER_USER@$SERVER_IP "sudo npm install -g pm2"
+        run_ssh "sudo npm install -g pm2"
     fi
     
     echo -e "${GREEN}✓ 服务器环境检查完成${NC}"
@@ -76,11 +92,15 @@ upload_project() {
     echo -e "${YELLOW}[3/6] 上传项目到服务器...${NC}"
     
     # 创建远程目录
-    $SSH_CMD $SERVER_USER@$SERVER_IP "mkdir -p $REMOTE_DIR"
+    run_ssh "mkdir -p $REMOTE_DIR"
     
     # 同步文件（排除 node_modules, build, .git, 数据库文件）
-    if [ ! -z "$SERVER_PASSWORD" ]; then
-        rsync -avz --progress -e "sshpass -p $SERVER_PASSWORD ssh -o StrictHostKeyChecking=no" \
+    local rsync_rsh
+    rsync_rsh="$(build_ssh_cmd)"
+
+    if [ -n "$SERVER_PASSWORD" ]; then
+        sshpass -p "$SERVER_PASSWORD" rsync -avz --progress -e "$rsync_rsh" \
+            --rsync-path="mkdir -p $REMOTE_DIR && rsync" \
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude '.gitignore' \
@@ -92,7 +112,8 @@ upload_project() {
             --exclude '*.db-journal' \
             ./ $SERVER_USER@$SERVER_IP:$REMOTE_DIR/
     else
-        rsync -avz --progress -e "ssh -o StrictHostKeyChecking=no" \
+        rsync -avz --progress -e "$rsync_rsh" \
+            --rsync-path="mkdir -p $REMOTE_DIR && rsync" \
             --exclude 'node_modules' \
             --exclude '.git' \
             --exclude '.gitignore' \
@@ -112,8 +133,9 @@ upload_project() {
 deploy_server() {
     echo -e "${YELLOW}[4/6] 服务器端部署...${NC}"
     
-    $SSH_CMD $SERVER_USER@$SERVER_IP << 'ENDSSH'
+    remote_exec bash -s <<'ENDSSH'
         cd /home/ubuntu/poker
+        sudo rm -rf /opt/poker/solver /home/ubuntu/poker/solver-cli
         
         # 安装运行时依赖（部署包内已包含本地构建好的 dist）
         echo "安装运行时依赖..."
@@ -133,7 +155,7 @@ deploy_server() {
         echo "重启服务..."
         pm2 stop poker 2>/dev/null || true
         pm2 delete poker 2>/dev/null || true
-        pm2 start npm --name "poker" -- start
+        pm2 start npm --name "poker" --cwd /home/ubuntu/poker -- start
         
         # 保存 PM2 状态
         pm2 save
@@ -148,7 +170,10 @@ ENDSSH
 config_firewall() {
     echo -e "${YELLOW}[5/6] 配置防火墙...${NC}"
     
-    $SSH_CMD $SERVER_USER@$SERVER_IP "sudo ufw allow $APP_PORT/tcp && sudo ufw reload" 2>/dev/null || true
+    run_ssh "sudo ufw allow 22/tcp" 2>/dev/null || true
+    run_ssh "sudo ufw allow $APP_PORT/tcp" 2>/dev/null || true
+    run_ssh "sudo ufw --force enable" 2>/dev/null || true
+    run_ssh "sudo ufw reload" 2>/dev/null || true
     
     echo -e "${GREEN}✓ 防火墙配置完成${NC}"
 }
@@ -184,6 +209,10 @@ main() {
     
     if [ ! -z "$3" ]; then
         SERVER_PORT=$3
+    fi
+
+    if [ -n "$SERVER_PASSWORD" ]; then
+        export SSHPASS="$SERVER_PASSWORD"
     fi
     
     check_local

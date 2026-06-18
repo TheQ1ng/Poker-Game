@@ -49,8 +49,8 @@ function acceptSupport(room: Room, supporterToken: string, targetToken: string, 
 }
 
 function totalAssets(room: Room, token: string): number {
-  const rec = getChipsRecord(room, token);
-  return (Number(userMap[token].stack) || 0) + (Number((rec as any).overflow) || 0);
+  getChipsRecord(room, token);
+  return Number(userMap[token].stack) || 0;
 }
 
 function sumStacks(room: Room, tokens: string[]): number {
@@ -170,6 +170,27 @@ describe("Support settlement simulation", () => {
     assert.equal(totalAssets(room, "T"), 1774);
     assert.equal(sumStacks(room, tokens), totalBefore);
 
+    tokens.forEach((t) => {
+      assert.equal(getChipsRecord(room, t).chips, userMap[t].stack);
+    });
+  });
+
+  it("加时费用计入底池后，结算前后总筹码保持一致", () => {
+    const tokens = ["T", "A", "B", "S"];
+    const { room, game } = createManualGame(tokens, 1000);
+    game.boardCards = parse(["14h", "13h", "12h", "2c", "3d"], false);
+
+    setPlayer("T", { stack: 1000, bet: 300, fold: false, cards: ["11h", "10h"] });
+    setPlayer("A", { stack: 1000, bet: 300, fold: false, cards: ["14s", "14d"] });
+    setPlayer("B", { stack: 1000, bet: 300, fold: false, cards: ["2d", "2s"] });
+    setPlayer("S", { stack: 1000, bet: 100, fold: true, cards: ["9c", "8c"] });
+    userMap["T"].overtimeFeePaid = 45;
+
+    const totalBefore = sumStacks(room, tokens);
+
+    settleWithoutTimers(game);
+
+    assert.equal(sumStacks(room, tokens), totalBefore);
     tokens.forEach((t) => {
       assert.equal(getChipsRecord(room, t).chips, userMap[t].stack);
     });

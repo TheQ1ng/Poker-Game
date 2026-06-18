@@ -105,6 +105,7 @@ export function User({
   totalShowdown = 0,
   isActingUser = false,
   isSettlingCountdown = false,
+  isSettleCountdownActive = false,
   nextPositionUserIds = { SB: null, BB: null, D: null },
 }: {
   id: string;
@@ -113,11 +114,9 @@ export function User({
   totalShowdown?: number;
   isActingUser?: boolean;
   isSettlingCountdown?: boolean;
+  isSettleCountdownActive?: boolean;
   nextPositionUserIds?: { SB: string | null; BB: string | null; D: string | null };
 }) {
-  // 计算是否处于胜者动画阶段（亮牌按钮只在此时显示）
-  const isWinnerPhase = totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
-
   const user = useSelector((state: RootState) => {
     const users = state.room.room?.users;
     if (!users) return null;
@@ -156,7 +155,6 @@ export function User({
   const actionEndTime = user?.actionEndTime || Date.now();
   const revealedForMe = revealedHandsForMe[id];
   const showHands = !!user?.hands?.some((card) => !!card);
-  const displayHands = user?.shouldShowHand ? user : revealedForMe;
   const showHandsArea = showHands || (revealedForMe && revealedForMe.hands?.length);
   const handsToShow = user?.shouldShowHand ? user?.hands : revealedForMe?.hands;
   const handsTypeToShow = user?.shouldShowHand ? user?.handsType : revealedForMe?.handsType;
@@ -179,7 +177,6 @@ export function User({
   const winnerPhase = isSettling && totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
   const settleDone = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
   const showAsWinner = (winnerPhase || settleDone) && !!user?.isWinner;
-  const hideCardsInSettle = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && !showHolePhase && !showMax5Phase && !showAsWinner;
   const usePhasedSettle = isSettling && totalShowdown > 0 && !isSettlingCountdown;
   const isOmahaGame = !!(room?.isOmaha || game?.isOmaha);
 
@@ -199,12 +196,10 @@ export function User({
   const chipsRecord = room?.roomid && chipsRecordState?.roomid === room.roomid
     ? chipsRecordState.chipsRecords.find((r) => r.id === id)
     : undefined;
-  const chipsRecordOverflow = Number(chipsRecord?.overflow) || 0;
-  const totalChipsForProfit = (Number(chipsRecord?.chips) || 0) + chipsRecordOverflow;
   const chipsForProfit = delaySettleStack
-    ? displayStack + chipsRecordOverflow
+    ? displayStack
     : chipsRecord
-      ? totalChipsForProfit
+      ? (Number(chipsRecord.chips) || 0)
       : displayStack;
   const netProfit = chipsRecord != null ? chipsForProfit - chipsRecord.buyIn : undefined;
   const stackBarStyle =
@@ -651,7 +646,7 @@ export function User({
           </span>
         )}
         {bet > 0 ? (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: '#ffd700' }}>
             <span className="coins">🌟</span>
             <RollingNumber value={bet} style={{ fontSize: 'inherit', fontWeight: 'bold' }} />
           </span>
@@ -695,8 +690,8 @@ export function User({
               isSelected={false}
               showHand={shouldShowCards}
               size="small"
-              // 亮牌按钮只在胜者动画阶段显示，避免干扰分阶段比牌动画
-              showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe && isWinnerPhase}
+              // 亮牌按钮只在真实倒计时阶段显示，避免等待房主发牌时误触
+              showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe && isSettleCountdownActive}
             />
           ))}
           {!isSettlingCountdown && (
@@ -739,7 +734,7 @@ export function User({
         ) : null}
       </div>
       {(() => {
-        if (isSettlingCountdown) {
+        if (isSettleCountdownActive) {
           const el: ReactNode[] = [];
           (["SB", "BB", "D"] as const).forEach((role) => {
             const isCurrent = position === role && nextPositionUserIds[role] !== id;

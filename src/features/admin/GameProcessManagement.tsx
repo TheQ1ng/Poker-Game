@@ -103,9 +103,15 @@ const GameProcessManagement: React.FC = () => {
       key: 'buyin',
     },
     {
-      title: '东山再起要求',
-      dataIndex: 'reBuyLimit',
-      key: 'reBuyLimit',
+      title: '东山再起规则',
+      key: 'reBuyRule',
+      render: (_: any, record: RoomInfo) => {
+        const tableMaxChips = (record.players || []).reduce(
+          (max, player) => Math.max(max, Math.max(0, Number(player.stack) || 0)),
+          0
+        );
+        return <span title={`当前最高欢乐豆 ${tableMaxChips}（含旁观者）`}>动态</span>;
+      },
     },
     {
       title: '游戏类型',

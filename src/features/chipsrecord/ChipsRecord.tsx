@@ -8,7 +8,6 @@ export interface TableData {
   id: string;
   name: string;
   chips: number;
-  overflow: number;
   buyIn: number;
   profit: number;
 }
@@ -21,9 +20,8 @@ export function ChipsRecord() {
     id: cr.id,
     name: cr.nickname || cr.name,
     chips: Number(cr.chips) || 0,
-    overflow: Number(cr.overflow) || 0,
     buyIn: cr.buyIn,
-    profit: (Number(cr.chips) || 0) + (Number(cr.overflow) || 0) - cr.buyIn,
+    profit: (Number(cr.chips) || 0) - cr.buyIn,
   }));
   
   const columns: ColumnsType<any> = [
@@ -36,13 +34,7 @@ export function ChipsRecord() {
       title: "欢乐豆",
       dataIndex: "chips",
       key: "chips",
-      sorter: (a: TableData, b: TableData) => (a.chips + a.overflow) - (b.chips + b.overflow),
-    },
-    {
-      title: "溢出",
-      dataIndex: "overflow",
-      key: "overflow",
-      sorter: (a: TableData, b: TableData) => a.overflow - b.overflow,
+      sorter: (a: TableData, b: TableData) => a.chips - b.chips,
     },
     {
       title: "初始",

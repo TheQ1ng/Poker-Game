@@ -35,6 +35,7 @@ export const createRoomAsync = createAsyncThunk(
     supportEnabled,
     supportMinPot,
     supportMaxPercent,
+    overtimeCost,
   }: {
     sb: number;
     buyIn: number;
@@ -46,6 +47,7 @@ export const createRoomAsync = createAsyncThunk(
     supportEnabled: boolean;
     supportMinPot: number;
     supportMaxPercent: number;
+    overtimeCost: number;
   }) => {
     return await createroom(
       sb,
@@ -57,7 +59,8 @@ export const createRoomAsync = createAsyncThunk(
       redPacketMaxPercent,
       supportEnabled,
       supportMinPot,
-      supportMaxPercent
+      supportMaxPercent,
+      overtimeCost
     );
   }
 );

@@ -12,7 +12,7 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 APP_PORT="8086"
-PROJECT_DIR="/home/theq1ng/poker"
+PROJECT_DIR="/home/ubuntu/poker"
 
 echo -e "${GREEN}=== 欢乐积分王训练系统服务器端部署脚本 ===${NC}"
 
@@ -63,7 +63,8 @@ build_project() {
     echo -e "${YELLOW}[4/5] 安装依赖并构建...${NC}"
     
     cd $PROJECT_DIR
-    
+    sudo rm -rf /opt/poker/solver /home/ubuntu/poker/solver-cli
+
     # 先安装完整依赖用于构建（含 TypeScript 类型与构建工具）
     if [ -f package-lock.json ]; then
         npm ci
@@ -91,7 +92,7 @@ start_service() {
     pm2 delete poker 2>/dev/null || true
     
     # 启动新服务
-    pm2 start npm --name "poker" -- start
+    pm2 start npm --name "poker" --cwd /home/ubuntu/poker -- start
     
     # 保存状态
     pm2 save
@@ -105,7 +106,9 @@ start_service() {
 # 配置防火墙
 setup_firewall() {
     echo -e "${YELLOW}配置防火墙...${NC}"
+    sudo ufw allow 22/tcp 2>/dev/null || true
     sudo ufw allow $APP_PORT/tcp 2>/dev/null || true
+    sudo ufw --force enable 2>/dev/null || true
     sudo ufw reload 2>/dev/null || true
     echo -e "${GREEN}✓ 防火墙配置完成${NC}"
 }
@@ -124,7 +127,7 @@ main() {
     echo -e "${GREEN}  部署完成!${NC}"
     echo -e "${GREEN}======================================${NC}"
     echo ""
-    echo "访问地址: http://你的服务器IP:$APP_PORT"
+    echo "游戏地址: http://你的服务器IP:$APP_PORT"
     echo ""
     echo "常用命令:"
     echo "  查看日志: pm2 logs poker"

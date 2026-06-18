@@ -49,7 +49,6 @@ import {
   ws_userHangup,
   ws_userLeave,
   ws_userWatch,
-  ws_settleGame,
   ws_extendActionTime,
   ws_respondSeeHand,
   ws_sendRedPacket,
@@ -59,6 +58,7 @@ import {
   ws_setShortDeck,
   ws_transferRoomOwner,
   ws_repairRoomBalance,
+  ws_revealBoardCard,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -83,8 +83,13 @@ function Room() {
   const [supportAmounts, setSupportAmounts] = useState<Record<string, number>>({});
   const [supportPhaseRemain, setSupportPhaseRemain] = useState(0);
   const [supportSummaryRemain, setSupportSummaryRemain] = useState(0);
+  const [overtimeConfirmVisible, setOvertimeConfirmVisible] = useState(false);
   const [transferOwnerVisible, setTransferOwnerVisible] = useState(false);
   const [transferOwnerTarget, setTransferOwnerTarget] = useState<string>("");
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window === "undefined" ? 1200 : window.innerWidth,
+    height: typeof window === "undefined" ? 800 : window.innerHeight,
+  }));
 
   const roomid = useAppSelector(selectRoomID);
   const users = useAppSelector(selectUsers);
@@ -101,26 +106,37 @@ function Room() {
   const isSettling = game?.isSettling || false;
   // 使用服务端时间偏移来计算下一局开始的剩余秒数，避免不同客户端本地时间差异
   const serverNowForNextGame = Date.now() + serverTimeOffset;
-  const nextGameTime = Math.floor(
-    ((game?.nextGameTime || serverNowForNextGame) - serverNowForNextGame) / 1000
+  const settleCountdownRemainMs = Math.max(
+    0,
+    (game?.nextGameTime || 0) - serverNowForNextGame
   );
-  const cards: PokerCard[] = [...(game?.boardCards || [])];
-  const chipsRecords =
-    room?.roomid && chipsRecordState?.roomid === room.roomid
-      ? chipsRecordState.chipsRecords
-      : [];
+  const isSettleCountdownActive = isSettling && settleCountdownRemainMs > 0;
+  const isWaitingForOwnerStart = isSettling && !isSettleCountdownActive;
+  const cards = useMemo<PokerCard[]>(() => [...(game?.boardCards || [])], [game?.boardCards]);
+  const displayBoardCards = useMemo<(PokerCard | null)[]>(() => {
+    const nextDisplayCards = game?.displayBoardCards || [];
+    if (Array.isArray(nextDisplayCards) && nextDisplayCards.length > 0) {
+      return [...nextDisplayCards, null, null, null, null, null].slice(0, 5);
+    }
+    return [...cards, null, null, null, null, null].slice(0, 5);
+  }, [cards, game?.displayBoardCards]);
+  const chipsRecords = useMemo(
+    () =>
+      room?.roomid && chipsRecordState?.roomid === room.roomid
+        ? chipsRecordState.chipsRecords
+        : [],
+    [room?.roomid, chipsRecordState?.roomid, chipsRecordState?.chipsRecords]
+  );
   const roomBalanceDiff = useMemo(
     () =>
       chipsRecords.reduce((sum, cr) => {
-        const total = (Number(cr.chips) || 0) + (Number(cr.overflow) || 0);
+        const total = Number(cr.chips) || 0;
         return sum + (Number(cr.buyIn) || 0) - total;
       }, 0),
     [chipsRecords]
   );
   const selfRecord = self?.id ? chipsRecords.find((cr) => cr.id === self.id) : undefined;
-  const selfTotalChips = selfRecord
-    ? (Number(selfRecord.chips) || 0) + (Number(selfRecord.overflow) || 0)
-    : 0;
+  const selfTotalChips = selfRecord ? (Number(selfRecord.chips) || 0) : 0;
   const selfProfit = selfTotalChips - (selfRecord?.buyIn || 0);
   const redPacketThresholdMultiple = room?.redPacketConfig?.thresholdMultiple ?? 1;
   const redPacketMaxPercent = room?.redPacketConfig?.maxPercent ?? 30;
@@ -128,7 +144,7 @@ function Room() {
     if (u.isSpectator) return false;
     if (u.id === self?.id) return false;
     const cr = chipsRecords.find((item) => item.id === u.id);
-    return !!cr && ((Number(cr.chips) || 0) + (Number(cr.overflow) || 0) < cr.buyIn);
+    return !!cr && ((Number(cr.chips) || 0) < cr.buyIn);
   });
   const underwaterCount = underwaterUsers.length;
   const minRedPacketAmount = underwaterCount;
@@ -146,6 +162,11 @@ function Room() {
   const canEnableShortDeck = !room?.isOmaha && seatedPlayerCount < 7;
   const shortDeckToggleDisabled = !isShortDeckConfigured && !canEnableShortDeck;
   const transferOwnerCandidates = (room?.users || []).filter((u) => u.id !== self?.id);
+  const isMobile = viewport.width <= 768;
+  const isPortraitMobile = isMobile && viewport.height > viewport.width;
+  const sidebarPanelWidth = isMobile
+    ? Math.max(280, Math.min(360, Math.floor(viewport.width * 0.88)))
+    : 600;
   const canSendRedPacket =
     !!self &&
     !!selfRecord &&
@@ -170,6 +191,8 @@ function Room() {
   const rawIsSettlingCountdown =
     isSettling && (totalShowdown === 0 || settleRevealStep > 2 * totalShowdown);
   const isSettlingCountdown = isSettling && (rawIsSettlingCountdown || countdownLocked);
+  const revealableBoardStartIndex = cards.length;
+  const canRevealHiddenBoardCards = isSettleCountdownActive && revealableBoardStartIndex < 5;
   useEffect(() => {
     if (!isSettling) {
       setCountdownLocked(false);
@@ -180,7 +203,7 @@ function Room() {
     }
   }, [isSettling, rawIsSettlingCountdown, countdownLocked]);
   const nextPositionUserIds = useMemo(() => {
-    if (!isSettlingCountdown || !room?.users?.length) return { SB: null, BB: null, D: null };
+    if (!isSettleCountdownActive || !room?.users?.length) return { SB: null, BB: null, D: null };
     const orderedIds = users as string[];
     const n = orderedIds.length;
     if (n === 0) return { SB: null, BB: null, D: null };
@@ -192,7 +215,7 @@ function Room() {
       return orderedIds[(idx + 1) % n];
     };
     return { SB: getNext("SB"), BB: getNext("BB"), D: getNext("D") };
-  }, [isSettlingCountdown, room?.users, users]);
+  }, [isSettleCountdownActive, room?.users, users]);
   useEffect(() => {
     if (!isSettling) {
       settleAnimatingRef.current = false;
@@ -258,6 +281,10 @@ function Room() {
     : 30;
   const isMyTurnToAct = !!actingUserId && self?.id === actingUserId;
   const addTimeRemaining = isMyTurnToAct ? Math.max(0, 3 - (self?.addTimeUsed ?? 0)) : 0;
+  const overtimeCost = Math.max(0, Number(room?.overtimeCost) || 0);
+  const currentChips = Math.max(0, Number(self?.stack) || 0);
+  const canExtendActionTime =
+    !!isMyTurnToAct && !isSettling && actionTimeLeft > 0 && addTimeRemaining > 0 && currentChips >= overtimeCost;
   const isRedPacketSender = !!activeRedPacket && self?.id === activeRedPacket.senderUserId;
   const isRedPacketRecipient =
     !!activeRedPacket && !!self?.id && activeRedPacket.recipientUserIds.includes(self.id);
@@ -292,16 +319,18 @@ function Room() {
 
   // 结算阶段：胜者动画结束后的倒计时（用于右上角圆形读条）
   const [settleCountdownTotal, setSettleCountdownTotal] = useState<number | null>(null);
+  const settleCountdownLeft = isSettleCountdownActive
+    ? Math.max(0, Math.ceil(settleCountdownRemainMs / 1000))
+    : 0;
   useEffect(() => {
-    if (isSettlingCountdown) {
-      if (settleCountdownTotal == null && nextGameTime > 0) {
-        setSettleCountdownTotal(nextGameTime);
+    if (isSettleCountdownActive) {
+      if (settleCountdownTotal == null && settleCountdownLeft > 0) {
+        setSettleCountdownTotal(settleCountdownLeft);
       }
     } else if (settleCountdownTotal != null) {
       setSettleCountdownTotal(null);
     }
-  }, [isSettlingCountdown, nextGameTime, settleCountdownTotal]);
-  const settleCountdownLeft = isSettlingCountdown ? Math.max(0, nextGameTime) : 0;
+  }, [isSettleCountdownActive, settleCountdownLeft, settleCountdownTotal]);
   const settleCountdownTotalSec =
     settleCountdownTotal != null && settleCountdownTotal > 0
       ? settleCountdownTotal
@@ -396,6 +425,12 @@ function Room() {
     }
   }, [activeRedPacket, redPacketSendVisible]);
 
+  useEffect(() => {
+    if (overtimeConfirmVisible && !canExtendActionTime) {
+      setOvertimeConfirmVisible(false);
+    }
+  }, [overtimeConfirmVisible, canExtendActionTime]);
+
   function setSettleTimes(times: number) {
     ws_settleTimes(times);
     dispatch(setSelectSettleTimes(false));
@@ -407,11 +442,14 @@ function Room() {
       const minHeight = 600;
       const width = window.innerWidth;
       const height = window.innerHeight;
+      setViewport({ width, height });
       
       // 移动端使用不同的计算方式
       if (width < 768) {
-        // 手机端：自适应缩放
-        setZoom(Math.min(width / 400, height / 300, 1));
+        const isMobilePortraitNow = height > width;
+        const targetWidth = isMobilePortraitNow ? 480 : 420;
+        const targetHeight = isMobilePortraitNow ? 760 : 320;
+        setZoom(Math.min(width / targetWidth, height / targetHeight, 1));
       } else if (width < 1024) {
         // iPad
         setZoom(Math.min(width / 900, height / 600, 1));
@@ -459,13 +497,12 @@ function Room() {
   async function handleSaveChipsRecord() {
     try {
       const chipsRecordData = chipsRecords.map((record) => {
-        const totalChips = (Number(record.chips) || 0) + (Number(record.overflow) || 0);
+        const totalChips = Number(record.chips) || 0;
         return {
           id: record.id,
           username: record.name,
           nickname: record.nickname || record.name,
           chips: totalChips,
-          overflow: Number(record.overflow) || 0,
           buyIn: record.buyIn,
           profit: totalChips - record.buyIn,
         };
@@ -496,25 +533,27 @@ function Room() {
 
   return (
     <div
+      className="room-root"
       ref={centerRef}
       style={{
         display: "flex",
         flexDirection: "row",
         flex: 1,
         overflow: "hidden",
-        height: "100vh",
+        height: "100dvh",
         width: "100vw",
-        padding: "10px",
+        padding: isMobile ? "6px" : "10px",
       }}
     >
       {/* 左侧边栏 */}
       <div
+        className="room-sidebar"
         style={{
           position: "absolute",
           left: 0,
           top: 0,
           bottom: 0,
-          width: sidebarVisible ? 600 : 0,
+          width: sidebarVisible ? sidebarPanelWidth : 0,
           backgroundColor: "#1a1a1a",
           borderRight: "2px solid rgba(201, 162, 39, 0.5)",
           boxShadow: "0 0 20px rgba(0,0,0,0.5)",
@@ -523,7 +562,7 @@ function Room() {
           overflow: "hidden",
         }}
       >
-        <div style={{ padding: 20, height: "100%", display: "flex", flexDirection: "column" }}>
+        <div className="room-sidebar-content" style={{ padding: isMobile ? 12 : 20, height: "100%", display: "flex", flexDirection: "column" }}>
           <h2 style={{ color: "#fff", marginBottom: 20 }}>游戏信息</h2>
           
           {/* 切换按钮 */}
@@ -595,10 +634,10 @@ function Room() {
         type="primary"
         icon={<InfoCircleOutlined />}
         onClick={() => setSidebarVisible(!sidebarVisible)}
-        className="sidebar-btn"
+        className="sidebar-btn room-sidebar-toggle"
         style={{
           position: "absolute",
-          left: sidebarVisible ? 610 : 10,
+          left: sidebarVisible ? sidebarPanelWidth + 10 : 10,
           top: "10px",
           zIndex: 100,
           borderRadius: "30px",
@@ -615,6 +654,7 @@ function Room() {
         type="default"
         icon={<InfoCircleOutlined />}
         onClick={() => setDisclaimerModalVisible(true)}
+        className="room-disclaimer-btn"
         style={{
           position: "absolute",
           right: "10px",
@@ -631,14 +671,14 @@ function Room() {
 
       {/* 牌桌区域 */}
       <div
-        className="card"
+        className="card room-main-card"
         style={{
           flex: 1,
           position: "relative",
           margin: "0 auto",
           background: "linear-gradient(145deg, #1a3d28 0%, #0f2518 100%)",
-          borderRadius: "60px",
-          border: "15px solid #4a2c17",
+          borderRadius: isMobile ? "28px" : "60px",
+          border: `${isMobile ? 8 : 15}px solid #4a2c17`,
           boxShadow: "inset 0 0 80px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.5)",
         }}
       >
@@ -1014,7 +1054,7 @@ function Room() {
               红包进行中，倒计时暂停（剩 {pausedNextGameSeconds}s）
             </div>
           </div>
-        ) : isSettlingCountdown ? (
+        ) : isSettleCountdownActive ? (
           <div
             style={{
               position: "absolute",
@@ -1103,6 +1143,50 @@ function Room() {
               下一局倒计时
             </div>
           </div>
+        ) : isWaitingForOwnerStart ? (
+          <div
+            style={{
+              position: "absolute",
+              top: 14,
+              right: 14,
+              zIndex: 50,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <div
+              className="action-countdown-circle"
+              style={{
+                width: 58,
+                height: 58,
+                borderRadius: "50%",
+                background: "linear-gradient(145deg, #102018 0%, #08120d 100%)",
+                border: "3px solid rgba(255, 215, 0, 0.65)",
+                boxShadow: "0 0 20px rgba(255, 215, 0, 0.28), inset 0 0 15px rgba(0,0,0,0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                position: "relative",
+              }}
+            >
+              <CaretRightOutlined style={{ color: "#ffd700", fontSize: 24 }} />
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: "#fff3bf",
+                textShadow: "0 0 6px rgba(0, 0, 0, 0.6)",
+                padding: "2px 8px",
+                borderRadius: 12,
+                background: "rgba(0, 0, 0, 0.55)",
+                border: "1px solid rgba(255, 215, 0, 0.45)",
+              }}
+            >
+              等待房主发牌
+            </div>
+          </div>
         ) : (
           !isSettling &&
           actingUserId && (
@@ -1180,11 +1264,11 @@ function Room() {
                   {actionTimeLeft}
                 </span>
               </div>
-              {isMyTurnToAct && addTimeRemaining > 0 && (
+              {canExtendActionTime && (
                 <Button
                   type="primary"
                   size="small"
-                  onClick={ws_extendActionTime}
+                  onClick={() => setOvertimeConfirmVisible(true)}
                   style={{
                     fontSize: 12,
                     height: 28,
@@ -1194,13 +1278,14 @@ function Room() {
                     border: "1px solid rgba(201, 162, 39, 0.5)",
                   }}
                 >
-                  +30s ({addTimeRemaining})
+                  +45s ({addTimeRemaining})
                 </Button>
               )}
             </div>
           )
         )}
         <div
+          className="room-stage"
           style={{
             display: "flex",
             flexDirection: "column",
@@ -1210,9 +1295,9 @@ function Room() {
             height: `${100/zoom}%`,
           }}
         >
-          <div className="roominfo flex-row flex-center" style={{ color: 'white', gap: '8px' }}>
+          <div className="roominfo room-top-actions flex-row flex-center" style={{ color: 'white', gap: '8px' }}>
             {/* 房间号显示 */}
-            <span style={{
+            <span className="room-id-chip" style={{
               fontSize: '14px',
               fontWeight: 'bold',
               color: '#ffd700',
@@ -1256,17 +1341,6 @@ function Room() {
                 </Tooltip>
               )
             ) : null}
-            {/* 结算按钮 - 仅房主可见 */}
-            {self?.isRoomOwner && roomid && (
-              <Tooltip title="盈利封顶到1999并发放溢出红包（欢乐豆封顶1000，超出计入溢出）">
-                <Button
-                  className="room-action-btn"
-                  type="primary"
-                  icon={<DollarOutlined />}
-                  onClick={ws_settleGame}
-                />
-              </Tooltip>
-            )}
             {/* 保存积分榜按钮 - 仅房主可见 */}
             {self?.isRoomOwner && roomid && (
               <Tooltip title="保存当前积分榜到数据库">
@@ -1412,9 +1486,9 @@ function Room() {
             </Popconfirm>
           </div>
           {/* 玩家布局：围着桌子的三个面坐一圈，根据人数动态分配 */}
-          <div className="flex1 flex-row">
+          <div className="room-seats-layout flex1 flex-row">
             {/* 左侧玩家（1个） */}
-            <div className="flex1 flex-column flex-center" style={{ maxWidth: '150px' }}>
+            <div className="room-seat-side flex1 flex-column flex-center" style={{ maxWidth: isPortraitMobile ? '86px' : isMobile ? '110px' : '150px' }}>
               {users.length > 0 && (
                 <User
                   id={`${users[0]}`}
@@ -1424,6 +1498,7 @@ function Room() {
                   totalShowdown={totalShowdown}
                   isActingUser={actingUserId === users[0]}
                   isSettlingCountdown={isSettlingCountdown}
+                  isSettleCountdownActive={isSettleCountdownActive}
                   nextPositionUserIds={nextPositionUserIds}
                 />
               )}
@@ -1432,7 +1507,7 @@ function Room() {
             {/* 中间区域：牌桌中心和上方玩家 */}
             <div className="flex3 flex-column">
               {/* 上方玩家（对面，数量比两边多） */}
-              <div className="flex1 flex-row" style={{ justifyContent: 'space-around', padding: '0 20px' }}>
+              <div className="room-top-seats flex1 flex-row" style={{ justifyContent: 'space-around', padding: isPortraitMobile ? '0 6px' : isMobile ? '0 10px' : '0 20px' }}>
                 {users.slice(1, users.length - 1).map((id) => (
                   <User
                     id={`${id}`}
@@ -1442,35 +1517,67 @@ function Room() {
                     totalShowdown={totalShowdown}
                     isActingUser={actingUserId === id}
                     isSettlingCountdown={isSettlingCountdown}
+                    isSettleCountdownActive={isSettleCountdownActive}
                     nextPositionUserIds={nextPositionUserIds}
                   />
                 ))}
               </div>
               
               {/* 牌桌中心 */}
-              <div className="flex2 flex-column flex-center">
+              <div className="room-center-area flex2 flex-column flex-center">
                 <div style={{ width: 100 }}>{/* 结算倒计时读条改为右上角圆形动画，这里留空 */}</div>
                 <div className="boards flex-row flex-center">
-                  {[...cards, null, null, null, null, null]
-                    .splice(0, 5)
-                    .map((card, i) => {
-                      let isSelected = true;
-                      return (
+                  {displayBoardCards.map((card, i) => {
+                    const isRevealSlot =
+                      canRevealHiddenBoardCards && i >= revealableBoardStartIndex;
+                    return (
+                      <div
+                        key={`${card ? `${card.num}${card.suit}` : "hidden"}-${i}`}
+                        className={`board-card-slot ${isRevealSlot ? "board-card-slot-reveal" : ""}`}
+                      >
                         <Poker
                           card={card}
-                          key={`${card ? `${card.num}${card.suit}` : i}`}
-                          isSelected={isSelected}
-                          animation={card ? "deal" : "none"}
+                          isSelected={true}
+                          animation={card ? (i >= revealableBoardStartIndex ? "flip" : "deal") : "none"}
+                          showShowHandButton={false}
                         />
-                      );
-                    })}
+                        {isRevealSlot && !card ? (
+                          <Button
+                            type="primary"
+                            size="small"
+                            className="board-card-reveal-btn"
+                            onClick={() => {
+                              soundManager.playButton();
+                              ws_revealBoardCard(i);
+                            }}
+                            style={{
+                              position: "absolute",
+                              left: "50%",
+                              top: "50%",
+                              transform: "translate(-50%, -50%)",
+                              zIndex: 3,
+                              whiteSpace: "nowrap",
+                              padding: "0 8px",
+                              borderRadius: 12,
+                              fontSize: 12,
+                              background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
+                              border: "1px solid rgba(201, 162, 39, 0.7)",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+                            }}
+                          >
+                            查看
+                          </Button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
-                <div style={{
+                <div className="room-pot-row" style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   width: "100%",
-                  maxWidth: "400px",
+                  maxWidth: isPortraitMobile ? "100%" : "400px",
                   marginBottom: "20px",
                 }}>
                   {/* 左侧总积分区域 */}
@@ -1496,7 +1603,7 @@ function Room() {
                   </div>
                   
                   {/* 右侧免责声明内容 */}
-                  <div style={{
+                  <div className="room-center-disclaimer" style={{
                     textAlign: "right",
                     maxWidth: "150px",
                     fontSize: "10px",
@@ -1512,7 +1619,7 @@ function Room() {
             </div>
             
             {/* 右侧玩家（1个） */}
-            <div className="flex1 flex-column flex-center" style={{ maxWidth: '150px' }}>
+            <div className="room-seat-side flex1 flex-column flex-center" style={{ maxWidth: isPortraitMobile ? '86px' : isMobile ? '110px' : '150px' }}>
               {users.length > 1 && (
                 <User
                   id={`${users[users.length - 1]}`}
@@ -1522,6 +1629,7 @@ function Room() {
                   totalShowdown={totalShowdown}
                   isActingUser={actingUserId === users[users.length - 1]}
                   isSettlingCountdown={isSettlingCountdown}
+                  isSettleCountdownActive={isSettleCountdownActive}
                   nextPositionUserIds={nextPositionUserIds}
                 />
               )}
@@ -1574,12 +1682,13 @@ function Room() {
               showdownOrder={showdownOrder}
               totalShowdown={totalShowdown}
               isSettlingCountdown={isSettlingCountdown}
+              isSettleCountdownActive={isSettleCountdownActive}
+              settleCountdownLeft={settleCountdownLeft}
               nextPositionUserIds={nextPositionUserIds}
             />
           </div>
         </div>
       </div>
-
       {/* 发红包弹窗 */}
       <Modal
         title={<span style={{ color: "#f7d777" }}>👑 转移房主</span>}
@@ -1719,6 +1828,61 @@ function Room() {
             strokeColor={{ "0%": "#f7d777", "100%": "#ffec99" }}
             trailColor="rgba(255,255,255,0.18)"
           />
+        </div>
+      </Modal>
+
+      <style>{`
+        .overtime-confirm-modal .ant-modal-content {
+          background: linear-gradient(180deg, #1d3d2b 0%, #102017 100%);
+          color: #fff;
+          border: 1px solid rgba(255, 215, 0, 0.18);
+        }
+        .overtime-confirm-modal .ant-modal-header,
+        .overtime-confirm-modal .ant-modal-footer {
+          background: transparent;
+          border-color: rgba(255, 255, 255, 0.12);
+        }
+        .overtime-confirm-modal .ant-modal-body {
+          background: transparent;
+          color: #fff;
+        }
+        .overtime-confirm-modal .ant-modal-title {
+          color: #fff;
+        }
+      `}</style>
+
+      <Modal
+        visible={overtimeConfirmVisible}
+        title={<span style={{ color: "#fff" }}>确认加时</span>}
+        onOk={() => {
+          setOvertimeConfirmVisible(false);
+          ws_extendActionTime();
+        }}
+        onCancel={() => setOvertimeConfirmVisible(false)}
+        okText="确认"
+        cancelText="取消"
+        okButtonProps={{
+          style: { background: "#2d5a3d", borderColor: "#2d5a3d", color: "#fff" },
+        }}
+        cancelButtonProps={{
+          style: {
+            background: "rgba(255,255,255,0.08)",
+            borderColor: "rgba(255,255,255,0.18)",
+            color: "#fff",
+          },
+        }}
+        centered
+        destroyOnClose
+        maskClosable={false}
+        className="overtime-confirm-modal"
+        style={{ top: 220 }}
+        bodyStyle={{
+          background: "linear-gradient(180deg, #1d3d2b 0%, #102017 100%)",
+          color: "#fff",
+        }}
+      >
+        <div style={{ color: "#fff", lineHeight: 1.7 }}>
+          确认支付 {overtimeCost} 欢乐豆加时45s吗
         </div>
       </Modal>
 

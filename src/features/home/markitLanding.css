@@ -1,0 +1,387 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Be+Vietnam+Pro:wght@600;700;800;900&display=swap");
+
+.markit-shell {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #1a1c1c;
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+.markit-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid #ebebeb;
+  backdrop-filter: blur(12px);
+}
+
+.markit-header-inner,
+.markit-subnav-inner,
+.markit-main {
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.markit-header-inner {
+  height: 80px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.markit-brand {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex: 0 0 auto;
+}
+
+.markit-brand-text {
+  font-family: "Be Vietnam Pro", "Inter", system-ui, sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #ba0035;
+}
+
+.markit-header-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.markit-header-links a,
+.markit-subnav-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.markit-header-links a {
+  color: #666666;
+  font-size: 18px;
+  line-height: 1;
+  padding-bottom: 8px;
+}
+
+.markit-header-links a.active {
+  color: #1a1a1a;
+  border-bottom: 2px solid #ba0035;
+}
+
+.markit-search {
+  flex: 1 1 auto;
+  max-width: 560px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  background: #f5f5f5;
+}
+
+.markit-search-icon {
+  color: #666666;
+  font-size: 20px;
+}
+
+.markit-search input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #1a1a1a;
+  font-size: 16px;
+}
+
+.markit-search input::placeholder {
+  color: #7a7a7a;
+}
+
+.markit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.markit-icon-button {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #555555;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 24px;
+}
+
+.markit-post-button {
+  height: 48px;
+  padding: 0 24px;
+  border: 0;
+  border-radius: 9999px;
+  background: #ba0035;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.markit-avatar-button {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 2px solid #f0f0f0;
+  border-radius: 50%;
+  background: #0f172a;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.markit-avatar-button svg {
+  display: block;
+}
+
+.markit-subnav {
+  position: fixed;
+  top: 80px;
+  left: 0;
+  z-index: 45;
+  width: 100%;
+  height: 68px;
+  background: rgba(255, 255, 255, 0.98);
+  border-bottom: 1px solid #ededed;
+  backdrop-filter: blur(10px);
+}
+
+.markit-subnav-inner {
+  height: 100%;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.markit-subnav-inner::-webkit-scrollbar {
+  display: none;
+}
+
+.markit-subnav-button {
+  color: #666666;
+  font-size: 18px;
+  line-height: 1;
+  padding-bottom: 7px;
+  white-space: nowrap;
+}
+
+.markit-subnav-button.active {
+  color: #ba0035;
+  border-bottom: 2px solid #ba0035;
+}
+
+.markit-main {
+  padding: 156px 32px 120px;
+}
+
+.markit-grid {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.markit-card {
+  overflow: hidden;
+  border: 1px solid #f0f0f0;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.markit-card-media {
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+
+.markit-card-artwork {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.markit-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 14px 12px;
+}
+
+.markit-card-title {
+  margin: 0;
+  min-height: 45px;
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: #111111;
+  font-size: 17px;
+  line-height: 1.28;
+  font-weight: 500;
+}
+
+.markit-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.markit-card-author {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.markit-card-author > span:first-child {
+  flex: 0 0 auto;
+}
+
+.markit-card-author span,
+.markit-card-likes {
+  color: #666666;
+  font-size: 14px;
+}
+
+.markit-card-author span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markit-card-likes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.markit-fab {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 40;
+  width: 68px;
+  height: 68px;
+  border: 0;
+  border-radius: 50%;
+  background: #ba0035;
+  color: #ffffff;
+  box-shadow: 0 16px 30px rgba(186, 0, 53, 0.28);
+  font-size: 34px;
+  cursor: pointer;
+}
+
+@media (max-width: 1400px) {
+  .markit-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1120px) {
+  .markit-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .markit-header-links,
+  .markit-search {
+    display: none;
+  }
+
+  .markit-header-inner {
+    justify-content: space-between;
+  }
+
+  .markit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .markit-header-inner,
+  .markit-subnav-inner,
+  .markit-main {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .markit-header-inner {
+    height: 72px;
+  }
+
+  .markit-brand {
+    gap: 16px;
+  }
+
+  .markit-brand-text {
+    font-size: 24px;
+  }
+
+  .markit-header-actions {
+    gap: 10px;
+  }
+
+  .markit-post-button {
+    padding: 0 18px;
+    height: 42px;
+    font-size: 15px;
+  }
+
+  .markit-avatar-button {
+    width: 38px;
+    height: 38px;
+  }
+
+  .markit-subnav {
+    top: 72px;
+    height: 62px;
+  }
+
+  .markit-subnav-button {
+    font-size: 16px;
+  }
+
+  .markit-main {
+    padding-top: 146px;
+  }
+
+  .markit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .markit-fab {
+    right: 16px;
+    bottom: 16px;
+    width: 60px;
+    height: 60px;
+    font-size: 30px;
+  }
+}

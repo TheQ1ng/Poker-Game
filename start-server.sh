@@ -15,7 +15,6 @@ SERVER_IP="111.229.164.165"
 SERVER_PASSWORD="6*5z}%CAh^8D{4Ev"
 SERVER_USER="ubuntu"
 APP_PORT="8086"
-
 # SSH 命令前缀
 SSH_CMD="sshpass -p $SERVER_PASSWORD ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP"
 
@@ -25,7 +24,7 @@ echo -e "${YELLOW}[1/3] 连接服务器...${NC}"
 
 # 启动 PM2 服务
 echo -e "${YELLOW}[2/3] 启动服务...${NC}"
-$SSH_CMD "cd /home/ubuntu/poker && pm2 start npm --name \"poker\" -- start"
+$SSH_CMD "sudo rm -rf /opt/poker/solver /home/ubuntu/poker/solver-cli && cd /home/ubuntu/poker && pm2 start npm --name \"poker\" --cwd /home/ubuntu/poker -- start"
 
 # 保存 PM2 状态
 echo -e "${YELLOW}[3/3] 保存状态...${NC}"

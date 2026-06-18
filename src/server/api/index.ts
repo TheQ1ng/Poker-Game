@@ -9,8 +9,6 @@ import {
   getUser,
   isNicknameExists,
   getUserByUuid,
-  getDailyBuyInState,
-  getDailyBuyInDayKey,
 } from "../service/database";
 import db from "../service/database";
 import User from "../service/User";
@@ -18,6 +16,15 @@ import { v4 as uuidv4 } from "uuid";
 
 const router = new Router();
 export default router;
+
+function requireAuth(ctx: any) {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token]) {
+    createUser(token, ctx.user, "");
+  }
+  return { token, username: userMap[token].name };
+}
 
 function syncGameRecordProfit(gameRecordId: number) {
   const sumStmt = db.prepare(`
@@ -177,6 +184,7 @@ router.post("/createroom", (ctx) => {
     supportEnabled,
     supportMinPot,
     supportMaxPercent,
+    overtimeCost,
   } = ctx.request.body;
   const room = createRoom(
     token,
@@ -187,9 +195,10 @@ router.post("/createroom", (ctx) => {
     !!isOmaha,
     Number(redPacketThresholdMultiple ?? 1),
     Number(redPacketMaxPercent ?? 30),
-    supportEnabled == null ? true : !!supportEnabled,
+    supportEnabled == null ? false : !!supportEnabled,
     Number(supportMinPot ?? 600),
-    Number(supportMaxPercent ?? 5)
+    Number(supportMaxPercent ?? 5),
+    Number(overtimeCost ?? 0)
   );
   ctx.data = room.id;
 });
@@ -282,6 +291,26 @@ router.get("/profile", (ctx) => {
   };
 });
 
+function requireRoomMember(ctx: any) {
+  const { token, username } = requireAuth(ctx);
+  const user = userMap[token];
+  if (!user?.roomid) {
+    throw "not in room";
+  }
+  const room = roomMap[user.roomid];
+  if (!room) {
+    throw "room not found";
+  }
+  return { token, username, user, room };
+}
+
+function requireRoomOwner(ctx: any) {
+  const data = requireRoomMember(ctx);
+  if (!data.user?.isRoomOwner) {
+    throw "only room owner";
+  }
+  return data;
+}
 // 管理员接口：获取所有用户
 router.get("/admin/users", (ctx) => {
   const token = ctx.header.authorization;
@@ -290,7 +319,7 @@ router.get("/admin/users", (ctx) => {
   
   // 从数据库获取所有用户
   const stmt = db.prepare(
-    "SELECT username, nickname, avatar, admin, created_at, daily_buyin_used, daily_buyin_day_key FROM users ORDER BY created_at DESC"
+    "SELECT username, nickname, avatar, admin, created_at FROM users ORDER BY created_at DESC"
   );
   const users = (stmt.all() as Array<{
     username: string;
@@ -298,17 +327,7 @@ router.get("/admin/users", (ctx) => {
     avatar: string;
     admin: number;
     created_at: string;
-    daily_buyin_used?: number;
-    daily_buyin_day_key?: string;
-  }>).map((u) => {
-    const state = getDailyBuyInState(u.username);
-    return {
-      ...u,
-      daily_buyin_used: state.used,
-      daily_buyin_remaining: state.remaining,
-      daily_buyin_day_key: state.dayKey,
-    };
-  });
+  }>).map((u) => u);
   ctx.data = users;
 });
 
@@ -331,58 +350,43 @@ router.post("/admin/user/update", (ctx) => {
   if (!token) throw "need login";
   if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
   
-  const { username, nickname, avatar, admin, dailyBuyInUsed } = ctx.request.body;
+  const { username, nickname, avatar, admin } = ctx.request.body;
   if (!username) throw "username is required";
 
-  const normalizedUsed =
-    dailyBuyInUsed === undefined || dailyBuyInUsed === null
-      ? null
-      : Math.max(0, Math.min(5, Math.floor(Number(dailyBuyInUsed) || 0)));
-
-  // 更新用户信息（支持管理员手动调整每日买入次数）
-  if (normalizedUsed === null) {
-    const stmt = db.prepare(`
-      UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE username = ?
-    `);
-    stmt.run(nickname, avatar, admin ? 1 : 0, username);
-  } else {
-    const stmt = db.prepare(`
-      UPDATE users SET
-        nickname = ?,
-        avatar = ?,
-        admin = ?,
-        daily_buyin_used = ?,
-        daily_buyin_day_key = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE username = ?
-    `);
-    stmt.run(
-      nickname,
-      avatar,
-      admin ? 1 : 0,
-      normalizedUsed,
-      getDailyBuyInDayKey(),
-      username
-    );
-  }
+  const stmt = db.prepare(`
+    UPDATE users SET nickname = ?, avatar = ?, admin = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE username = ?
+  `);
+  stmt.run(nickname, avatar, admin ? 1 : 0, username);
 
   Object.values(userMap).forEach((onlineUser) => {
     if (onlineUser.name !== username) return;
     onlineUser.nickname = nickname;
     onlineUser.avatar = avatar;
     onlineUser.isAdmin = !!admin;
-    if (normalizedUsed !== null) {
-      onlineUser.dailyBuyInDayKey = getDailyBuyInDayKey();
-      onlineUser.dailyBuyInUsed = normalizedUsed;
-      onlineUser.dailyBuyInRemaining = Math.max(0, 5 - normalizedUsed);
-    } else {
-      const state = getDailyBuyInState(username);
-      onlineUser.dailyBuyInDayKey = state.dayKey;
-      onlineUser.dailyBuyInUsed = state.used;
-      onlineUser.dailyBuyInRemaining = state.remaining;
-    }
   });
+
+  ctx.data = { success: true };
+});
+
+router.post("/admin/user/reset-password", (ctx) => {
+  const token = ctx.header.authorization;
+  if (!token) throw "need login";
+  if (!userMap[token] || !userMap[token].isAdmin) throw "not admin";
+
+  const { username, password } = ctx.request.body;
+  if (!username) throw "username is required";
+  if (!password) throw "password is required";
+
+  const stmt = db.prepare(`
+    UPDATE users
+    SET password = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE username = ?
+  `);
+  const result = stmt.run(String(password), String(username));
+  if ((result.changes || 0) < 1) {
+    throw "user not found";
+  }
 
   ctx.data = { success: true };
 });
@@ -508,7 +512,7 @@ router.post("/admin/save-chips-record", (ctx) => {
             const username = mapped?.name || cr.name || "未知玩家";
             const nickname = mapped?.nickname || cr.nickname || username;
             const profile = getUser(username);
-            const totalChips = (Number(cr.chips) || 0) + (Number((cr as any).overflow) || 0);
+            const totalChips = Number(cr.chips) || 0;
             return {
               username,
               nickname,
@@ -524,7 +528,7 @@ router.post("/admin/save-chips-record", (ctx) => {
             const username = mapped?.name || record.username || "未知玩家";
             const nickname = mapped?.nickname || record.nickname || username;
             const profile = getUser(username);
-            const totalChips = (Number(record.chips) || 0) + (Number((record as any).overflow) || 0);
+            const totalChips = Number(record.chips) || 0;
             return {
               username,
               nickname,

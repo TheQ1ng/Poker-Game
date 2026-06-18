@@ -6,6 +6,8 @@ import { addLogs, replaceLogs, setHistoryRoom } from "../features/gamehistory/ga
 import { addMessage, setChatRoom } from "../features/chat/chatSlice";
 import { roominfo } from "../features/home/homeAPI";
 import { clearRoomID } from "../features/home/homeSlice";
+import { getQuickVoiceSoundFile } from "../utils/quickVoice";
+import { soundManager } from "../utils/soundManager";
 import {
   setGame,
   setHands,
@@ -29,19 +31,6 @@ import {
   clearSupportSummary,
 } from "../features/room/roomSlice";
 import { AppThunk } from "./store";
-
-// 快捷消息到音效的映射
-const messageToSoundMap: { [key: string]: string } = {
-  "棒棒棒棒！": "bangbangbangbang.WAV",
-  "难道他真的是赋能哥": "funeng.WAV",
-  "哈哈哈哈哈哈": "hahahhahahaha.WAV",
-  "颗秒！": "kemiao.WAV",
-  "17张牌你能秒我！": "17zhangpai.WAV",
-  "给我擦皮鞋！": "capixie.WAV",
-  "慢波！": "manbo.WAV",
-  "牌没有问题！": "meiyouwenti.WAV",
-  "我要验牌！": "yanpai.WAV"
-};
 
 let ws: WebSocket;
 function send2server(data: any) {
@@ -228,6 +217,24 @@ export const connect2server =
             }));
           }
           if (data.roomChat) {
+            const message = data.roomChat.message;
+            const soundFile = getQuickVoiceSoundFile(message);
+            if (soundFile) {
+              // 快捷语音走独立的预加载队列，避免被聊天写入/渲染阻塞
+              soundManager.playQuickVoice(soundFile);
+            } else if ('speechSynthesis' in window) {
+              // 非快捷消息，使用语音朗读
+              const isEmojiOnly = /^\p{Extended_Pictographic}+$/u.test(message);
+              if (!isEmojiOnly) {
+                const utterance = new SpeechSynthesisUtterance(message);
+                utterance.lang = 'zh-CN';
+                utterance.volume = 1;
+                utterance.rate = 1;
+                utterance.pitch = 1;
+                speechSynthesis.speak(utterance);
+              }
+            }
+
             dispatch(setRoomChatBubble({ userId: data.roomChat.userId, text: data.roomChat.message }));
             // 添加到聊天消息列表
             dispatch(addMessage({
@@ -235,28 +242,6 @@ export const connect2server =
               content: data.roomChat.message,
               timestamp: Date.now()
             }));
-            const message = data.roomChat.message;
-            // 检查是否为快捷消息（有对应的音效）
-            const soundFile = messageToSoundMap[message];
-            if (soundFile) {
-              // 播放快捷消息对应的音效
-              const audio = new Audio(`/sounds/${soundFile}`);
-              audio.play().catch(err => console.warn('Failed to play sound:', err));
-            } else {
-              // 非快捷消息，使用语音朗读
-              if ('speechSynthesis' in window) {
-                // 检查是否为表情消息（只包含表情符号）
-                const isEmojiOnly = /^\p{Extended_Pictographic}+$/u.test(message);
-                if (!isEmojiOnly) {
-                  const utterance = new SpeechSynthesisUtterance(message);
-                  utterance.lang = 'zh-CN';
-                  utterance.volume = 1;
-                  utterance.rate = 1;
-                  utterance.pitch = 1;
-                  speechSynthesis.speak(utterance);
-                }
-              }
-            }
           }
 
           console.log(data);
@@ -320,6 +305,12 @@ export function ws_userRebuy() {
   });
 }
 
+export function ws_userRepay() {
+  send2server({
+    action: ActionType.REPAY,
+  });
+}
+
 export function ws_userLeave() {
   send2server({
     action: ActionType.LEAVE,
@@ -335,6 +326,13 @@ export function ws_overtime() {
 export function ws_userShowHands() {
   send2server({
     action: ActionType.SHOW_HANDS,
+  });
+}
+
+export function ws_revealBoardCard(boardIndex: number) {
+  send2server({
+    action: ActionType.REVEAL_BOARD_CARD,
+    boardIndex,
   });
 }
 
@@ -370,12 +368,6 @@ export function ws_kickUser(userId: string) {
   send2server({
     action: ActionType.KICK_USER,
     userId,
-  });
-}
-
-export function ws_settleGame() {
-  send2server({
-    action: ActionType.SETTLE_GAME,
   });
 }
 

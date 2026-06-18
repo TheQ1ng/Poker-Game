@@ -13,6 +13,7 @@ interface ChatState {
 }
 
 const STORAGE_KEY = "chatByRoom";
+const MAX_CHAT_MESSAGES = 300;
 
 function readStore(): Record<string, ChatMessage[]> {
   try {
@@ -25,7 +26,7 @@ function readStore(): Record<string, ChatMessage[]> {
 function writeStore(roomid: string, messages: ChatMessage[]) {
   if (!roomid) return;
   const all = readStore();
-  all[roomid] = messages;
+  all[roomid] = messages.slice(-MAX_CHAT_MESSAGES);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
 }
 
@@ -47,10 +48,13 @@ export const chatSlice = createSlice({
         return;
       }
       const all = readStore();
-      state.messages = Array.isArray(all[roomid]) ? all[roomid] : [];
+      state.messages = Array.isArray(all[roomid]) ? all[roomid].slice(-MAX_CHAT_MESSAGES) : [];
     },
     addMessage: (state, action: PayloadAction<ChatMessage>) => {
       state.messages.push(action.payload);
+      if (state.messages.length > MAX_CHAT_MESSAGES) {
+        state.messages.splice(0, state.messages.length - MAX_CHAT_MESSAGES);
+      }
       writeStore(state.roomid, state.messages);
     },
     clearMessages: (state) => {

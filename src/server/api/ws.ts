@@ -15,8 +15,10 @@ import {
   userOverTime,
   userReady,
   userReBuy,
+  userRepay,
   userSetSettleTimes,
   userShowHands,
+  userRevealBoardCard,
   userWatch,
   userSendMessage,
   addBotToRoom,
@@ -44,8 +46,8 @@ import {
   SimpleSelf,
   SimpleUser,
 } from "../../ApiType";
-import { getUser, saveRoomLogs, getRoomLogs, getDailyBuyInState } from "../service/database";
-import { getOverflow, normalizeChipsRecord } from "../service/chips";
+import { getUser, saveRoomLogs, getRoomLogs } from "../service/database";
+import { normalizeChipsRecord } from "../service/chips";
 
 export interface PokerWebSocket extends ws {
   name?: string;
@@ -174,6 +176,9 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
     case ActionType.REBUY:
       userReBuy(token);
       break;
+    case ActionType.REPAY:
+      userRepay(token);
+      break;
     case ActionType.OVERTIME:
       userOverTime(token);
       break;
@@ -182,6 +187,9 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
       break;
     case ActionType.SHOW_HANDS:
       userShowHands(token);
+      break;
+    case ActionType.REVEAL_BOARD_CARD:
+      userRevealBoardCard(token, Number(data.boardIndex));
       break;
     case ActionType.SET_SETTLE_TIMES:
       userSetSettleTimes(token, data.times);
@@ -269,8 +277,13 @@ function getSimpleRoom(room: Room): SimpleRoom {
             : undefined,
       }
     : null;
+  const ownerToken = room.users.find((t) => userMap[t]?.isRoomOwner) || "";
+  const ownerUser = ownerToken ? userMap[ownerToken] : null;
   return {
     roomid: room.id,
+    smallBlind: room.smallBlind,
+    buyIn: room.buyIn,
+    reBuyLimit: room.reBuyLimit,
     isGaming: room.isGaming,
     users: room.users.map((t) => getSimpleUser(t)),
     isShortDeck: !!room.isShortDeck,
@@ -285,6 +298,7 @@ function getSimpleRoom(room: Room): SimpleRoom {
       minPot: room.supportMinPot,
       maxPercent: room.supportMaxPercent,
     },
+    overtimeCost: room.overtimeCost,
   };
 }
 
@@ -298,7 +312,6 @@ function getSimpleChipsRecords(room: Room): SimpleRoomChipsRecords {
         name: cr.name,
         nickname: cr.nickname,
         chips: cr.chips,
-        overflow: getOverflow(cr),
         buyIn: cr.buyIn,
       };
     }),
@@ -309,11 +322,12 @@ function getSimpleGame(game: Game): SimpleGame {
   if (!game) {
     return {
       boardCards: [],
+      displayBoardCards: [null, null, null, null, null],
       pots: 0,
       acting: "",
       preBet: 0,
       bb: 0,
-      reBuyLimit: 1,
+      reBuyLimit: 500,
       isSettling: false,
       nextGameTime: 0,
       raiseUser: "",
@@ -331,7 +345,9 @@ function getSimpleGame(game: Game): SimpleGame {
   );
   return {
     boardCards: game.boardCards,
-    pots: sum(game.sortedUsers.map((t) => sum(userMap[t].bets))),
+    displayBoardCards: game.getDisplayedBoardCards(),
+    pots: sum(game.sortedUsers.map((t) => sum(userMap[t].bets))) +
+      sum(game.sortedUsers.map((t) => Math.max(0, Math.floor(Number(userMap[t].overtimeFeePaid) || 0)))),
     acting: actingUser ? userMap[actingUser].chipsRecordID : "",
     preBet,
     bb: game.smallBlind * 2,
@@ -350,12 +366,6 @@ function getSimpleGame(game: Game): SimpleGame {
 function getSimpleUser(token: Token): SimpleUser {
   const user = userMap[token];
   const room = roomMap[user.roomid];
-  const dailyState = getDailyBuyInState(user.name);
-  if (dailyState.persisted) {
-    user.dailyBuyInDayKey = dailyState.dayKey;
-    user.dailyBuyInUsed = dailyState.used;
-    user.dailyBuyInRemaining = dailyState.remaining;
-  }
   const hiddenHands = user.hands.map(() => null);
   const publicHands = user.shouldShowHand
     ? user.hands
@@ -387,11 +397,9 @@ function getSimpleUser(token: Token): SimpleUser {
     handsType: user.shouldShowHand ? user.handsType : "",
     shouldShowHand: user.shouldShowHand,
 
-    stack: user.stack - sum(user.bets),
+    stack: user.stack - sum(user.bets) - Math.max(0, Math.floor(Number(user.overtimeFeePaid) || 0)),
     bet: room.game ? user.bets[room.game.round] : 0,
     addTimeUsed: user.addTimeUsed ?? 0,
-    dailyBuyInUsed: user.dailyBuyInUsed ?? 0,
-    dailyBuyInRemaining: user.dailyBuyInRemaining ?? 5,
   };
 }
 
@@ -426,6 +434,7 @@ export function publish(token: Token, data: ActionBase, ws: PokerWebSocket) {
     case ActionType.FOLD:
     case ActionType.OVERTIME:
     case ActionType.REBUY:
+    case ActionType.REPAY:
     case ActionType.WATCH:
       send2all(room.id, {
         game: simpleGame,

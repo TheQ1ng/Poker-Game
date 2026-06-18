@@ -36,13 +36,7 @@ export function RecentGameRecords() {
       title: "欢乐豆",
       dataIndex: "chips",
       key: "chips",
-      sorter: (a: TableData, b: TableData) => (a.chips + a.overflow) - (b.chips + b.overflow),
-    },
-    {
-      title: "溢出",
-      dataIndex: "overflow",
-      key: "overflow",
-      sorter: (a: TableData, b: TableData) => a.overflow - b.overflow,
+      sorter: (a: TableData, b: TableData) => a.chips - b.chips,
     },
     {
       title: "初始",
@@ -66,9 +60,8 @@ export function RecentGameRecords() {
           id: cr.id,
           name: cr.name,
           chips: Number(cr.chips) || 0,
-          overflow: Number(cr.overflow) || 0,
           buyIn: cr.buyIn,
-          profit: (Number(cr.chips) || 0) + (Number(cr.overflow) || 0) - cr.buyIn,
+          profit: (Number(cr.chips) || 0) - cr.buyIn,
         }));
         return (
           <Card

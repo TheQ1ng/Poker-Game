@@ -24,7 +24,7 @@ const Admin: React.FC = () => {
         }}
       >
         <Title level={4} style={{ color: 'white', margin: 0 }}>
-          德州后台管理
+          后台管理
         </Title>
       </Header>
       <Layout>

@@ -22,9 +22,10 @@ export async function createroom(
   isOmaha: boolean,
   redPacketThresholdMultiple: number,
   redPacketMaxPercent: number,
-  supportEnabled: boolean = true,
+  supportEnabled: boolean = false,
   supportMinPot: number = 600,
-  supportMaxPercent: number = 5
+  supportMaxPercent: number = 5,
+  overtimeCost: number = 0
 ): Promise<ApiRsp> {
   const rsp = await fetch("/createroom", {
     method: "POST",
@@ -39,6 +40,7 @@ export async function createroom(
       supportEnabled,
       supportMinPot,
       supportMaxPercent,
+      overtimeCost,
     }),
     headers: {
       authorization: localStorage["token"],

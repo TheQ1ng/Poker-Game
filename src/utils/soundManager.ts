@@ -1,6 +1,8 @@
 // 扑克游戏音效管理器
 // 使用 Web Audio API 生成各种游戏音效
 
+import { QUICK_VOICE_SOUND_FILES } from "./quickVoice";
+
 type SoundType = 
   | 'deal'        // 发牌
   | 'flip'        // 翻牌
@@ -22,8 +24,15 @@ type SoundType =
 class SoundManager {
   private audioContext: AudioContext | null = null;
   private sounds: Map<SoundType, AudioBuffer> = new Map();
+  private quickVoiceBuffers: Map<string, AudioBuffer> = new Map();
+  private quickVoiceLoadPromises: Map<string, Promise<AudioBuffer | null>> = new Map();
+  private quickVoiceQueue: Array<{ soundFile: string; volume: number }> = [];
+  private quickVoicePlaying = false;
+  private quickVoiceDraining = false;
   private enabled: boolean = true;
   private masterVolume: number = 0.5;
+  private initPromise: Promise<void> | null = null;
+  private initialized = false;
   
   constructor() {
     this.initAudioContext();
@@ -39,29 +48,135 @@ class SoundManager {
   
   // 初始化所有音效
   async init() {
+    if (this.initialized) {
+      return;
+    }
+    if (this.initPromise) {
+      return this.initPromise;
+    }
     if (!this.audioContext) {
       this.initAudioContext();
     }
-    
-    // 生成各种音效
-    await Promise.all([
-      this.generateDealSound(),
-      this.generateFlipSound(),
-      this.generateChipStackSound(),
-      this.generateChipBetSound(),
-      this.generateAllinSound(),
-      this.generateFoldSound(),
-      this.generateCheckSound(),
-      this.generateCallSound(),
-      this.generateRaiseSound(),
-      this.generateWinSound(),
-      this.generateLoseSound(),
-      this.generateShowdownSound(),
-      this.generateGameStartSound(),
-      this.generateTickSound(),
-      this.generateButtonSound(),
-      this.generateHoverSound(),
-    ]);
+    this.initPromise = (async () => {
+      // 生成各种音效并预加载快捷语音，避免首次播放时再走网络/解码
+      await Promise.all([
+        this.generateDealSound(),
+        this.generateFlipSound(),
+        this.generateChipStackSound(),
+        this.generateChipBetSound(),
+        this.generateAllinSound(),
+        this.generateFoldSound(),
+        this.generateCheckSound(),
+        this.generateCallSound(),
+        this.generateRaiseSound(),
+        this.generateWinSound(),
+        this.generateLoseSound(),
+        this.generateShowdownSound(),
+        this.generateGameStartSound(),
+        this.generateTickSound(),
+        this.generateButtonSound(),
+        this.generateHoverSound(),
+        this.preloadQuickVoiceSounds(),
+      ]);
+      this.initialized = true;
+    })();
+
+    try {
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
+    }
+  }
+
+  private async preloadQuickVoiceSounds() {
+    if (!this.audioContext || QUICK_VOICE_SOUND_FILES.length === 0) {
+      return;
+    }
+    await Promise.allSettled(QUICK_VOICE_SOUND_FILES.map((soundFile) => this.ensureQuickVoiceBuffer(soundFile)));
+  }
+
+  private async ensureQuickVoiceBuffer(soundFile: string): Promise<AudioBuffer | null> {
+    if (!this.audioContext) {
+      return null;
+    }
+    const cached = this.quickVoiceBuffers.get(soundFile);
+    if (cached) {
+      return cached;
+    }
+    const loading = this.quickVoiceLoadPromises.get(soundFile);
+    if (loading) {
+      return loading;
+    }
+
+    const loadPromise = (async () => {
+      try {
+        const response = await fetch(`/sounds/${soundFile}`, { cache: "force-cache" });
+        if (!response.ok) {
+          return null;
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer.slice(0));
+        this.quickVoiceBuffers.set(soundFile, audioBuffer);
+        return audioBuffer;
+      } catch (e) {
+        console.warn("Failed to preload quick voice:", soundFile, e);
+        return null;
+      } finally {
+        this.quickVoiceLoadPromises.delete(soundFile);
+      }
+    })();
+
+    this.quickVoiceLoadPromises.set(soundFile, loadPromise);
+    return loadPromise;
+  }
+
+  playQuickVoice(soundFile: string, volume: number = this.masterVolume) {
+    if (!this.enabled || !this.audioContext) return;
+    this.quickVoiceQueue.push({ soundFile, volume });
+    void this.drainQuickVoiceQueue();
+  }
+
+  private async drainQuickVoiceQueue() {
+    if (this.quickVoiceDraining || this.quickVoicePlaying) {
+      return;
+    }
+    const next = this.quickVoiceQueue.shift();
+    if (!next || !this.enabled || !this.audioContext) {
+      return;
+    }
+
+    this.quickVoiceDraining = true;
+    try {
+      const buffer = await this.ensureQuickVoiceBuffer(next.soundFile);
+      if (!buffer || !this.enabled || !this.audioContext) {
+        return;
+      }
+
+      if (this.audioContext.state === "suspended") {
+        this.audioContext.resume();
+      }
+
+      const source = this.audioContext.createBufferSource();
+      const gainNode = this.audioContext.createGain();
+
+      source.buffer = buffer;
+      gainNode.gain.value = next.volume;
+      source.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+
+      this.quickVoicePlaying = true;
+      source.onended = () => {
+        this.quickVoicePlaying = false;
+        void this.drainQuickVoiceQueue();
+      };
+      source.start(0);
+    } catch (e) {
+      console.warn("Failed to play quick voice:", e);
+      this.quickVoicePlaying = false;
+      void this.drainQuickVoiceQueue();
+    } finally {
+      this.quickVoiceDraining = false;
+    }
   }
   
   // 生成发牌音效 - 短促的"嗖"声
@@ -440,6 +555,11 @@ class SoundManager {
   // 设置音效开关
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
+
+    if (!enabled) {
+      this.quickVoiceQueue = [];
+      this.quickVoicePlaying = false;
+    }
     
     // 控制 AudioContext 的状态来实现标签页级别的静音
     if (this.audioContext) {
@@ -478,4 +598,3 @@ export const soundManager = new SoundManager();
 
 // 导出类型
 export type { SoundType };
-

@@ -1,58 +1,59 @@
-import React, { useEffect, useState, lazy, Suspense } from "react";
-import { PageHeader, Button, Avatar, Dropdown, Menu } from "antd";
-import { DownOutlined } from "@ant-design/icons";
+import React, { useEffect, useState } from "react";
 
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
 import {
   selectToken,
-  logout,
   selectRoomID,
   loadRoomInfoAsync,
 } from "./homeSlice";
 import { connect2server } from "../../app/websocket";
-import Loading from "../../components/Loading";
+import MarkitLanding from "./MarkitLanding";
+import Register from "../register/Register";
+import Room from "../room/Room";
+import CreateRoom from "../createroom/CreateRoom";
+import Admin from "../admin/Admin";
 
-// 懒加载组件
-const Register = lazy(() => import("../register/Register"));
-const Room = lazy(() => import("../room/Room"));
-const CreateRoom = lazy(() => import("../createroom/CreateRoom"));
-const Admin = lazy(() => import("../admin/Admin"));
+function normalizePath(pathname: string) {
+  const trimmed = pathname.replace(/\/+$/, "");
+  return trimmed || "/";
+}
 
 function Home() {
   const dispatch = useAppDispatch();
   const token = useAppSelector(selectToken);
   const roomid = useAppSelector(selectRoomID);
-  // 直接从localStorage获取isAdmin值，确保初始渲染时就有正确的值
-  const [isAdmin, setIsAdmin] = useState(() => {
-    const adminStatus = localStorage.getItem("isAdmin");
-    return adminStatus === "true";
-  });
-  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem("isAdmin") === "true");
+  const [currentPath, setCurrentPath] = useState(() => normalizePath(window.location.pathname));
+
+  const navigate = (path: string, replace = false) => {
+    const nextPath = normalizePath(path);
+    if (replace) {
+      window.history.replaceState({}, "", nextPath);
+    } else {
+      window.history.pushState({}, "", nextPath);
+    }
+    setCurrentPath(nextPath);
+  };
 
   useEffect(() => {
-    // 检查是否是管理员
-    const checkAdminStatus = () => {
-      const adminStatus = localStorage.getItem("isAdmin");
-      setIsAdmin(adminStatus === "true");
+    const syncAdminState = () => {
+      setIsAdmin(localStorage.getItem("isAdmin") === "true");
     };
 
-    // 初始检查
-    checkAdminStatus();
-
-    // 监听localStorage变化
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === "isAdmin") {
-        checkAdminStatus();
+        syncAdminState();
       }
     };
 
-    // 监听路径变化
     const handlePathChange = () => {
-      setCurrentPath(window.location.pathname);
+      setCurrentPath(normalizePath(window.location.pathname));
     };
 
+    syncAdminState();
     window.addEventListener("storage", handleStorageChange);
     window.addEventListener("popstate", handlePathChange);
+
     return () => {
       window.removeEventListener("storage", handleStorageChange);
       window.removeEventListener("popstate", handlePathChange);
@@ -63,51 +64,43 @@ function Home() {
     if (token) {
       dispatch(loadRoomInfoAsync());
     }
-  }, [token]);
+  }, [token, dispatch]);
 
   useEffect(() => {
     if (roomid) {
       dispatch(connect2server(roomid));
-      console.log("got room", roomid);
     }
-  }, [roomid]);
+  }, [roomid, dispatch]);
 
-  // 处理管理界面路由
-  if (currentPath === "/admin" && token && isAdmin) {
+  const isAdminPath = currentPath === "/admin";
+  const isLoginPath = currentPath === "/login";
+
+  if (isAdminPath && token && isAdmin) {
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          width: "100vw",
-          height: "100vh",
-        }}
-      >
-        <Suspense fallback={<Loading />}>
-          <Admin />
-        </Suspense>
+      <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "100vh" }}>
+        <Admin />
       </div>
     );
   }
 
-  // 非管理员访问 /admin 路径时重定向到首页
-  if (currentPath === "/admin" && (!token || !isAdmin)) {
-    window.location.href = "/";
+  if (isAdminPath && (!token || !isAdmin)) {
+    window.location.replace("/");
     return null;
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100vw",
-        height: "100vh",
-      }}
-    >
-      <Suspense fallback={<Loading />}>
-        {!token ? <Register /> : roomid ? <Room></Room> : <CreateRoom />}
-      </Suspense>
+    <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "100vh" }}>
+      {!token ? (
+        isLoginPath ? (
+          <Register onBackClick={() => navigate("/", true)} />
+        ) : (
+          <MarkitLanding onLoginClick={() => navigate("/login")} />
+        )
+      ) : roomid ? (
+        <Room />
+      ) : (
+        <CreateRoom />
+      )}
     </div>
   );
 }

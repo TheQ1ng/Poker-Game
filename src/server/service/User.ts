@@ -44,14 +44,10 @@ class User {
   shouldShowHand: boolean = false;
   autoLeaveTimer: ReturnType<typeof setTimeout> = setTimeout(() => {}, 0);
   settleTimes: number = 0;
-  /** 本手牌已使用「+30s」次数，每手牌最多 3 次 */
+  /** 本轮已使用「+45s」次数，每轮最多 3 次 */
   addTimeUsed: number = 0;
-  /** 每日已使用买入次数（北京时间 12 点重置） */
-  dailyBuyInUsed: number = 0;
-  /** 每日剩余买入次数（上限 5 次） */
-  dailyBuyInRemaining: number = 5;
-  /** 每日买入计数的日键（北京时间中午分界） */
-  dailyBuyInDayKey: string = "";
+  /** 本手牌已支付的加时费用，结算时计入底池 */
+  overtimeFeePaid: number = 0;
 
   constructor(token: Token, name: string, avatar: string, uuid: string = "") {
     this.token = token;
@@ -86,6 +82,8 @@ class User {
     this.bets = [0, 0, 0, 0];
     this.hands = [];
     this.revealedHandsMask = [];
+    this.addTimeUsed = 0;
+    this.overtimeFeePaid = 0;
 
     this.isInRoom = true;
     this.isReady = false;
@@ -112,6 +110,8 @@ class User {
     this.isWinner = false;
     this.maxCards = [];
     this.revealedHandsMask = [];
+    this.addTimeUsed = 0;
+    this.overtimeFeePaid = 0;
   }
   setReady(ready: boolean) {
     this.isReady = ready;

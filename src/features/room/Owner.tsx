@@ -2,13 +2,14 @@
 import {
   Avatar,
   Button,
+  Modal,
   Popover,
   Tooltip,
   Switch,
   Input,
   message,
 } from "antd";
-import { SendOutlined, SmileOutlined } from "@ant-design/icons";
+import { SendOutlined, SmileOutlined, CaretRightOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
@@ -17,8 +18,10 @@ import {
   ws_userBet,
   ws_userFold,
   ws_userRebuy,
+  ws_userRepay,
   ws_sendMessage,
   ws_userReady,
+  ws_startGame,
 } from "../../app/websocket";
 import { CountDown } from "./CountDown";
 import { Poker } from "./Poker";
@@ -27,19 +30,7 @@ import { BigBlind, Dealer, SmallBlind } from "./Symbol";
 import { selectGame, selectRoom, selectSelf, selectRoomChatBubbles, clearRoomChatBubble } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
 import { soundManager } from "../../utils/soundManager";
-
-// 预设快捷消息与音效绑定
-const quickMessages = [
-  { text: "棒棒棒棒！", sound: "bangbangbangbang.WAV" },
-  { text: "难道他真的是赋能哥", sound: "funeng.WAV" },
-  { text: "哈哈哈哈哈哈", sound: "hahahhahahaha.WAV" },
-  { text: "颗秒！", sound: "kemiao.WAV" },
-  { text: "17张牌你能秒我！", sound: "17zhangpai.WAV" },
-  { text: "给我擦皮鞋！", sound: "capixie.WAV" },
-  { text: "慢波！", sound: "manbo.WAV" },
-  { text: "牌没有问题！", sound: "meiyouwenti.WAV" },
-  { text: "我要验牌！", sound: "yanpai.WAV" }
-];
+import { QUICK_VOICE_MESSAGES } from "../../utils/quickVoice";
 
 // 表情列表
 const emojis = [
@@ -106,6 +97,8 @@ export function Owner({
   showdownOrder = [],
   totalShowdown = 0,
   isSettlingCountdown = false,
+  isSettleCountdownActive = false,
+  settleCountdownLeft = 0,
   nextPositionUserIds = { SB: null, BB: null, D: null },
 }: {
   zoom: number;
@@ -113,13 +106,13 @@ export function Owner({
   showdownOrder?: string[];
   totalShowdown?: number;
   isSettlingCountdown?: boolean;
+  isSettleCountdownActive?: boolean;
+  settleCountdownLeft?: number;
   nextPositionUserIds?: { SB: string | null; BB: string | null; D: string | null };
 }) {
-  // 计算是否处于胜者动画阶段（亮牌按钮只在此时显示）
-  const isWinnerPhase = totalShowdown > 0 && settleRevealStep === 2 * totalShowdown;
-
   const hintSoundRef = useRef<HTMLAudioElement>(null);
   const dealCardSoundRef = useRef<HTMLAudioElement>(null);
+  const rebuyConfirmRef = useRef<{ destroy: () => void } | null>(null);
 
   const self = useAppSelector(selectSelf);
   const game = useAppSelector(selectGame);
@@ -144,6 +137,8 @@ export function Owner({
     room?.roomid && chipsRecordState?.roomid === room.roomid && self?.id
       ? chipsRecordState.chipsRecords.find((r) => r.id === self.id)
       : undefined;
+  const showOwnerDealButton = !!self?.isRoomOwner && !!room?.isGaming && !!game?.isSettling;
+  const showReadyButton = !showOwnerDealButton && !self?.isReady && !self?.isSpectator;
   const stackBeforeSettleRef = useRef(stack);
   useEffect(() => {
     if (!isSettling) {
@@ -156,13 +151,10 @@ export function Owner({
     totalShowdown > 0 &&
     settleRevealStep < 2 * totalShowdown;
   const displayStack = delaySettleStack ? stackBeforeSettleRef.current : stack;
-  const chipsRecordOverflowSelf = Number(chipsRecordSelf?.overflow) || 0;
-  const totalChipsForProfitSelf =
-    (Number(chipsRecordSelf?.chips) || 0) + chipsRecordOverflowSelf;
   const chipsForProfit = delaySettleStack
-    ? displayStack + chipsRecordOverflowSelf
+    ? displayStack
     : chipsRecordSelf
-      ? totalChipsForProfitSelf
+      ? (Number(chipsRecordSelf.chips) || 0)
       : displayStack;
   const netProfitSelf =
     chipsRecordSelf != null ? chipsForProfit - chipsRecordSelf.buyIn : undefined;
@@ -180,20 +172,62 @@ export function Owner({
   const raiseBetDiff = game?.raiseBetDiff || 0;
   const pots = game?.pots || 0;
   const bb = game?.bb || 0;
-  const reBuyLimit = game?.reBuyLimit || 1;
-  const dailyBuyInUsed = self?.dailyBuyInUsed ?? 0;
-  const dailyBuyInRemaining = self?.dailyBuyInRemaining ?? 5;
-  const nextBuyInNo = dailyBuyInUsed + 1;
-  const nextRebuyLabel =
-    nextBuyInNo <= 2
-      ? "东山再起"
-      : nextBuyInNo === 3
-        ? "西山再起"
-        : nextBuyInNo === 4
-          ? "南山再起"
-        : nextBuyInNo === 5
-            ? "北山再起"
-            : "洗洗睡吧";
+  const bigBlind = Math.max(1, bb || Math.floor((Number(room?.smallBlind) || 0) * 2));
+  const initialBuyIn = Math.max(1, Number(room?.buyIn) || bigBlind * 100);
+  const currentChips = Math.max(0, Number(self?.stack) || 0);
+  const tableMaxChips = (room?.users || []).reduce((max, user) => {
+    return Math.max(max, Math.max(0, Number(user.stack) || 0));
+  }, 0);
+  const rebuyThreshold = tableMaxChips - (bigBlind * 100 - 1);
+  const rebuyNeedsCountdown = !!self?.isInCurrentGame;
+  const repayNeedsCountdown = !!self?.isInCurrentGame;
+  const loanCount = chipsRecordSelf
+    ? Math.max(0, Math.floor((Number(chipsRecordSelf.buyIn) || 0) / initialBuyIn) - 1)
+    : 0;
+  const canRebuyNow =
+    !!chipsRecordSelf &&
+    currentChips <= rebuyThreshold &&
+    (!rebuyNeedsCountdown || isSettleCountdownActive);
+  const canRepayNow =
+    !!chipsRecordSelf &&
+    loanCount > 0 &&
+    currentChips >= initialBuyIn &&
+    (!repayNeedsCountdown || isSettleCountdownActive);
+  const buyTooltip = canRebuyNow
+    ? rebuyNeedsCountdown
+      ? `买入 ${initialBuyIn} 欢乐豆（倒计时期间）`
+      : `买入 ${initialBuyIn} 欢乐豆（不在桌上，可随时买入）`
+    : !chipsRecordSelf
+      ? "暂无可用的积分记录"
+      : rebuyNeedsCountdown && !isSettleCountdownActive
+        ? "仅在下一局倒计时期间可买入"
+        : `当前欢乐豆需不高于 ${rebuyThreshold} 才可买入`;
+  const repayTooltip = canRepayNow
+    ? `还贷 ${initialBuyIn} 欢乐豆，当前可还 ${loanCount} 次`
+    : !chipsRecordSelf
+      ? "暂无可用的积分记录"
+      : repayNeedsCountdown && !isSettleCountdownActive
+        ? "仅在下一局倒计时期间可还贷"
+      : loanCount <= 0
+        ? "当前没有可还的贷款"
+        : `至少需要 ${initialBuyIn} 欢乐豆才能还贷`;
+
+  useEffect(() => {
+    if (isSettleCountdownActive) return;
+    if (rebuyConfirmRef.current) {
+      rebuyConfirmRef.current.destroy();
+      rebuyConfirmRef.current = null;
+    }
+  }, [isSettleCountdownActive]);
+
+  useEffect(() => {
+    return () => {
+      if (rebuyConfirmRef.current) {
+        rebuyConfirmRef.current.destroy();
+        rebuyConfirmRef.current = null;
+      }
+    };
+  }, []);
 
   const myShowdownIndex = totalShowdown > 0 && self?.id ? showdownOrder.indexOf(self.id) : -1;
   const showHolePhase = isSettling && totalShowdown > 0 && myShowdownIndex >= 0 && settleRevealStep === myShowdownIndex * 2;
@@ -210,9 +244,6 @@ export function Owner({
   // 获取头像
   const avatar = localStorage.getItem("avatar") || "";
   const bet = self?.bet || 0;
-  const showRebuyButton =
-    stack + bet < reBuyLimit * bb && (game?.isSettling || !self?.isInCurrentGame || self.isFoled);
-  const canRebuyNow = showRebuyButton && dailyBuyInRemaining > 0;
   const isActing = self?.isActing || false;
   const isWaiting =
     !self?.isActing &&
@@ -617,21 +648,76 @@ export function Owner({
             <span className="coins">🌟</span>
             <RollingNumber value={displayStack} style={{ fontSize: "12px", fontWeight: "bold" }} />
           </div>
-          {showRebuyButton ? (
-            <Tooltip title={`今日剩余买入次数：${dailyBuyInRemaining}/5（北京时间12点重置）`}>
-              <Button
-                type="primary"
-                disabled={!canRebuyNow}
-                onClick={() => {
-                  if (canRebuyNow) ws_userRebuy();
-                }}
-              >
-                {canRebuyNow ? nextRebuyLabel : "洗洗睡吧"}
-              </Button>
-            </Tooltip>
-          ) : null}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
+              gap: 8,
+              width: "100%",
+              marginTop: 6,
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <Tooltip title={buyTooltip}>
+                <span style={{ display: "block", width: "100%" }}>
+                  <Button
+                    type="primary"
+                    block
+                    disabled={!canRebuyNow}
+                    style={{ width: "100%", minWidth: 0 }}
+                    onClick={() => {
+                      if (!canRebuyNow || rebuyConfirmRef.current) {
+                        return;
+                      }
+                      const confirmModal = Modal.confirm({
+                        title: <span style={{ color: "#fff" }}>确认买入</span>,
+                        content: (
+                          <div style={{ color: "#fff" }}>
+                            当前桌面最高 {tableMaxChips}（含旁观者），确认投入 {initialBuyIn} 欢乐豆吗？
+                          </div>
+                        ),
+                        okText: "确认",
+                        cancelText: "取消",
+                        centered: true,
+                        onOk: () => {
+                          rebuyConfirmRef.current = null;
+                          ws_userRebuy();
+                        },
+                        onCancel: () => {
+                          rebuyConfirmRef.current = null;
+                        },
+                      });
+                      rebuyConfirmRef.current = confirmModal as unknown as { destroy: () => void };
+                    }}
+                  >
+                    买入
+                  </Button>
+                </span>
+              </Tooltip>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <Tooltip title={repayTooltip}>
+                <span style={{ display: "block", width: "100%" }}>
+                  <Button
+                    type="primary"
+                    block
+                    disabled={!canRepayNow}
+                    style={{ width: "100%", minWidth: 0 }}
+                    onClick={() => {
+                      if (!canRepayNow) {
+                        return;
+                      }
+                      ws_userRepay();
+                    }}
+                  >
+                    还贷
+                  </Button>
+                </span>
+              </Tooltip>
+            </div>
+          </div>
           {(() => {
-            if (isSettlingCountdown && self?.id) {
+            if (isSettleCountdownActive && self?.id) {
               const el: ReactNode[] = [];
               (["SB", "BB", "D"] as const).forEach((role) => {
                 const isCurrent = position === role && nextPositionUserIds[role] !== self.id;
@@ -729,7 +815,7 @@ export function Owner({
             <Popover
               content={
                 <div style={{ padding: '8px', width: '160px' }}>
-                  {quickMessages.map((message, index) => (
+                  {QUICK_VOICE_MESSAGES.map((message, index) => (
                     <div
                       key={index}
                       style={{
@@ -818,38 +904,59 @@ export function Owner({
       </div>
       <div className="flex3 flex flex-column" style={{ height: "100%", position: 'relative' }}>
         {/* 准备按钮 - 手牌上方浮动 */}
-        {!self?.isReady && !self?.isSpectator && (
-          <div style={{
-            position: 'absolute',
-            top: -40,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 200,
-          }}>
-            <Button
-              type="primary"
-              size="small"
-              onClick={ws_userReady}
-              style={{
-                background: 'linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                boxShadow: '0 4px 15px rgba(76, 175, 80, 0.5), 0 0 20px rgba(76, 175, 80, 0.3)',
-                fontWeight: 'bold',
-                padding: '0 20px',
-                height: 36,
-                fontSize: 14,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-              }}
+        {showOwnerDealButton || showReadyButton ? (
+          <div
+            style={{
+              position: "absolute",
+              top: -40,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 200,
+            }}
+          >
+            <Tooltip
+              title={
+                showOwnerDealButton
+                  ? isSettleCountdownActive
+                    ? `倒计时结束后可发牌（剩余 ${settleCountdownLeft}s）`
+                    : "点击发牌开始下一局"
+                  : "点击准备进入下一局"
+              }
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ display: 'block' }}>
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white"/>
-              </svg>
-              准备
-            </Button>
+              <Button
+                type="primary"
+                size="small"
+                onClick={showOwnerDealButton ? ws_startGame : ws_userReady}
+                disabled={showOwnerDealButton && isSettleCountdownActive}
+                style={{
+                  background: showOwnerDealButton
+                    ? "linear-gradient(135deg, #ff9f43 0%, #d35400 100%)"
+                    : "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)",
+                  border: "2px solid rgba(255, 255, 255, 0.3)",
+                  boxShadow: showOwnerDealButton
+                    ? "0 4px 15px rgba(255, 159, 67, 0.45), 0 0 20px rgba(255, 159, 67, 0.25)"
+                    : "0 4px 15px rgba(76, 175, 80, 0.5), 0 0 20px rgba(76, 175, 80, 0.3)",
+                  fontWeight: "bold",
+                  padding: "0 20px",
+                  height: 36,
+                  fontSize: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                {showOwnerDealButton ? (
+                  <CaretRightOutlined />
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white" />
+                  </svg>
+                )}
+                {showOwnerDealButton ? "发牌" : "准备"}
+              </Button>
+            </Tooltip>
           </div>
-        )}
+        ) : null}
         <div className="bet" style={{ color: 'white', fontWeight: 'bold' }}>
           {self?.actionName}
           {bet == 0 ? null : (
@@ -858,6 +965,7 @@ export function Owner({
               borderRadius: "20px",
               padding: "2px 8px",
               marginLeft: "8px",
+              color: "#ffd700",
             }}>
               <span className="coins">🌟</span>
               <RollingNumber value={bet} style={{ fontWeight: "bold" }} />
@@ -912,7 +1020,7 @@ export function Owner({
                       isSelected={false}
                       size="medium"
                       // 亮牌按钮只在下一局倒计时环节显示
-                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn && isSettlingCountdown}
+                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn && isSettleCountdownActive}
                     />
                   ))}
                   {!isSettlingCountdown && (
@@ -943,7 +1051,7 @@ export function Owner({
                     isSelected={false}
                     size="medium"
                     // 亮牌按钮只在下一局倒计时环节显示
-                    showShowHandButton={!selfAsUser?.isAllIn && isSettlingCountdown}
+                    showShowHandButton={!selfAsUser?.isAllIn && isSettleCountdownActive}
                   />
                   <Poker
                     card={self?.hands[1] || null}

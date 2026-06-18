@@ -10,12 +10,10 @@ import {
   Card,
   Space,
   Tag,
-  InputNumber,
   Typography,
   Avatar,
-  Progress,
 } from 'antd';
-import { EditOutlined, DeleteOutlined, ReloadOutlined, UserOutlined } from '@ant-design/icons';
+import { EditOutlined, DeleteOutlined, ReloadOutlined, UserOutlined, LockOutlined } from '@ant-design/icons';
 
 interface User {
   username: string;
@@ -23,19 +21,19 @@ interface User {
   avatar: string;
   admin: number;
   created_at: string;
-  daily_buyin_used: number;
-  daily_buyin_remaining: number;
-  daily_buyin_day_key: string;
 }
 
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [passwordUser, setPasswordUser] = useState<User | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [modalDailyBuyInUsed, setModalDailyBuyInUsed] = useState(0);
+  const [passwordModalVisible, setPasswordModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [passwordForm] = Form.useForm();
 
   // 获取所有用户
   const fetchUsers = async () => {
@@ -72,9 +70,7 @@ const UserManagement: React.FC = () => {
       nickname: user.nickname,
       avatar: user.avatar,
       admin: user.admin === 1,
-      dailyBuyInUsed: user.daily_buyin_used ?? 0,
     });
-    setModalDailyBuyInUsed(user.daily_buyin_used ?? 0);
     setIsModalVisible(true);
   };
 
@@ -107,6 +103,15 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleResetPassword = (user: User) => {
+    setPasswordUser(user);
+    passwordForm.setFieldsValue({
+      username: user.username,
+      password: '123456',
+    });
+    setPasswordModalVisible(true);
+  };
+
   // 保存编辑
   const handleSave = async () => {
     setSaving(true);
@@ -123,7 +128,6 @@ const UserManagement: React.FC = () => {
           nickname: values.nickname,
           avatar: values.avatar,
           admin: values.admin ? 1 : 0,
-          dailyBuyInUsed: Number(values.dailyBuyInUsed ?? 0),
         }),
       });
       const data = await response.json();
@@ -142,11 +146,41 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleSavePassword = async () => {
+    setPasswordSaving(true);
+    try {
+      const values = await passwordForm.validateFields();
+      const response = await fetch('/admin/user/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: localStorage.getItem('token') || '',
+        },
+        body: JSON.stringify({
+          username: values.username,
+          password: values.password,
+        }),
+      });
+      const data = await response.json();
+      if (data.code === 0) {
+        message.success(`已重置 ${values.username} 的密码`);
+        setPasswordModalVisible(false);
+        setPasswordUser(null);
+      } else {
+        message.error(data.error);
+      }
+    } catch (error) {
+      console.error('Failed to reset password:', error);
+      message.error('重置密码失败');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   const stats = useMemo(() => {
     const total = users.length;
     const admins = users.filter((u) => u.admin === 1).length;
-    const exhausted = users.filter((u) => (u.daily_buyin_remaining ?? 0) <= 0).length;
-    return { total, admins, exhausted };
+    return { total, admins };
   }, [users]);
 
   const columns = [
@@ -180,24 +214,7 @@ const UserManagement: React.FC = () => {
     {
       title: '买入次数',
       key: 'buyin',
-      render: (_: unknown, record: User) => (
-        <div style={{ minWidth: 150 }}>
-          <Typography.Text style={{ fontSize: 12 }}>
-            已用 {record.daily_buyin_used ?? 0} / 5，剩余 {record.daily_buyin_remaining ?? 0}
-          </Typography.Text>
-          <Progress
-            percent={Math.min(100, Math.round(((record.daily_buyin_used ?? 0) / 5) * 100))}
-            size="small"
-            showInfo={false}
-            status={(record.daily_buyin_remaining ?? 0) <= 0 ? 'exception' : 'active'}
-          />
-        </div>
-      ),
-    },
-    {
-      title: '重置日键',
-      dataIndex: 'daily_buyin_day_key',
-      key: 'daily_buyin_day_key',
+      render: () => <Tag color="blue">已取消</Tag>,
     },
     {
       title: '创建时间',
@@ -211,6 +228,14 @@ const UserManagement: React.FC = () => {
         <Space>
           <Button className="admin-action-btn" type="primary" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
+          </Button>
+          <Button
+            className="admin-action-btn"
+            size="small"
+            icon={<LockOutlined />}
+            onClick={() => handleResetPassword(record)}
+          >
+            重置密码
           </Button>
           <Button
             className="admin-action-btn"
@@ -242,9 +267,6 @@ const UserManagement: React.FC = () => {
       <Space size={16} className="admin-stats">
         <Tag color="blue">总用户：{stats.total}</Tag>
         <Tag color="gold">管理员：{stats.admins}</Tag>
-        <Tag color={stats.exhausted > 0 ? 'red' : 'green'}>
-          买入耗尽：{stats.exhausted}
-        </Tag>
       </Space>
       <Table
         columns={columns}
@@ -263,18 +285,9 @@ const UserManagement: React.FC = () => {
         onOk={handleSave}
         onCancel={() => {
           setIsModalVisible(false);
-          setModalDailyBuyInUsed(0);
         }}
       >
-        <Form
-          form={form}
-          layout="vertical"
-          onValuesChange={(changedValues) => {
-            if (Object.prototype.hasOwnProperty.call(changedValues, 'dailyBuyInUsed')) {
-              setModalDailyBuyInUsed(Number(changedValues.dailyBuyInUsed || 0));
-            }
-          }}
-        >
+        <Form form={form} layout="vertical">
           <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
             <Input disabled={!!editingUser} />
           </Form.Item>
@@ -287,16 +300,31 @@ const UserManagement: React.FC = () => {
           <Form.Item name="admin" label="管理员" valuePropName="checked">
             <Switch />
           </Form.Item>
-          <Form.Item
-            name="dailyBuyInUsed"
-            label="今日已用买入次数"
-            rules={[{ required: true, message: '请输入0~5' }]}
-          >
-            <InputNumber min={0} max={5} precision={0} style={{ width: '100%' }} />
+        </Form>
+      </Modal>
+
+      <Modal
+        title={passwordUser ? `重置 ${passwordUser.username} 的密码` : '重置密码'}
+        visible={passwordModalVisible}
+        confirmLoading={passwordSaving}
+        className="admin-modal"
+        onOk={handleSavePassword}
+        onCancel={() => {
+          setPasswordModalVisible(false);
+          setPasswordUser(null);
+        }}
+      >
+        <Form form={passwordForm} layout="vertical">
+          <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
+            <Input disabled />
           </Form.Item>
-          <Typography.Text type="secondary">
-            剩余买入次数：{Math.max(0, 5 - Number(modalDailyBuyInUsed ?? 0))}
-          </Typography.Text>
+          <Form.Item
+            name="password"
+            label="新密码"
+            rules={[{ required: true, message: '请输入新密码' }]}
+          >
+            <Input.Password placeholder="输入新密码" />
+          </Form.Item>
         </Form>
       </Modal>
     </Card>
