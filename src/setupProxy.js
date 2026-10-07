@@ -1,6 +1,7 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = function (app) {
+  const backendPort = process.env.REACT_APP_BACKEND_PORT || "1999";
   app.use(
     createProxyMiddleware(
       [
@@ -15,7 +16,7 @@ module.exports = function (app) {
         '/profile',
       ],
       {
-        target: 'http://localhost:8086',
+        target: `http://localhost:${backendPort}`,
         changeOrigin: true,
         ws: true,
       }

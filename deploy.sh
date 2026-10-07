@@ -9,7 +9,8 @@ set -e
 PROJECT_NAME="poker"
 SERVER_USER="ubuntu"
 SERVER_PORT="22"
-APP_PORT="8086"
+APP_PORT="1999"
+TOKEN_PORT="1000"
 REMOTE_DIR="/home/$SERVER_USER/$PROJECT_NAME"
 
 # 颜色定义
@@ -74,8 +75,8 @@ check_server() {
     
     # 检查 Node.js
     if ! run_ssh "command -v node &> /dev/null"; then
-        echo -e "${YELLOW}安装 Node.js 18...${NC}"
-        run_ssh "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs"
+        echo -e "${YELLOW}安装 Node.js 20...${NC}"
+        run_ssh "curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs"
     fi
     
     # 检查 PM2
@@ -155,7 +156,11 @@ deploy_server() {
         echo "重启服务..."
         pm2 stop poker 2>/dev/null || true
         pm2 delete poker 2>/dev/null || true
-        pm2 start npm --name "poker" --cwd /home/ubuntu/poker -- start
+        pm2 stop poker-token 2>/dev/null || true
+        pm2 delete poker-token 2>/dev/null || true
+        sudo setcap 'cap_net_bind_service=+ep' "$(readlink -f "$(which node)")" || true
+        PORT=1999 pm2 start npm --name "poker" --cwd /home/ubuntu/poker -- start
+        PORT=1000 pm2 start npm --name "poker-token" --cwd /home/ubuntu/poker -- run start:redirect
         
         # 保存 PM2 状态
         pm2 save
@@ -172,6 +177,7 @@ config_firewall() {
     
     run_ssh "sudo ufw allow 22/tcp" 2>/dev/null || true
     run_ssh "sudo ufw allow $APP_PORT/tcp" 2>/dev/null || true
+    run_ssh "sudo ufw allow $TOKEN_PORT/tcp" 2>/dev/null || true
     run_ssh "sudo ufw --force enable" 2>/dev/null || true
     run_ssh "sudo ufw reload" 2>/dev/null || true
     
@@ -184,6 +190,7 @@ show_result() {
     echo ""
     echo -e "${GREEN}======================================${NC}"
     echo -e "${GREEN}  游戏地址: http://$SERVER_IP:$APP_PORT${NC}"
+    echo -e "${GREEN}  令牌地址: http://$SERVER_IP:$TOKEN_PORT${NC}"
     echo -e "${GREEN}======================================${NC}"
     echo ""
     echo "常用命令:"

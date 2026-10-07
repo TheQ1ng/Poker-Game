@@ -13,6 +13,7 @@ import {
 import db from "../service/database";
 import User from "../service/User";
 import { v4 as uuidv4 } from "uuid";
+import { isRegisterCodeValid } from "../service/registerToken";
 
 const router = new Router();
 export default router;
@@ -67,7 +68,7 @@ router.get("/rooms", (ctx) => {
 
 router.post("/register", (ctx) => {
   console.log('[DEBUG] Register API called, body:', ctx.request.body);
-  const { name, password, avatar } = ctx.request.body;
+  const { name, password, avatar, code } = ctx.request.body;
   if (name === null || name === "") {
     throw new Error(`register name is empty`);
   }
@@ -76,6 +77,9 @@ router.post("/register", (ctx) => {
   }
   if (password === null || password === "") {
     throw new Error(`password is empty`);
+  }
+  if (!isRegisterCodeValid(code)) {
+    throw new Error(`注册码无效或已过期，请刷新令牌页后重试`);
   }
 
   // 从数据库检查用户名是否已存在

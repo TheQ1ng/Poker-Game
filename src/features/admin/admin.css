@@ -1,8 +1,73 @@
+.admin-app-shell {
+  width: 100%;
+  height: 100vh;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .admin-root-layout {
   background: #f4f7fb;
+  width: 100%;
+  height: 100vh;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.admin-root-layout > .ant-layout-header {
+  flex: 0 0 64px;
+}
+
+.admin-body-layout {
+  min-width: 0;
+  min-height: 0;
+  height: calc(100vh - 64px);
+  overflow: hidden;
+}
+
+.admin-sidebar {
+  flex: 0 0 220px !important;
+  width: 220px !important;
+  max-width: 220px !important;
+  min-width: 220px !important;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.admin-sidebar .ant-layout-sider-children {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-sidebar .ant-menu {
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+
+.admin-main-layout {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 20px 20px;
+}
+
+.admin-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  background: #fff;
+  padding: 20px;
+  margin: 0;
+  border-radius: 12px;
 }
 
 .admin-page-card {
+  width: 100%;
+  min-width: 0;
   border-radius: 14px;
   border: 1px solid #e9eef7;
   box-shadow: 0 8px 24px rgba(21, 65, 146, 0.08);
@@ -43,6 +108,36 @@
   background: #f8fbff !important;
 }
 
+.admin-table,
+.admin-table .ant-table-wrapper,
+.admin-table .ant-spin-nested-loading,
+.admin-table .ant-spin-container {
+  width: 100%;
+  min-width: 0;
+}
+
+.admin-table .ant-table-container {
+  max-width: 100%;
+}
+
+.admin-table .ant-table-content {
+  overflow-x: auto !important;
+}
+
+.admin-user-table .ant-table-thead > tr > th,
+.admin-user-table .ant-table-tbody > tr > td {
+  white-space: nowrap;
+}
+
+.admin-user-table .ant-table-tbody > tr > td:last-child {
+  white-space: normal;
+}
+
+.admin-user-table .ant-space {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+
 .admin-action-btn {
   border-radius: 8px;
 }
@@ -54,4 +149,69 @@
 
 .admin-modal .ant-modal-header {
   background: #f7faff;
+}
+
+@media (max-width: 767px) {
+  .admin-root-layout {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .admin-root-layout > .ant-layout-header {
+    flex-basis: 56px;
+    height: 56px;
+    padding: 0 16px !important;
+  }
+
+  .admin-body-layout {
+    height: auto;
+    min-height: calc(100vh - 56px);
+    overflow: visible;
+    flex-direction: column;
+  }
+
+  .admin-sidebar {
+    flex: 0 0 auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid #f0f0f0;
+    overflow: hidden;
+  }
+
+  .admin-sidebar .ant-layout-sider-children {
+    min-height: auto;
+  }
+
+  .admin-sidebar .ant-menu {
+    min-height: auto;
+    height: auto !important;
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 8px !important;
+  }
+
+  .admin-sidebar .ant-menu-item {
+    flex: 0 0 auto;
+    margin: 4px !important;
+  }
+
+  .admin-main-layout {
+    padding: 0 10px 10px;
+    overflow: visible;
+  }
+
+  .admin-content {
+    padding: 10px;
+    overflow: visible;
+  }
+
+  .admin-toolbar {
+    align-items: flex-start;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
 }

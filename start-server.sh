@@ -14,7 +14,8 @@ NC='\033[0m'
 SERVER_IP="111.229.164.165"
 SERVER_PASSWORD="6*5z}%CAh^8D{4Ev"
 SERVER_USER="ubuntu"
-APP_PORT="8086"
+APP_PORT="1999"
+TOKEN_PORT="1000"
 # SSH 命令前缀
 SSH_CMD="sshpass -p $SERVER_PASSWORD ssh -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_IP"
 
@@ -24,7 +25,8 @@ echo -e "${YELLOW}[1/3] 连接服务器...${NC}"
 
 # 启动 PM2 服务
 echo -e "${YELLOW}[2/3] 启动服务...${NC}"
-$SSH_CMD "sudo rm -rf /opt/poker/solver /home/ubuntu/poker/solver-cli && cd /home/ubuntu/poker && pm2 start npm --name \"poker\" --cwd /home/ubuntu/poker -- start"
+$SSH_CMD "sudo rm -rf /opt/poker/solver /home/ubuntu/poker/solver-cli && cd /home/ubuntu/poker && PORT=$APP_PORT pm2 start npm --name \"poker\" --cwd /home/ubuntu/poker -- start"
+$SSH_CMD "sudo setcap 'cap_net_bind_service=+ep' \"\$(readlink -f \"\$(which node)\")\" || true && cd /home/ubuntu/poker && PORT=$TOKEN_PORT pm2 start npm --name \"poker-token\" --cwd /home/ubuntu/poker -- run start:redirect"
 
 # 保存 PM2 状态
 echo -e "${YELLOW}[3/3] 保存状态...${NC}"
@@ -33,6 +35,7 @@ $SSH_CMD "pm2 save"
 echo -e "${GREEN}✓ 服务器已成功启动${NC}"
 echo -e "${GREEN}======================================${NC}"
 echo -e "${GREEN}  游戏地址: http://$SERVER_IP:$APP_PORT${NC}"
+echo -e "${GREEN}  令牌地址: http://$SERVER_IP:$TOKEN_PORT${NC}"
 echo -e "${GREEN}======================================${NC}"
 echo ""
 echo "常用命令:"

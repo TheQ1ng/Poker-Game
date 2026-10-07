@@ -11,7 +11,8 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-APP_PORT="8086"
+APP_PORT="1999"
+TOKEN_PORT="1000"
 PROJECT_DIR="/home/ubuntu/poker"
 
 echo -e "${GREEN}=== 欢乐积分王训练系统服务器端部署脚本 ===${NC}"
@@ -21,8 +22,8 @@ check_nodejs() {
     echo -e "${YELLOW}[1/5] 检查 Node.js 环境...${NC}"
     
     if ! command -v node &> /dev/null; then
-        echo -e "${YELLOW}安装 Node.js 18...${NC}"
-        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        echo -e "${YELLOW}安装 Node.js 20...${NC}"
+        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
         sudo apt-get install -y nodejs
     fi
     
@@ -90,9 +91,13 @@ start_service() {
     # 停止旧服务
     pm2 stop poker 2>/dev/null || true
     pm2 delete poker 2>/dev/null || true
+    pm2 stop poker-token 2>/dev/null || true
+    pm2 delete poker-token 2>/dev/null || true
+    sudo setcap 'cap_net_bind_service=+ep' "$(readlink -f "$(which node)")" || true
     
     # 启动新服务
-    pm2 start npm --name "poker" --cwd /home/ubuntu/poker -- start
+    PORT=$APP_PORT pm2 start npm --name "poker" --cwd /home/ubuntu/poker -- start
+    PORT=$TOKEN_PORT pm2 start npm --name "poker-token" --cwd /home/ubuntu/poker -- run start:redirect
     
     # 保存状态
     pm2 save
@@ -108,6 +113,7 @@ setup_firewall() {
     echo -e "${YELLOW}配置防火墙...${NC}"
     sudo ufw allow 22/tcp 2>/dev/null || true
     sudo ufw allow $APP_PORT/tcp 2>/dev/null || true
+    sudo ufw allow $TOKEN_PORT/tcp 2>/dev/null || true
     sudo ufw --force enable 2>/dev/null || true
     sudo ufw reload 2>/dev/null || true
     echo -e "${GREEN}✓ 防火墙配置完成${NC}"

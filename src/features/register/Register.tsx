@@ -17,15 +17,14 @@ function Register({
   const loading = useAppSelector((state) => state.register.status === "loading");
 
   const onFinish = (values: { name: string; password: string; code: string }) => {
-    if (String(values.code ?? "").trim() !== "MARK") {
-      return;
-    }
+    const code = String(values.code ?? "").trim().toUpperCase();
 
     dispatch(
       registerAsync({
         account: {
           name: values.name,
           password: values.password,
+          code,
         },
         dispatch,
       })
@@ -87,21 +86,20 @@ function Register({
             </Form.Item>
 
             <Form.Item
-              label="注册码"
+              label="网页令牌"
               name="code"
+              normalize={(value) =>
+                String(value ?? "")
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9]/g, "")
+                  .slice(0, 5)
+              }
               rules={[
-                { required: true, message: "请输入注册码" },
-                {
-                  validator: (_, value) => {
-                    if (String(value ?? "").trim() === "MARK") {
-                      return Promise.resolve();
-                    }
-                    return Promise.reject(new Error("注册码无效"));
-                  },
-                },
+                { required: true, message: "请输入网页令牌" },
+                { len: 5, message: "请输入 5 位大写字母或数字" },
               ]}
             >
-              <Input placeholder="请输入注册码" maxLength={4} />
+              <Input placeholder="请输入 5 位令牌" maxLength={5} />
             </Form.Item>
 
             {error ? <div className="markit-login-error">{error}</div> : null}

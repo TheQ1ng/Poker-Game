@@ -44,10 +44,10 @@ export const connect2server =
         return;
       }
 
-      const url =
-        window.location.port == "8086"
-          ? `ws://${window.location.host}`
-          : `ws://${window.location.host.replace(window.location.port, "8086")}`;
+      const browserPort = window.location.port;
+      const backendPort = process.env.REACT_APP_BACKEND_PORT || (browserPort === "3000" || browserPort === "" ? "1999" : browserPort);
+      const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+      const url = `${wsProtocol}://${window.location.hostname}:${backendPort}`;
       const token = localStorage["token"];
 
       ws = new WebSocket(url, token);

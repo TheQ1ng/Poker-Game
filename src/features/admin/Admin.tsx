@@ -13,7 +13,7 @@ const Admin: React.FC = () => {
   const [activeTab, setActiveTab] = useState('users');
 
   return (
-    <Layout className="admin-root-layout" style={{ minHeight: '100vh' }}>
+    <Layout className="admin-root-layout">
       <Header
         style={{
           background: 'linear-gradient(90deg, #001529 0%, #0f2d5c 100%)',
@@ -27,8 +27,12 @@ const Admin: React.FC = () => {
           后台管理
         </Title>
       </Header>
-      <Layout>
-        <Sider width={220} style={{ background: '#fff', borderRight: '1px solid #f0f0f0' }}>
+      <Layout className="admin-body-layout">
+        <Sider
+          width={220}
+          className="admin-sidebar"
+          style={{ background: '#fff', borderRight: '1px solid #f0f0f0' }}
+        >
           <Menu
             mode="inline"
             selectedKeys={[activeTab]}
@@ -40,7 +44,7 @@ const Admin: React.FC = () => {
             <Menu.Item key="game-processes" icon={<DesktopOutlined />}>游戏进程管理</Menu.Item>
           </Menu>
         </Sider>
-        <Layout style={{ padding: '0 20px 20px' }}>
+        <Layout className="admin-main-layout">
           <Breadcrumb style={{ margin: '16px 0' }}>
             <Breadcrumb.Item>管理后台</Breadcrumb.Item>
             <Breadcrumb.Item>
@@ -48,7 +52,7 @@ const Admin: React.FC = () => {
                activeTab === 'game-records' ? '游戏记录' : '游戏进程管理'}
             </Breadcrumb.Item>
           </Breadcrumb>
-          <Content style={{ background: '#fff', padding: 20, margin: 0, minHeight: 280, borderRadius: 12 }}>
+          <Content className="admin-content">
             {activeTab === 'users' ? <UserManagement /> : 
              activeTab === 'game-records' ? <GameRecordManagement /> : 
              <GameProcessManagement />}

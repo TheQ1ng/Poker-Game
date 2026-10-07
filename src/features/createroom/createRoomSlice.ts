@@ -106,7 +106,7 @@ export const createRoomSlice = createSlice({
         state.createRoomStatus = "idle";
         const err = action.error?.message || "";
         if (err.includes("fetch") || err.includes("Failed") || err.includes("Network")) {
-          message.error("无法连接服务器，请确认后端已启动（端口 8086）");
+          message.error("无法连接服务器，请确认后端已启动（端口 1999）");
         } else {
           message.error("创建房间失败：" + (action.error?.message || "未知错误"));
         }
@@ -127,7 +127,7 @@ export const createRoomSlice = createSlice({
         state.joinRoomStatus = "idle";
         const err = action.error?.message || "";
         if (err.includes("fetch") || err.includes("Failed") || err.includes("Network")) {
-          message.error("无法连接服务器，请确认后端已启动（端口 8086）");
+          message.error("无法连接服务器，请确认后端已启动（端口 1999）");
         } else {
           message.error("加入房间失败：" + (action.error?.message || "未知错误"));
         }

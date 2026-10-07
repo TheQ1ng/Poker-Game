@@ -77,7 +77,7 @@ function Home() {
 
   if (isAdminPath && token && isAdmin) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", width: "100vw", height: "100vh" }}>
+      <div className="admin-app-shell">
         <Admin />
       </div>
     );

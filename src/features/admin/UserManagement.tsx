@@ -188,6 +188,7 @@ const UserManagement: React.FC = () => {
       title: '用户名',
       dataIndex: 'username',
       key: 'username',
+      width: 240,
       render: (_: string, record: User) => (
         <Space>
           <Avatar
@@ -208,22 +209,27 @@ const UserManagement: React.FC = () => {
       title: '管理员',
       dataIndex: 'admin',
       key: 'admin',
+      width: 120,
       render: (admin: number) =>
         admin === 1 ? <Tag color="gold">管理员</Tag> : <Tag>普通用户</Tag>,
     },
     {
       title: '买入次数',
       key: 'buyin',
+      width: 120,
       render: () => <Tag color="blue">已取消</Tag>,
     },
     {
       title: '创建时间',
       dataIndex: 'created_at',
       key: 'created_at',
+      width: 190,
     },
     {
       title: '操作',
       key: 'action',
+      width: 320,
+      className: 'admin-user-actions',
       render: (_: any, record: User) => (
         <Space>
           <Button className="admin-action-btn" type="primary" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
@@ -272,8 +278,9 @@ const UserManagement: React.FC = () => {
         columns={columns}
         dataSource={users}
         rowKey="username"
-        className="admin-table"
+        className="admin-table admin-user-table"
         loading={loading}
+        scroll={{ x: 980 }}
         pagination={{ pageSize: 15, showSizeChanger: true }}
       />
 

@@ -22,7 +22,7 @@ export const registerAsync = createAsyncThunk(
     account,
     dispatch
   }: {
-    account: { name: string; password: string };
+    account: { name: string; password: string; code: string };
     dispatch: ThunkDispatch<any, any, any>;
   }) => {
     console.log('[DEBUG] Thunk started, account:', account);

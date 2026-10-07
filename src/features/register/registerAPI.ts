@@ -2,17 +2,20 @@ import { ApiRsp } from '../../ApiType';
 
 export async function registerApi({
   name,
-  password
+  password,
+  code
 }: {
   name: string;
   password: string;
+  code: string;
 }): Promise<ApiRsp> {
   console.log('[DEBUG] API call started, name:', name);
   const rsp = await fetch('/register', {
     method: 'POST',
     body: JSON.stringify({
       name,
-      password
+      password,
+      code
     }),
     headers: {
       'Content-Type': 'application/json'

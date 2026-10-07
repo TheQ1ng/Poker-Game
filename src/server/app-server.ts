@@ -75,6 +75,7 @@ app.use(async (ctx) => {
 
 app.ws.use(ws);
 
-const PORT = 8086;
+const rawPort = process.env.PORT || process.env.APP_PORT || "1999";
+const PORT = Number.parseInt(rawPort, 10) || 1999;
 app.listen(PORT);
 console.log(`server at: http://localhost:${PORT}`);
