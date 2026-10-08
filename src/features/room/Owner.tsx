@@ -237,6 +237,8 @@ export function Owner({
   const showAsWinner = (winnerPhase || settleDone) && !!self?.isWinner;
   const usePhasedSettle = isSettling && totalShowdown > 0 && !isSettlingCountdown;
   const showPhasedCards = usePhasedSettle && (showHolePhase || showMax5Phase || showAsWinner);
+  // 比牌流程的视图优先级高于主动亮牌，避免 room 更新后覆盖结算展示。
+  const isShowdownDisplayActive = usePhasedSettle;
 
   const name = self?.name || "";
   // 获取昵称，如果没有则使用用户名
@@ -1020,7 +1022,7 @@ export function Owner({
                       isSelected={false}
                       size="medium"
                       // 亮牌按钮只在下一局倒计时环节显示
-                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn && isSettleCountdownActive}
+                      showShowHandButton={i === 0 && !selfAsUser?.isAllIn && isSettleCountdownActive && !isShowdownDisplayActive}
                     />
                   ))}
                   {!isSettlingCountdown && (
@@ -1051,7 +1053,7 @@ export function Owner({
                     isSelected={false}
                     size="medium"
                     // 亮牌按钮只在下一局倒计时环节显示
-                    showShowHandButton={!selfAsUser?.isAllIn && isSettleCountdownActive}
+                    showShowHandButton={!selfAsUser?.isAllIn && isSettleCountdownActive && !isShowdownDisplayActive}
                   />
                   <Poker
                     card={self?.hands[1] || null}

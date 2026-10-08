@@ -178,6 +178,8 @@ export function User({
   const settleDone = isSettling && totalShowdown > 0 && settleRevealStep > 2 * totalShowdown;
   const showAsWinner = (winnerPhase || settleDone) && !!user?.isWinner;
   const usePhasedSettle = isSettling && totalShowdown > 0 && !isSettlingCountdown;
+  // 比牌动画期间优先渲染结算牌，不能被主动亮牌状态切换回普通手牌视图。
+  const isShowdownDisplayActive = usePhasedSettle;
   const isOmahaGame = !!(room?.isOmaha || game?.isOmaha);
 
   const stackBeforeSettleRef = useRef(stack);
@@ -680,7 +682,7 @@ export function User({
             ))}
           </div>
         ) : null
-      ) : showHandsArea ? (
+      ) : showHandsArea && !isShowdownDisplayActive ? (
         <div className={`card-box card-box-stacked ${isOmahaGame ? "card-box-stacked-omaha4" : ""}`}>
           {(isOmahaGame ? (handsToShow || []).slice(0, 4) : (handsToShow || [])).map((card, i) => (
             <Poker
@@ -691,7 +693,7 @@ export function User({
               showHand={shouldShowCards}
               size="small"
               // 亮牌按钮只在真实倒计时阶段显示，避免等待房主发牌时误触
-              showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe && isSettleCountdownActive}
+              showShowHandButton={i === 0 && isSelf && !user?.isAllIn && !revealedForMe && isSettleCountdownActive && !isShowdownDisplayActive}
             />
           ))}
           {!isSettlingCountdown && (

@@ -2,6 +2,11 @@ import { userMap } from "../service";
 import { Game } from "../service/Room";
 import { prettify } from "../utils/game-engine";
 
+function redactCards(cards: any[] = []): string {
+  if (!cards.length) return "[]";
+  return `[${cards.length} 张牌（已隐藏）]`;
+}
+
 export function logGame(game: Game) {
   // const posMap: {
   //   [x: number]: string[];
@@ -19,9 +24,7 @@ export function logGame(game: Game) {
   const userLog = game.sortedUsers
     .map((t) => {
       const user = userMap[t];
-      const log = `${user.positon}, ${user.stack}: ${prettify(
-        user.hands
-      )}   bets: ${user.bets.join(", ")}  ${user.isActing ? "√" : ""} ${
+      const log = `${user.positon}, ${user.stack}: ${redactCards(user.hands)}   bets: ${user.bets.join(", ")}  ${user.isActing ? "√" : ""} ${
         user.isAllIn ? "AllIn" : ""
       } ${user.isFolded ? "Fold" : ""} ${user.needAction ? "⏳" : "✅"}\t`;
       return user.isFolded ? log.strikethrough.gray : log;
@@ -33,5 +36,5 @@ export function logGame(game: Game) {
   game.sortedUsers.forEach(
     (t) => (pots += userMap[t].bets.reduce((a, b) => a + b, 0))
   );
-  console.log(`POTS: ${pots}    Board: ${prettify(game.boardCards)}`);
+  console.log(`POTS: ${pots}    Board: ${redactCards(game.boardCards)}`);
 }

@@ -1913,6 +1913,17 @@ function Room() {
           <p>请合理安排游戏时间，避免过度沉迷</p>
           <p>本游戏不含任何赌博元素，请勿将游戏内容与实际赌博行为联系</p>
           <p>如有任何问题或建议，请联系开发者</p>
+          <p>
+            源码：{" "}
+            <a
+              href="https://github.com/TheQ1ng/Poker-Game"
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "#69b1ff" }}
+            >
+              GitHub Poker-Game
+            </a>
+          </p>
         </div>
       </Modal>
     </div>

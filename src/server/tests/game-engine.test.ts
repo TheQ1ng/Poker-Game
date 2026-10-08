@@ -42,7 +42,7 @@ describe("Game Engine", () => {
 
   describe("randomHands()", () => {
     it("长度测试", () => {
-      for (let i = 51; i <= 53; ++i) {
+      for (let i = 0; i <= 52; ++i) {
         let hands = randomHands(i);
         console.log(prettify(hands));
         assert.equal(hands.length, i);

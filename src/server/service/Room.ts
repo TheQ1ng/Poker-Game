@@ -12,6 +12,7 @@ import {
   rank,
   settle,
   bestOmahaHand,
+  secureRandomInt,
 } from "../utils/game-engine";
 import { logGame } from "../tests/utils";
 import { publish2all, publishLog2all, send2user, send2all } from "../api/ws";
@@ -36,6 +37,11 @@ function sum(nums: number[]): number {
 }
 
 type FnType = () => void;
+
+function redactCards(cards: Card[] = []): string {
+  if (!cards.length) return "[]";
+  return `[${cards.length} 张牌（已隐藏）]`;
+}
 
 function delayTry(fn: FnType, delay: number): ReturnType<typeof setTimeout> {
   return setTimeout(() => {
@@ -132,8 +138,8 @@ export class Game {
       return;
     }
     console.log(new Array(10).fill("==").join(""));
-    console.log("START:", this.sortedUsers);
-    console.log(prettify(this.cards));
+    console.log("START:", this.sortedUsers.map((token) => userMap[token]?.name || token));
+    console.log("Deck:", redactCards(this.cards));
     publishLog2all(this.roomid, ["====游戏开始===="]);
 
     this.dealCards2User();
@@ -304,8 +310,8 @@ export class Game {
       `USER ${chips == availableStack ? "AllIn" : chips == preBets ? "Call" : "NBet"
       }:`.green,
       user.name,
-      prettify(user.hands),
-      chips
+      redactCards(user.hands),
+      `chips=${chips}`
     );
 
     const delta = chips - user.bets[this.round];
@@ -352,7 +358,7 @@ export class Game {
       console.error("FOLD: not action", user.name);
       throw "not your action now";
     }
-    console.log(`USER Fold: ${user.name}`.green, prettify(user.hands));
+    console.log(`USER Fold: ${user.name}`.green, redactCards(user.hands));
     publishLog2all(this.roomid, [`${user.nickname || user.name} Fold`]);
     this.recordHandAction(token, "fold", user.bets[this.round], 0, this.maxPreBet());
     user.isFolded = true;
@@ -422,10 +428,7 @@ export class Game {
       const user = userMap[p.id];
       const total = subTotal(user.totalBets + (user.overtimeFeePaid || 0));
       console.log(
-        `${user.name} ${prettify(user.hands)} Stage: ${p.stage} Max: ${prettify(
-          p.maxCards!
-        )}  total: ${total} ${p.fold ? "Fold" : "Alive"} Profits: ${p.profits
-        } Stack:${user.stack} => ${user.stack + p.profits! - total}`
+        `${user.name} Stage: ${p.stage} Max: ${redactCards(p.maxCards || [])} total: ${total} ${p.fold ? "Fold" : "Alive"} Profits: ${p.profits} Stack:${user.stack} => ${user.stack + p.profits! - total} Hands:${redactCards(user.hands)}`
       );
     });
     // end log
@@ -1047,14 +1050,14 @@ export class Game {
       for (let i = 0; i < 3; ++i) {
         const card = this.cards[this.cardIndex];
         this.boardCards.push(card);
-        console.log("deal card", prettify([card]));
+        console.log("deal card", redactCards([card]));
         log += `${card.num}${card.suit}`;
         this.cardIndex += 1;
       }
     } else {
       const card = this.cards[this.cardIndex];
       this.boardCards.push(card);
-      console.log("deal card", prettify([card]));
+      console.log("deal card", redactCards([card]));
       this.cardIndex += 1;
       log += `${card.num}${card.suit}`;
     }
@@ -1338,7 +1341,7 @@ class Room {
 
     this.game = new Game(
       this.id,
-      readyUsers.sort((_) => Math.random() - 0.5)[0],
+      readyUsers.sort(() => (secureRandomInt(2) === 0 ? -1 : 1))[0],
       this.smallBlind,
       this.reBuyLimit,
       this.isShortDeck,

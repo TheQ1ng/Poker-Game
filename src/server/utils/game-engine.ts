@@ -1,13 +1,21 @@
+import { randomInt } from "crypto";
 import { Card } from "../../ApiType";
 
 const colors = require("colors");
+
+export function secureRandomInt(max: number): number {
+  if (!Number.isInteger(max) || max <= 0) {
+    throw new Error(`secureRandomInt requires a positive integer, got ${max}`);
+  }
+  return randomInt(max);
+}
 export const NUMS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 /** 短牌只用 6～A，共 36 张；6 最小、A 最大，A6789 为最小顺子 */
 export const NUMS_SHORT = [6, 7, 8, 9, 10, 11, 12, 13, 14];
 export const SUITS = ["c", "d", "h", "s"]; // club ♣︎, diamond ♦︎, heart ♥︎, spade ♠︎
 
 export function _randomPickOne(items: any) {
-  return items[Math.floor(Math.random() * items.length)];
+  return items[secureRandomInt(items.length)];
 }
 
 /** @param len 需要牌数；@param is_short 是否短牌（仅 6～A，共 36 张） */
@@ -25,7 +33,7 @@ export function randomHands(len = 7, is_short = false): Card[] {
 
   // Fisher-Yates Shuffle
   for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = secureRandomInt(i + 1);
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
 
