@@ -11,6 +11,7 @@ export type ApiRsp = ApiRspSuccess | ApiRspError;
 
 export type RoomID = string;
 export type Token = string;
+export const MAX_ROOM_PLAYERS = 9;
 export type Card = {
   num: number;
   suit: string;

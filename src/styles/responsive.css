@@ -699,26 +699,83 @@
 
 @media only screen and (max-width: 768px) {
   .room-root {
-    padding: 6px !important;
+    padding: 0 !important;
+  }
+
+  .room-site-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: 8px;
+    height: 70px;
+    flex-basis: 70px;
+    padding: 0 10px;
+  }
+
+  .room-site-brand {
+    font-size: 16px;
+  }
+
+  .room-site-account-name {
+    max-width: 96px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .room-site-header .room-top-actions {
+    grid-column: 2;
+    grid-row: 1;
+    width: auto !important;
+    min-width: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 4px !important;
+    justify-content: flex-start !important;
+    background: transparent !important;
+    border: 0 !important;
+  }
+
+  .room-site-header .room-header-controls {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    justify-content: flex-start;
+    gap: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .room-root .room-site-header .room-top-actions {
+    position: static !important;
+    transform: none !important;
+    width: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  .room-site-header .room-owner-actions {
+    flex: 0 0 auto;
+    gap: 4px;
+    padding-left: 8px;
   }
 
   .room-root .room-main-card {
-    border-radius: 28px !important;
-    border-width: 8px !important;
+    border-radius: 0 !important;
   }
 
   .room-root .room-sidebar {
+    top: 70px !important;
     max-width: 92vw !important;
     z-index: 140 !important;
   }
 
   .room-root .sidebar-btn {
-    top: 8px !important;
+    top: 78px !important;
     z-index: 150 !important;
   }
 
   .room-root .room-disclaimer-btn {
-    top: 8px !important;
+    top: 78px !important;
     right: 8px !important;
     z-index: 150 !important;
   }
@@ -744,6 +801,33 @@
   }
 
   .room-root .room-top-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .room-site-header .room-top-actions {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 4px !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+  }
+
+  .room-root .room-site-header .room-action-btn {
+    min-width: 32px !important;
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 6px !important;
+  }
+
+  .room-site-account {
+    gap: 0;
+    max-width: 36px;
+    padding: 6px 8px;
+  }
+
+  .room-site-account-name {
     display: none;
   }
 
@@ -776,10 +860,60 @@
     max-width: 94px !important;
   }
 
+  .room-root .room-seat-side-right {
+    gap: clamp(36px, 8vh, 70px);
+    padding-top: clamp(45px, 15vh, 90px);
+  }
+
   .room-root .room-top-seats {
-    justify-content: space-evenly !important;
     gap: 4px !important;
-    padding: 0 8px !important;
+    padding: 20px 8px 0 !important;
+  }
+
+  .room-root .room-seat-slot {
+    min-height: 0;
+  }
+
+  .room-root .room-seat-slot > .user {
+    width: 100% !important;
+    margin: 0 !important;
+    transform: scale(0.8);
+    transform-origin: center center;
+  }
+
+  .room-root .user-nickname-row {
+    width: 144px;
+    min-width: 0;
+  }
+
+  .room-root .room-seat-side > .user {
+    transform: scale(0.8);
+    transform-origin: center top;
+  }
+
+  .room-root .room-seat-side-right > .user:nth-of-type(2) {
+    transform: translateY(-14px) scale(0.8);
+  }
+
+  .room-root .owner-seat {
+    padding-right: clamp(64px, 13vw, 94px);
+  }
+
+  .room-root .owner-control-column {
+    transform: translateY(44px);
+  }
+
+  .room-root .owner-chat-input-wrap {
+    width: min(148px, 42vw);
+  }
+
+  .room-root .owner-seat .user-actions {
+    flex: 2.5 !important;
+    width: auto !important;
+  }
+
+  .room-root .owner-seat .user-actions.is-waiting .owner-auto-options {
+    bottom: 16px;
   }
 
   .room-root .room-center-area {
@@ -791,14 +925,17 @@
     transform-origin: center center;
   }
 
+  .room-root .room-center-content {
+    transform: translate(-50%, -50%);
+  }
+
   .room-root .room-pot-row {
-    max-width: 100% !important;
     gap: 8px;
-    margin-bottom: 8px !important;
   }
 
   .room-root .room-center-disclaimer {
-    display: none !important;
+    max-width: 120px;
+    font-size: 9px;
   }
 
   .room-root .roominfo {
@@ -825,12 +962,36 @@
 }
 
 @media only screen and (max-width: 768px) and (orientation: portrait) {
+  .room-site-header {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0 6px;
+    column-gap: 4px;
+  }
+
+  .room-site-brand {
+    font-size: 13px;
+  }
+
+  .room-site-header .room-top-actions {
+    gap: 3px !important;
+  }
+
+  .room-site-header .room-action-btn {
+    min-width: 30px !important;
+    width: 30px !important;
+    height: 30px !important;
+  }
+
+  .room-site-header .room-id-chip {
+    font-size: 11px !important;
+  }
+
   .room-root .room-seat-side {
     max-width: 82px !important;
   }
 
   .room-root .room-top-seats {
-    padding: 0 2px !important;
+    padding: 16px 2px 0 !important;
   }
 
   .room-root .boards {
@@ -838,13 +999,33 @@
   }
 
   .room-root .room-pot-row {
-    flex-direction: column !important;
-    align-items: center !important;
-    margin-bottom: 4px !important;
+    gap: 4px;
+  }
+
+  .room-root .room-pot-row .pots {
+    padding: 6px 8px;
+  }
+
+  .room-root .room-pot-row .pots span {
+    margin-right: 4px;
+    letter-spacing: 0;
+  }
+
+  .room-root .room-pot-row .pots strong {
+    font-size: 18px;
+  }
+
+  .room-root .room-center-disclaimer {
+    max-width: 95px;
+    font-size: 8px;
   }
 
   .room-root .room-top-actions {
     padding: 6px 40px !important;
+  }
+
+  .room-root .room-site-header .room-top-actions {
+    padding: 0 !important;
   }
 
   /* 覆盖旧规则：竖屏也显示核心操作区 */

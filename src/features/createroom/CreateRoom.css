@@ -1,5 +1,6 @@
 /* 德扑首页容器 - 绿色牌桌风格 */
 .poker-home-container {
+  height: 100vh;
   min-height: 100vh;
   background: linear-gradient(180deg, #0d4d2b 0%, #0a3d23 50%, #072d18 100%);
   display: flex;
@@ -16,7 +17,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
+  background-image:
     radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 1px, transparent 1px);
   background-size: 20px 20px;
   pointer-events: none;
@@ -27,71 +28,40 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 24px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%);
-  border-bottom: 3px solid #c9a227;
+  box-sizing: border-box;
+  height: 70px;
+  flex: 0 0 70px;
+  padding: 0 24px;
+  color: #f6c232;
+  background: linear-gradient(180deg, #0d3a25 0%, #0b321f 100%);
+  border-bottom: 2px solid #b89018;
   position: relative;
   z-index: 10;
 }
 
 .poker-table-logo {
-  font-size: 22px;
-  font-weight: bold;
-  color: #c9a227;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-  letter-spacing: 1px;
-}
-
-.user-dropdown {
-  color: #fff !important;
-  font-size: 16px;
-  font-weight: 500;
-  padding: 8px 16px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: all 0.3s ease;
-}
-
-.user-dropdown:hover {
-  background: rgba(255,255,255,0.2);
-}
-
-.username {
-  max-width: 100px;
   overflow: hidden;
+  color: #f6c232;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* 下拉菜单样式 */
-.user-menu {
-  background: rgba(20, 60, 40, 0.95) !important;
-  border: 1px solid #c9a227 !important;
-  border-radius: 8px !important;
-}
-
-.user-menu .ant-menu-item {
-  color: #fff !important;
-}
-
-.user-menu .ant-menu-item:hover {
-  background: rgba(201, 162, 39, 0.2) !important;
-}
-
-.user-menu .ant-menu-item-danger {
-  color: #ff4d4f !important;
+.poker-home-container .room-account-menu {
+  min-width: 160px;
 }
 
 /* 主内容区 */
 .poker-home-content {
   flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 0;
   position: relative;
   z-index: 1;
 }
@@ -99,42 +69,111 @@
 /* 牌桌表面 */
 .poker-table-surface {
   width: 100%;
-  max-width: 420px;
+  height: 100%;
+  max-width: none;
+  min-height: 0;
   background: linear-gradient(145deg, #1a5c38, #0d4d2b);
-  border-radius: 20px;
-  padding: 30px 20px;
-  box-shadow: 
-    0 20px 60px rgba(0,0,0,0.5),
-    inset 0 2px 0 rgba(255,255,255,0.1),
-    inset 0 -2px 0 rgba(0,0,0,0.2);
-  border: 4px solid #8b6914;
+  border-radius: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
+  border: 0;
   position: relative;
 }
 
-/* 牌桌边缘装饰 */
-.poker-table-surface::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: -8px;
-  right: -8px;
-  bottom: -8px;
-  border: 2px solid #c9a227;
-  border-radius: 24px;
-  pointer-events: none;
-  opacity: 0.5;
+.poker-home-container .room-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.poker-home-container .room-action-btn {
+  width: 132px;
+  height: 32px !important;
+  border-radius: 9px !important;
+  border-color: #c9a227 !important;
+  color: #ffe089 !important;
+  background: rgba(5, 47, 28, 0.8) !important;
+  font-weight: 700 !important;
+}
+
+.poker-home-container .room-action-btn.ant-btn-primary {
+  color: #1e1e1e !important;
+  background: linear-gradient(145deg, #e9c451, #b48b24) !important;
+  border-color: transparent !important;
+}
+
+.poker-home-container .room-action-btn:hover {
+  filter: brightness(1.12);
+}
+
+.room-modal-tabs .ant-tabs-nav {
+  display: none;
+}
+
+.room-action-modal .ant-modal-content {
+  background: linear-gradient(145deg, #1a3d2a, #0d2818) !important;
+  border: 2px solid #c9a227 !important;
+}
+
+.room-action-modal .ant-modal-header {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(201, 162, 39, 0.3) !important;
+}
+
+.room-action-modal .ant-modal-title,
+.room-action-modal .ant-modal-close-x {
+  color: #f2cd62 !important;
+}
+
+.room-action-modal .ant-tabs-content {
+  color: #fff;
+}
+
+.room-action-modal .ant-modal-body {
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.find-room-card {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none;
+}
+
+.find-room-card.home-card {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.find-room-card .ant-card-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 24px 24px !important;
 }
 
 /* Tab 样式 */
-.poker-tabs .ant-tabs-nav {
+.room-action-modal .poker-tabs .ant-tabs-nav {
   margin-bottom: 20px;
 }
 
-.poker-tabs .ant-tabs-nav::before {
+.room-action-modal .poker-tabs .ant-tabs-nav::before {
   border-bottom: 2px solid rgba(201, 162, 39, 0.3) !important;
 }
 
-.poker-tabs .ant-tabs-tab {
+.room-action-modal .poker-tabs .ant-tabs-tab {
   padding: 12px 20px;
   font-size: 15px;
   background: rgba(255, 255, 255, 0.05);
@@ -144,21 +183,21 @@
   color: rgba(255,255,255,0.7) !important;
 }
 
-.poker-tabs .ant-tabs-tab:hover {
+.room-action-modal .poker-tabs .ant-tabs-tab:hover {
   background: rgba(255, 255, 255, 0.1);
   color: #fff !important;
 }
 
-.poker-tabs .ant-tabs-tab-active {
+.room-action-modal .poker-tabs .ant-tabs-tab-active {
   background: linear-gradient(145deg, #c9a227, #8b6914) !important;
 }
 
-.poker-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+.room-action-modal .poker-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
   color: #1a1a1a !important;
   font-weight: 600;
 }
 
-.poker-tabs .ant-tabs-ink-bar {
+.room-action-modal .poker-tabs .ant-tabs-ink-bar {
   display: none;
 }
 
@@ -247,8 +286,7 @@
   width: 80px !important;
 }
 
-.buyin-input,
-.rebuy-input {
+.buyin-input,.rebuy-input {
   width: 120px !important;
 }
 
@@ -399,8 +437,7 @@
 .find-room-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 14px;
 }
 
@@ -422,6 +459,8 @@
 }
 
 .refresh-room-btn {
+  flex: 0 0 132px;
+  width: 132px;
   height: 32px !important;
   border-radius: 8px !important;
   border: 1px solid rgba(201, 162, 39, 0.5) !important;
@@ -462,12 +501,17 @@
 }
 
 .room-list {
-  max-height: 330px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
-  padding-right: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  padding: 2px 4px 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 312px);
+  grid-auto-rows: 148px;
+  justify-content: start;
+  align-content: start;
+  gap: 14px;
 }
 
 .room-list::-webkit-scrollbar {
@@ -480,13 +524,17 @@
 }
 
 .room-item {
+  width: 312px;
+  height: 148px;
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   padding: 12px;
   border-radius: 12px;
   border: 1px solid rgba(201, 162, 39, 0.26);
   background: linear-gradient(135deg, rgba(13, 71, 43, 0.92), rgba(7, 42, 26, 0.95));
+  overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -501,8 +549,14 @@
   min-width: 0;
 }
 
-.room-main-row,
-.room-detail-row {
+.room-owner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.room-main-row,.room-detail-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -524,9 +578,7 @@
   letter-spacing: 0.4px;
 }
 
-.room-owner,
-.room-blind,
-.room-mode {
+.room-owner,.room-blind,.room-mode {
   color: rgba(255, 255, 255, 0.82);
   font-size: 12px;
 }
@@ -610,21 +662,23 @@
 /* iPad 横屏 */
 @media (max-width: 1024px) and (orientation: landscape) {
   .poker-table-surface {
-    max-width: 380px;
-    padding: 25px 15px;
-    max-height: 70vh;
-    overflow-y: auto;
+    padding: 0;
+    max-height: none;
   }
-  
+
+  .find-room-card .ant-card-body {
+    padding: 12px 20px 20px !important;
+  }
+
   .poker-table-logo {
     font-size: 20px;
   }
-  
+
   .number-key {
     width: 64px;
     height: 50px;
   }
-  
+
   .digit-box {
     width: 44px;
     height: 52px;
@@ -637,45 +691,44 @@
   .poker-home-header {
     padding: 12px 16px;
   }
-  
+
   .poker-table-logo {
     font-size: 18px;
   }
-  
+
   .poker-table-surface {
-    padding: 20px 15px;
-    border-width: 3px;
-    min-height: 70vh;
+    padding: 0;
+    border-width: 0;
+    min-height: 0;
   }
-  
-  .poker-tabs .ant-tabs-tab {
+
+  .room-action-modal .poker-tabs .ant-tabs-tab {
     padding: 10px 16px;
     font-size: 14px;
   }
-  
+
   .digit-box {
     width: 52px;
     height: 56px;
     font-size: 24px;
   }
-  
+
   .number-key {
     width: 72px;
     height: 52px;
     font-size: 18px;
   }
-  
+
   .poker-btn {
     height: 44px !important;
     font-size: 15px !important;
   }
-  
+
   .blind-input {
     width: 70px !important;
   }
-  
-  .buyin-input,
-  .rebuy-input {
+
+  .buyin-input,.rebuy-input {
     width: 100px !important;
   }
 }
@@ -685,57 +738,51 @@
   .poker-home-header {
     padding: 10px 16px;
   }
-  
+
   .poker-table-logo {
     font-size: 16px;
   }
-  
-  .user-dropdown {
-    font-size: 14px;
-    padding: 6px 12px;
-  }
-  
+
   .poker-table-surface {
-    max-width: 340px;
-    padding: 15px;
+    padding: 0;
   }
-  
+
   .poker-form-group {
     margin-bottom: 12px;
   }
-  
+
   .digit-box {
     width: 48px;
     height: 48px;
     font-size: 20px;
   }
-  
+
   .number-key {
     width: 60px;
     height: 44px;
     font-size: 16px;
   }
-  
+
   .numpad-hint {
     font-size: 13px;
     margin-bottom: 10px;
   }
-  
+
   .number-display {
     gap: 6px;
   }
-  
+
   .number-row {
     gap: 6px;
   }
-  
+
   .poker-btn {
     height: 40px !important;
     font-size: 14px !important;
   }
 
   .room-list {
-    max-height: 220px;
+    max-height: none;
   }
 
   .room-item {
@@ -750,30 +797,42 @@
     flex-wrap: wrap;
     gap: 10px;
   }
-  
+
   .poker-table-logo {
     font-size: 16px;
   }
-  
-  .user-dropdown {
-    font-size: 14px;
-    padding: 6px 10px;
-  }
-  
+
   .poker-home-content {
-    padding: 15px 10px;
+    padding: 0;
   }
-  
+
   .poker-table-surface {
-    padding: 15px 12px;
-    border-width: 2px;
+    padding: 0;
+    border-width: 0;
   }
-  
-  .poker-tabs .ant-tabs-tab {
+
+  .poker-home-container .room-action-btn {
+    min-width: 0;
+    padding: 0 8px;
+  }
+
+  .room-list {
+    grid-template-columns: repeat(auto-fill, 288px);
+    grid-auto-rows: 148px;
+    gap: 10px;
+  }
+
+  .room-item {
+    width: 288px;
+    height: 148px;
+    padding: 10px;
+  }
+
+  .room-action-modal .poker-tabs .ant-tabs-tab {
     padding: 8px 12px;
     font-size: 13px;
   }
-  
+
   .poker-form-group {
     margin-bottom: 12px;
     display: flex;
@@ -781,71 +840,81 @@
     align-items: center;
     gap: 8px;
   }
-  
+
   .label {
     font-size: 13px;
     width: 100%;
     margin-bottom: 4px;
   }
-  
+
   .divider {
     display: none;
   }
-  
-  .blind-input,
-  .buyin-input,
-  .rebuy-input {
+
+  .blind-input,.buyin-input,.rebuy-input {
     width: calc(50% - 4px) !important;
   }
-  
+
   .label-text {
     width: 100%;
     font-size: 11px;
     margin-left: 0;
     margin-top: 4px;
   }
-  
+
   /* 数字键盘 */
   .number-display {
     gap: 8px;
   }
-  
+
   .digit-box {
     width: 48px;
     height: 50px;
     font-size: 22px;
   }
-  
+
   .number-pad {
     gap: 6px;
   }
-  
+
   .number-row {
     gap: 6px;
   }
-  
+
   .number-key {
     width: 64px;
     height: 46px;
     font-size: 16px;
   }
-  
+
   .poker-btn {
     height: 42px !important;
     font-size: 14px !important;
   }
-  
+
   .or-divider {
     margin: 10px 0;
   }
 
   .find-room-header {
-    flex-direction: column;
-    align-items: stretch;
+    flex-wrap: wrap;
   }
 
   .refresh-room-btn {
-    width: 100%;
+    flex: 0 0 132px;
+    width: 132px;
+  }
+
+  .poker-home-container .room-actions {
+    flex: 1 0 100%;
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+
+  .poker-home-container .room-action-btn {
+    flex: 1;
+    width: auto;
+    min-width: 0;
   }
 
   .room-item {
@@ -853,8 +922,7 @@
     align-items: stretch;
   }
 
-  .room-main-row,
-  .room-detail-row {
+  .room-main-row,.room-detail-row {
     flex-wrap: wrap;
   }
 
@@ -867,6 +935,16 @@
   }
 }
 
+@media (max-width: 400px) {
+  .room-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .room-item {
+    width: 100%;
+  }
+}
+
 /* 超小屏幕 */
 @media (max-width: 360px) {
   .digit-box {
@@ -874,16 +952,14 @@
     height: 46px;
     font-size: 20px;
   }
-  
+
   .number-key {
     width: 58px;
     height: 42px;
     font-size: 14px;
   }
-  
-  .blind-input,
-  .buyin-input,
-  .rebuy-input {
+
+  .blind-input,.buyin-input,.rebuy-input {
     width: calc(50% - 2px) !important;
   }
 }
@@ -891,29 +967,28 @@
 /* ==================== 手机端整体缩放 ==================== */
 @media (max-width: 400px) {
   .poker-home-content {
-    transform: scale(0.5);
-    transform-origin: top center;
+    transform: none;
   }
-  
+
   /* 数字键盘进一步缩小 */
   .number-display {
     gap: 4px;
   }
-  
+
   .digit-box {
     width: 32px;
     height: 38px;
     font-size: 16px;
   }
-  
+
   .number-pad {
     gap: 4px;
   }
-  
+
   .number-row {
     gap: 4px;
   }
-  
+
   .number-key {
     width: 48px;
     height: 34px;
@@ -923,29 +998,28 @@
 
 @media (max-width: 360px) {
   .poker-home-content {
-    transform: scale(0.5);
-    transform-origin: top center;
+    transform: none;
   }
-  
+
   /* 数字键盘更小 */
   .number-display {
     gap: 3px;
   }
-  
+
   .digit-box {
     width: 28px;
     height: 34px;
     font-size: 14px;
   }
-  
+
   .number-pad {
     gap: 3px;
   }
-  
+
   .number-row {
     gap: 3px;
   }
-  
+
   .number-key {
     width: 42px;
     height: 30px;
@@ -955,29 +1029,28 @@
 
 @media (max-width: 320px) {
   .poker-home-content {
-    transform: scale(0.5);
-    transform-origin: top center;
+    transform: none;
   }
-  
+
   /* 数字键盘最小 */
   .number-display {
     gap: 2px;
   }
-  
+
   .digit-box {
     width: 24px;
     height: 30px;
     font-size: 12px;
   }
-  
+
   .number-pad {
     gap: 2px;
   }
-  
+
   .number-row {
     gap: 2px;
   }
-  
+
   .number-key {
     width: 36px;
     height: 26px;
@@ -986,39 +1059,39 @@
 }
 
 /* 个人资料弹窗 */
-.profile-form {
+.profile-modal .profile-form {
   padding: 10px 0;
 }
 
-.profile-field {
+.profile-modal .profile-field {
   margin-bottom: 20px;
 }
 
-.profile-field label {
+.profile-modal .profile-field label {
   display: block;
   color: #ffd700;
   margin-bottom: 8px;
   font-weight: bold;
 }
 
-.profile-field .ant-input {
+.profile-modal .profile-field .ant-input {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 215, 0, 0.3);
   color: white;
 }
 
-.profile-field .ant-input:disabled {
+.profile-modal .profile-field .ant-input:disabled {
   background: rgba(0, 0, 0, 0.3);
   color: rgba(255, 255, 255, 0.5);
 }
 
-.avatar-grid {
+.profile-modal .avatar-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 10px;
 }
 
-.avatar-option {
+.profile-modal .avatar-option {
   width: 60px;
   height: 60px;
   border-radius: 50%;
@@ -1032,23 +1105,23 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
-.avatar-option:hover {
+.profile-modal .avatar-option:hover {
   border-color: rgba(255, 215, 0, 0.6);
   transform: scale(1.05);
 }
 
-.avatar-option.selected {
+.profile-modal .avatar-option.selected {
   border-color: #ffd700;
   box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
 
-.avatar-option img {
+.profile-modal .avatar-option img {
   width: 50px;
   height: 50px;
   object-fit: cover;
 }
 
-.profile-actions {
+.profile-modal .profile-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;

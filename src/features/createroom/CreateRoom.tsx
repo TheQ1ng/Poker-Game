@@ -10,7 +10,7 @@ import {
   Switch,
 } from "antd";
 import Tabs from "antd/lib/tabs";
-import { DownOutlined, PlusOutlined, KeyOutlined, HistoryOutlined, LogoutOutlined, SearchOutlined, UserOutlined, DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DownOutlined, PlusOutlined, KeyOutlined, LogoutOutlined, UserOutlined, DeleteOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAppDispatch, useAppSelector } from "../../app/hooks";
 import {
@@ -21,7 +21,6 @@ import {
 } from "./createRoomSlice";
 import { logout } from "../home/homeSlice";
 import { RoomInfo, updateProfile, fetchProfile } from "../home/homeAPI";
-import { RecentGameRecords } from "./RecentGameRecords";
 import "./CreateRoom.css";
 
 const style = { padding: "8px 0" };
@@ -115,19 +114,19 @@ function CreateRoom() {
   const [redPacketThresholdMultiple, setRedPacketThresholdMultiple] = useState(1);
   const [redPacketMaxPercent, setRedPacketMaxPercent] = useState(30);
   const [redPacketExpanded, setRedPacketExpanded] = useState(false);
-  const [overtimeCost, setOvertimeCost] = useState(20);
+  const [overtimeCost, setOvertimeCost] = useState(0);
   // 支持功能参数
   const [supportEnabled, setSupportEnabled] = useState(false);
   const [supportMinPot, setSupportMinPot] = useState(600);
   const [supportMaxPercent, setSupportMaxPercent] = useState(5);
   const [supportExpanded, setSupportExpanded] = useState(false);
   const [roomid, setRoomID] = useState("");
-  const [historyModalVisible, setHistoryModalVisible] = useState(false);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
   const [profileNickname, setProfileNickname] = useState("");
   const [profileAvatar, setProfileAvatar] = useState("");
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [activeTab, setActiveTab] = useState("create");
+  const [roomModalVisible, setRoomModalVisible] = useState(false);
   const [isRefreshingRooms, setIsRefreshingRooms] = useState(false);
   const status = useAppSelector(selectStatus);
 
@@ -145,12 +144,10 @@ function CreateRoom() {
     }
   }, [dispatch]);
 
-  // 切换标签时获取房间列表
+  // 页面加载时获取开放房间，列表始终作为大厅首页内容展示。
   useEffect(() => {
-    if (activeTab === "find") {
-      refreshRooms();
-    }
-  }, [activeTab, refreshRooms]);
+    refreshRooms();
+  }, [refreshRooms]);
 
   // 页面加载时获取用户资料
   useEffect(() => {
@@ -258,14 +255,16 @@ function CreateRoom() {
     }
   };
 
-  // 下拉菜单包含游戏记录和注销
+  const openRoomModal = (tab: string) => {
+    setActiveTab(tab);
+    setRoomModalVisible(true);
+  };
+
+  // 下拉菜单延续房间内账号菜单。
   const userMenu = (
-    <Menu className="user-menu">
+    <Menu className="user-menu room-account-menu">
       <Menu.Item key="profile" onClick={handleOpenProfile}>
         <UserOutlined /> 个人资料
-      </Menu.Item>
-      <Menu.Item key="history" onClick={() => setHistoryModalVisible(true)}>
-        <HistoryOutlined /> 最近游戏记录
       </Menu.Item>
       <Menu.Item key="clearCache" onClick={handleClearCache}>
         <DeleteOutlined /> 清除缓存
@@ -288,22 +287,101 @@ function CreateRoom() {
           overlay={userMenu}
           trigger={['click']}
         >
-          <a className="user-dropdown">
-            <span className="username">{localStorage["name"]}</span>
+          <button className="room-site-account" type="button">
+            <span className="room-site-account-name">
+              {localStorage.getItem("nickname") || localStorage.getItem("name")}
+            </span>
             <DownOutlined />
-          </a>
+          </button>
         </Dropdown>
       </div>
 
       {/* 主内容区 - 扑克牌桌面风格 */}
       <div className="poker-home-content">
         <div className="poker-table-surface">
-          <Tabs 
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            centered 
-            className="poker-tabs"
-          >
+          <Card className="home-card find-room-card">
+            <div className="find-room-header">
+              <div className="room-stats">
+                <span className="stat-pill">开放桌数 {availableRooms}</span>
+                <span className="stat-pill">在线玩家 {totalPlayers}</span>
+              </div>
+              <Button
+                className="refresh-room-btn"
+                icon={<ReloadOutlined />}
+                onClick={refreshRooms}
+                loading={isRefreshingRooms}
+              >
+                刷新
+              </Button>
+              <div className="room-actions">
+                <Button className="room-action-btn" icon={<KeyOutlined />} onClick={() => openRoomModal("join")}>
+                  加入房间
+                </Button>
+                <Button className="room-action-btn" type="primary" icon={<PlusOutlined />} onClick={() => openRoomModal("create")}>
+                  创建房间
+                </Button>
+              </div>
+            </div>
+            {rooms.length === 0 ? (
+              <div className="no-rooms">
+                <p className="no-rooms-title">暂无开放房间</p>
+                <p className="no-rooms-desc">点击“创建房间”开一桌，或者稍后点击刷新再看看</p>
+              </div>
+            ) : (
+              <div className="room-list">
+                {rooms.map((room) => (
+                  <div key={room.id} className="room-item">
+                    <div className="room-info">
+                      <div className="room-main-row">
+                        <span className="room-id">#{room.id}</span>
+                        <span className="room-owner">房主：{room.ownerName}</span>
+                      </div>
+                      <div className="room-detail-row">
+                        <span className="room-blind">盲注 {room.smallBlind}/{room.smallBlind * 2}</span>
+                        <span className="room-mode">
+                          {room.isOmaha ? "奥马哈" : room.isShortDeck ? "短牌" : "德州"}
+                        </span>
+                      </div>
+                      <div className="room-progress-wrap">
+                        <span className="room-players">人数 {room.playerCount}/{room.maxPlayers}</span>
+                        <div className="room-progress-track">
+                          <div
+                            className="room-progress-fill"
+                            style={{ width: `${(room.playerCount / room.maxPlayers) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="primary"
+                      size="small"
+                      className="join-room-btn"
+                      disabled={room.playerCount >= room.maxPlayers}
+                      onClick={() => handleJoinRoom(room.id)}
+                    >
+                      加入
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+
+      <Modal
+        title={activeTab === "join" ? "加入房间" : "创建房间"}
+        visible={roomModalVisible}
+        onCancel={() => setRoomModalVisible(false)}
+        footer={null}
+        centered
+        className="room-action-modal"
+      >
+        <Tabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          className="poker-tabs room-modal-tabs"
+        >
             <Tabs.TabPane tab={<span><PlusOutlined /> 创建</span>} key="create">
               <Card className="home-card create-room-card">
                 <div className="poker-form-group">
@@ -508,82 +586,7 @@ function CreateRoom() {
               </Card>
             </Tabs.TabPane>
 
-            <Tabs.TabPane tab={<span><SearchOutlined /> 寻找</span>} key="find">
-              <Card className="home-card find-room-card">
-                <div className="find-room-header">
-                  <div className="room-stats">
-                    <span className="stat-pill">开放桌数 {availableRooms}</span>
-                    <span className="stat-pill">在线玩家 {totalPlayers}</span>
-                  </div>
-                  <Button
-                    className="refresh-room-btn"
-                    icon={<ReloadOutlined />}
-                    onClick={refreshRooms}
-                    loading={isRefreshingRooms}
-                  >
-                    刷新
-                  </Button>
-                </div>
-                {rooms.length === 0 ? (
-                  <div className="no-rooms">
-                    <p className="no-rooms-title">暂无开放房间</p>
-                    <p className="no-rooms-desc">切到“创建”标签开一桌，或者稍后点击刷新再看看</p>
-                  </div>
-                ) : (
-                  <div className="room-list">
-                    {rooms.map((room) => (
-                      <div key={room.id} className="room-item">
-                        <div className="room-info">
-                          <div className="room-main-row">
-                            <span className="room-id">#{room.id}</span>
-                            <span className="room-owner">房主：{room.ownerName}</span>
-                          </div>
-                          <div className="room-detail-row">
-                            <span className="room-blind">盲注 {room.smallBlind}/{room.smallBlind * 2}</span>
-                            <span className="room-mode">
-                              {room.isOmaha ? "奥马哈" : room.isShortDeck ? "短牌" : "德州"}
-                            </span>
-                          </div>
-                          <div className="room-progress-wrap">
-                            <span className="room-players">人数 {room.playerCount}/{room.maxPlayers}</span>
-                            <div className="room-progress-track">
-                              <div
-                                className="room-progress-fill"
-                                style={{ width: `${(room.playerCount / room.maxPlayers) * 100}%` }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          type="primary"
-                          size="small"
-                          className="join-room-btn"
-                          disabled={room.playerCount >= room.maxPlayers}
-                          onClick={() => handleJoinRoom(room.id)}
-                        >
-                          加入
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            </Tabs.TabPane>
-          </Tabs>
-        </div>
-      </div>
-
-      {/* 游戏记录弹窗 */}
-      <Modal
-        title={<span className="modal-title">🎲 最近游戏记录</span>}
-        visible={historyModalVisible}
-        onCancel={() => setHistoryModalVisible(false)}
-        footer={null}
-        width={600}
-        className="history-modal"
-        centered
-      >
-        <RecentGameRecords />
+        </Tabs>
       </Modal>
 
       {/* 个人资料弹窗 */}

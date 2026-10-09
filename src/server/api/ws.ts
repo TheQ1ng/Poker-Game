@@ -198,7 +198,7 @@ function handle(ws: PokerWebSocket, data: ActionBase) {
       userSendMessage(token, data.message);
       break;
     case ActionType.ADD_BOT:
-      addBotToRoom(data.roomid);
+      addBotToRoom(token, data.roomid);
       break;
     case ActionType.KICK_USER:
       kickUser(token, data.userId);

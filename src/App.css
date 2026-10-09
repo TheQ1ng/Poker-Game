@@ -4,6 +4,35 @@ body {
   background-color: #ececec;
 }
 
+.room-root .room-balance-btn-balanced:not(:disabled) {
+  border-color: rgba(32, 214, 185, 0.85);
+  background: linear-gradient(145deg, rgba(10, 93, 76, 0.95), rgba(7, 57, 48, 0.98));
+  color: #55e2ca;
+}
+
+.room-root .room-balance-btn-unbalanced {
+  border-color: #ff7875 !important;
+  background: linear-gradient(145deg, #8c2f2a, #5f1e1b) !important;
+  color: #fff !important;
+  box-shadow: 0 0 10px rgba(255, 77, 79, 0.35) !important;
+}
+
+.room-root .room-balance-btn-unbalanced:hover {
+  border-color: #ffaaa8 !important;
+  background: linear-gradient(145deg, #a83a35, #762420) !important;
+  color: #fff !important;
+}
+
+.room-root .user-turn-indicator {
+  position: absolute;
+  z-index: 12;
+  top: -28px;
+  left: 50%;
+  margin: 0 !important;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 html,
 body {
   padding: 0;
@@ -111,6 +140,327 @@ body {
   color: white;
 }
 
+.room-root {
+  position: relative;
+  box-sizing: border-box;
+  background: #0d2a1b;
+}
+
+.room-site-header {
+  position: relative;
+  z-index: 120;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  align-items: center;
+  box-sizing: border-box;
+  height: 70px;
+  flex: 0 0 70px;
+  min-width: 0;
+  padding: 0 24px;
+  color: #f6c232;
+  background: linear-gradient(180deg, #0d3a25 0%, #0b321f 100%);
+  border-bottom: 2px solid #b89018;
+}
+
+.room-site-brand {
+  overflow: hidden;
+  color: #f6c232;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-site-account {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  justify-self: end;
+  overflow: hidden;
+  max-width: 180px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 215, 0, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.room-site-account:hover,
+.room-site-account:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 215, 0, 0.5);
+  color: #fff;
+  outline: none;
+}
+
+.room-site-header .room-top-actions {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: nowrap;
+  gap: 6px !important;
+  scrollbar-width: none;
+}
+
+.room-site-header .room-header-controls {
+  display: flex;
+  grid-column: 2;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(14px, 2vw, 28px);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.room-site-header .room-header-controls::-webkit-scrollbar {
+  display: none;
+}
+
+.room-site-header .room-top-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.room-site-header .room-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid rgba(32, 214, 185, 0.85);
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(10, 93, 76, 0.95), rgba(7, 57, 48, 0.98));
+  color: #55e2ca;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24), inset 0 1px rgba(255, 255, 255, 0.12);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+
+.room-site-header .room-action-btn:hover,
+.room-site-header .room-action-btn:focus-visible {
+  transform: translateY(-1px);
+  border-color: #65f1d9;
+  background: linear-gradient(145deg, #087c69, #07584b);
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32), 0 0 8px rgba(32, 214, 185, 0.22);
+}
+
+.room-site-header .room-action-btn.ant-btn-primary {
+  background: linear-gradient(145deg, #12b89d, #087a67);
+  color: #fff;
+}
+
+.room-site-header .room-action-btn.ant-btn-dangerous {
+  border-color: #ff7875;
+  background: linear-gradient(145deg, #8c2f2a, #5f1e1b);
+  color: #fff;
+}
+
+.room-site-header .room-action-btn.ant-btn:disabled,
+.room-site-header .room-action-btn.ant-btn:disabled:hover {
+  border-color: rgba(32, 214, 185, 0.85) !important;
+  background-color: #075f50 !important;
+  background-image: linear-gradient(145deg, #0a5d4c, #073930) !important;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24), inset 0 1px rgba(255, 255, 255, 0.12) !important;
+  color: #55e2ca !important;
+  opacity: 1 !important;
+  transform: none !important;
+  cursor: not-allowed;
+}
+
+.room-site-header .room-action-btn.ant-btn-primary:disabled,
+.room-site-header .room-action-btn.ant-btn-primary:disabled:hover {
+  border-color: rgba(32, 214, 185, 0.85) !important;
+  background-color: #087a67 !important;
+  background-image: linear-gradient(145deg, #12b89d, #087a67) !important;
+  color: #fff !important;
+}
+
+.room-site-header .room-action-btn.ant-btn:disabled span,
+.room-site-header .room-action-btn.ant-btn:disabled .anticon {
+  color: inherit !important;
+  -webkit-text-fill-color: currentColor !important;
+  opacity: 1 !important;
+}
+
+.room-site-header .room-owner-actions .room-action-btn-disabled.ant-btn,
+.room-site-header .room-owner-actions .room-action-btn-disabled.ant-btn:hover,
+.room-site-header .room-owner-actions .room-action-btn-disabled.ant-btn:focus,
+.room-site-header .room-owner-actions .room-action-btn-disabled.ant-btn-default {
+  border-color: rgba(32, 214, 185, 0.85) !important;
+  background: linear-gradient(145deg, #0a5d4c, #073930) !important;
+  color: #55e2ca !important;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.24), inset 0 1px rgba(255, 255, 255, 0.12) !important;
+  opacity: 1 !important;
+  filter: none !important;
+  text-shadow: none !important;
+  cursor: not-allowed !important;
+  -webkit-appearance: none;
+}
+
+.room-site-header .room-owner-actions .room-action-btn-disabled.ant-btn span,
+.room-site-header .room-owner-actions .room-action-btn-disabled.ant-btn .anticon {
+  color: #55e2ca !important;
+  -webkit-text-fill-color: #55e2ca !important;
+  opacity: 1 !important;
+}
+
+.room-site-header .room-owner-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding-left: clamp(12px, 1.5vw, 20px);
+  border-left: 1px solid rgba(201, 162, 39, 0.42);
+}
+
+.room-account-menu {
+  min-width: 160px;
+  background: rgba(20, 60, 40, 0.98) !important;
+  border: 1px solid #c9a227 !important;
+  border-radius: 8px !important;
+}
+
+.room-account-menu .ant-menu-item,
+.room-account-menu .ant-menu-item .anticon {
+  color: #fff !important;
+}
+
+.ant-dropdown .room-account-menu .ant-menu-item:not(.ant-menu-item-danger),
+.ant-dropdown .room-account-menu .ant-menu-item:not(.ant-menu-item-danger) span,
+.ant-dropdown .room-account-menu .ant-menu-item:not(.ant-menu-item-danger) .anticon {
+  color: #fff !important;
+}
+
+.ant-dropdown .room-account-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-danger),
+.ant-dropdown .room-account-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-danger) *,
+.ant-dropdown .room-account-menu .ant-menu-item:not(.ant-menu-item-danger) * {
+  color: #fff !important;
+}
+
+.room-account-menu .ant-menu-item:hover {
+  color: #fff !important;
+}
+
+.room-account-menu .ant-menu-item-danger,
+.room-account-menu .ant-menu-item-danger .anticon {
+  color: #ff7875 !important;
+}
+
+.room-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.room-profile-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #fff;
+}
+
+.room-profile-label {
+  margin-bottom: 8px;
+  color: #fff;
+}
+
+.room-profile-avatars {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.room-profile-avatars button {
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.room-profile-avatars button.selected {
+  border-color: #ffd700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.room-profile-avatars img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.room-profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.room-site-header .room-id-chip {
+  flex: 0 0 auto;
+  color: #ffd700;
+  font-size: 14px;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+  white-space: nowrap;
+}
+
+.room-root .room-main-card {
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  margin: 0;
+}
+
+.room-root .room-stage {
+  min-height: 0;
+}
+
+.room-root .room-seats-layout {
+  flex: 1.15 1 0;
+  min-height: 0;
+}
+
+.room-root .room-owner-area {
+  flex: 0.85 1 0;
+  min-height: 0;
+  overflow: visible;
+}
+
+.room-root .owner-seat {
+  position: relative;
+  box-sizing: border-box;
+  justify-content: space-between;
+  align-items: stretch;
+  padding-right: clamp(100px, 11vw, 150px);
+}
+
+.room-root .room-sidebar {
+  top: 70px !important;
+}
+
+.room-root .room-sidebar-toggle,
+.room-root .room-disclaimer-btn {
+  top: 80px !important;
+}
+
 .user {
   height: 150px;
   width: 80px;
@@ -206,11 +556,402 @@ body {
   position: absolute;
   width: 100%;
   height: 75px;
-  /* 略微下移并向右偏一点，避免左侧玩家摊牌时出画面 */
-  bottom: -4px;
+  bottom: -12px;
   left: 8px;
   display: flex;
   flex-direction: row;
+}
+
+.room-seat-side:first-child .user .card-box-stacked {
+  left: 0;
+  width: max-content;
+  justify-content: flex-start;
+}
+
+.room-table-center {
+  min-width: 0;
+}
+
+.room-top-seats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: flex-start;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 24px 10px 0;
+}
+
+.room-seat-slot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-width: 0;
+  min-height: 178px;
+}
+
+.room-seat-slot > .user {
+  flex: 0 1 100px;
+  min-width: 0;
+  margin: 0;
+}
+
+.room-seat-side-right {
+  box-sizing: border-box;
+  justify-content: flex-start;
+  gap: clamp(70px, 15vh, 115px);
+  padding-top: clamp(100px, 20vh, 165px);
+}
+
+.room-seat-side-right > .user:nth-of-type(2) {
+  transform: translateY(-18px) scale(0.8);
+}
+
+.room-seat-side-right > .user {
+  position: relative;
+  z-index: 40;
+  width: 132px;
+  margin: 0;
+  overflow: visible;
+}
+
+.room-seat-slot > .user,
+.room-seat-side > .user {
+  transform: scale(0.8);
+  transform-origin: center top;
+}
+
+.user-nickname {
+  display: block;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-root .user-nickname-row {
+  position: relative;
+  z-index: 20;
+  align-self: center;
+  left: auto;
+  flex: 0 0 24px;
+  width: 160px;
+  max-width: none;
+  min-width: 0;
+  height: 24px;
+  margin: 0;
+  justify-content: center !important;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.room-root .user-nickname-row .user-nickname {
+  position: absolute;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  flex: none;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.room-root .user-nickname-row .user-see-hand-action {
+  position: absolute;
+  left: 0;
+  z-index: 21;
+}
+
+.room-root .user-nickname-row .user-supported-flag {
+  position: absolute;
+  right: 0;
+  z-index: 21;
+}
+
+.room-root .chips-record-image-capture {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  z-index: -1;
+  width: 680px;
+  padding: 28px;
+  box-sizing: border-box;
+  border: 1px solid rgba(232, 190, 68, 0.7);
+  border-radius: 16px;
+  background: linear-gradient(145deg, #123c29, #0c2b1d);
+  color: #fff;
+  font-family: Arial, sans-serif;
+}
+
+.chips-record-image-title {
+  margin-bottom: 20px;
+  color: #ffd66b;
+  font-size: 26px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.chips-record-image-capture table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 17px;
+}
+
+.chips-record-image-capture th,
+.chips-record-image-capture td {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(225, 210, 160, 0.25);
+  text-align: center;
+}
+
+.chips-record-image-capture th {
+  background: rgba(218, 175, 54, 0.18);
+  color: #ffdf80;
+}
+
+.chips-record-image-capture td:first-child {
+  text-align: left;
+}
+
+.chips-record-image-capture .positive {
+  color: #7ee2a8;
+}
+
+.chips-record-image-capture .negative {
+  color: #ff938b;
+}
+
+.user .userinfo {
+  transform: scale(1);
+  transform-origin: center center;
+}
+
+.room-root .owner-seat .user-actions {
+  position: relative;
+  display: flex;
+  flex: 2.5 !important;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.room-root .owner-profile-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.room-root .owner-control-column {
+  transform: translateY(58px);
+}
+
+.room-root .owner-hand-column {
+  display: flex !important;
+  flex: 3 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+  padding-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.room-root .owner-deal-action {
+  display: flex;
+  width: 100%;
+}
+
+.room-root .owner-deal-action > span {
+  display: block !important;
+  width: 66px;
+  height: 34px;
+}
+
+.room-root .owner-deal-button,
+.room-root .owner-deal-button:hover,
+.room-root .owner-deal-button:focus {
+  box-sizing: border-box !important;
+  width: 66px !important;
+  min-width: 66px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  margin: 0 !important;
+  flex: 0 0 66px;
+  padding: 0 5px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.room-root .owner-deal-button-deal,
+.room-root .owner-deal-button-deal:disabled,
+.room-root .owner-deal-button-deal:disabled:hover {
+  background: linear-gradient(135deg, #ff9f43 0%, #d35400 100%) !important;
+  color: #fff !important;
+}
+
+.room-root .owner-deal-button-ready,
+.room-root .owner-deal-button-ready:disabled,
+.room-root .owner-deal-button-ready:disabled:hover {
+  background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%) !important;
+  color: #fff !important;
+}
+
+.room-root .owner-deal-button:disabled,
+.room-root .owner-deal-button:disabled:hover {
+  opacity: 1 !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 15px rgba(255, 159, 67, 0.45), 0 0 20px rgba(255, 159, 67, 0.25) !important;
+  transform: none !important;
+  cursor: not-allowed;
+}
+
+.room-root .owner-deal-button[aria-disabled="true"],
+.room-root .owner-deal-button[aria-disabled="true"]:hover,
+.room-root .owner-deal-button[aria-disabled="true"]:focus {
+  transform: none !important;
+  cursor: not-allowed;
+}
+
+.room-root .owner-deal-button[aria-disabled="true"] .anticon,
+.room-root .owner-deal-button[aria-disabled="true"] span {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.room-root .owner-hand-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.room-root .owner-action-countdown {
+  flex: 0 0 22px;
+  min-height: 22px;
+  width: 100%;
+}
+
+.room-root .owner-action-countdown .ant-btn {
+  width: auto !important;
+  min-width: 0 !important;
+  height: 22px;
+  padding: 0 6px;
+  line-height: 20px;
+}
+
+.room-root .owner-seat .owner-hole-cards {
+  position: relative;
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  transform: none;
+}
+
+.room-root .owner-finance-actions {
+  position: fixed;
+  z-index: 8;
+  left: 16px;
+  bottom: 108px;
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px !important;
+  width: 66px !important;
+  margin: 0 !important;
+}
+
+.room-root .owner-finance-actions > div,
+.room-root .owner-finance-actions > div > span {
+  display: block !important;
+  width: 66px !important;
+}
+
+.room-root .owner-finance-actions > .owner-deal-action {
+  display: flex !important;
+  align-items: flex-start;
+  height: 34px;
+}
+
+.room-root .owner-finance-actions .ant-btn {
+  box-sizing: border-box !important;
+  width: 66px !important;
+  min-width: 66px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  margin: 0 !important;
+  padding: 0 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: linear-gradient(145deg, #9b4dcc 0%, #7433a5 100%);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.24);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.room-root .owner-finance-actions .ant-btn:hover:not(:disabled) {
+  border-color: rgba(255, 225, 255, 0.75);
+  background: linear-gradient(145deg, #b261df 0%, #8844b7 100%);
+  color: #fff;
+}
+
+.room-root .owner-chat-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 148px;
+  min-width: 0;
+  margin-top: 8px;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.room-root .owner-chat-input-wrap .owner-emoji-button {
+  display: inline-flex;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  box-shadow: 0 2px 6px rgba(255, 152, 0, 0.4);
+  color: #fff;
+}
+
+.room-root .owner-chat-input-wrap .owner-chat-input {
+  flex: 1 1 auto;
+  width: auto !important;
+  min-width: 0;
+  height: 25px;
+  padding: 2px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.32);
+  color: #fff;
+}
+
+.room-root .owner-chat-input-wrap .owner-chat-input::placeholder {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.room-root .owner-seat .user-actions.is-waiting .owner-auto-options {
+  position: absolute;
+  right: 0;
+  bottom: 16px;
+  left: 0;
 }
 
 /* 别人/申请看牌展示：小牌 + 叠牌（第二张遮第一张右边约70%） */
@@ -224,9 +965,17 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 2px;
+  top: auto !important;
+  bottom: -24px !important;
   font-size: 10px;
   line-height: 1.2;
+  z-index: 20;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.78);
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
 }
 .user .card-box-stacked .poker-card-wrapper {
   margin: 0 !important;
@@ -310,10 +1059,31 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 2px;
+  top: auto !important;
+  bottom: -24px !important;
+  z-index: 20;
   font-size: 12px;
   line-height: 1.2;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.78);
   text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.owner-seat .hand-type-below-cards:not(.handstype) {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.owner-seat .owner-hole-cards {
+  flex: 0 0 auto;
+  margin: 0 0 8px;
+  transform: none;
 }
 .owner .card-box-stacked-2 .poker-card-wrapper:nth-child(2),
 .owner-seat .card-box-stacked-2 .poker-card-wrapper:nth-child(2) {
@@ -568,6 +1338,76 @@ body {
 
 .boards {
   height: 100%;
+}
+
+.room-center-area .boards {
+  position: relative;
+  height: auto;
+  margin: 0;
+  transform: none;
+}
+
+.room-center-area {
+  position: relative;
+}
+
+.room-center-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  transform: translate(-50%, -50%);
+}
+
+.room-pot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.room-pot-row .pots {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 20px;
+  border: 2px solid rgba(255, 215, 0, 0.3);
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.2) 100%);
+}
+
+.room-pot-row .pots span {
+  margin-right: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.room-pot-row .pots strong {
+  color: #ffd700;
+  font-size: 24px;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.room-center-disclaimer {
+  max-width: 150px;
+  flex: 0 0 auto;
+  color: #fff;
+  font-size: 10px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.room-center-disclaimer p {
+  margin: 0;
 }
 
 .board-card-slot {

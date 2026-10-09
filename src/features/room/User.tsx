@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import { Tooltip, Button, Popconfirm, InputNumber, Popover, Input } from "antd";
+import { Tooltip, Button, InputNumber, Popover, Input } from "antd";
 import { ApiOutlined, CoffeeOutlined, CloseOutlined, EyeOutlined, CheckOutlined } from "@ant-design/icons";
 import { shallowEqual, useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../app/store";
@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { selectSelf, selectGame, selectRoom, selectPendingSeeHandRequests, selectRevealedHandsForMe, selectRoomChatBubbles, selectSupportedTargetId } from "./roomSlice";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
-import { ws_kickUser, ws_requestSeeHand, ws_sendMessage } from "../../app/websocket";
+import { ws_requestSeeHand, ws_sendMessage } from "../../app/websocket";
 import { clearRoomChatBubble } from "./roomSlice";
 
 // 头像图片映射
@@ -39,46 +39,6 @@ const actionNameToClass: { [key: string]: string } = {
 
 // 获取所有头像键值
 const avatarKeys = Object.keys(avatarImages);
-
-// 靴子图标（踢出房间）- 使用与顶部控制按钮统一的线性风格 SVG
-function BootIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      style={{ display: "block" }}
-    >
-      <path
-        d="M7 4h5a2 2 0 0 1 2 2v6.5c0 .9.36 1.76 1 2.4L18 18H7V4Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M7 18h12.2a.8.8 0 0 1 .78 1.01L19.5 21.5a1.6 1.6 0 0 1-1.53 1.18H7"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M11 7.5h1.7A1.8 1.8 0 0 1 14.5 9.3V13"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M8.5 6.2H11M8.5 8.4H11M8.5 10.6H11"
-        stroke="currentColor"
-        strokeWidth="1.3"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 /** 聚宝盆金币数量：盈利≤100 为 14 枚，≥1000 为 50 枚，中间线性；动画同速率循环 */
 function coinCountFromProfits(profits: number): number {
@@ -264,7 +224,7 @@ export function User({
     <div className={`user flex-column flex-center ${user?.isFoled ? "folded" : ""}`}>
       {/* 当前行动玩家面前：行动中标识 */}
       {isActingUser && !isSettling && (
-        <div style={{
+        <div className="user-turn-indicator" style={{
           fontSize: 12,
           fontWeight: 'bold',
           color: '#ffd700',
@@ -360,7 +320,7 @@ export function User({
             </>
           )}
         </div>
-        <div className="avatar-container" style={{ transform: 'scale(0.8)', position: 'relative' }}>
+        <div className="avatar-container" style={{ width: 64, height: 64, position: 'relative' }}>
         {avatar && avatarImages[avatar] ? (
           <img 
             src={avatarImages[avatar]} 
@@ -516,52 +476,55 @@ export function User({
         )}
         </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
+        <div className="user-nickname-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'white', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
           {/* 结算阶段：眼睛按钮贴昵称左侧，只在结算阶段可申请 */}
           {!isSelf && isSettling && !user?.shouldShowHand && user?.hasCards && user?.isInCurrentGame && self && (
-            <Popover
-              visible={!!seeHandPopOpen[id]}
-              onVisibleChange={(open: boolean) => setSeeHandPopOpen((prev) => ({ ...prev, [id]: open }))}
-              trigger="click"
-              placement="top"
-              getPopupContainer={() => document.body}
-              zIndex={10050}
-              content={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
-                  <InputNumber
-                    min={1}
-                    max={Math.max(1, self.stack ?? 0)}
-                    value={seeHandChips}
-                    onChange={(v) => setSeeHandChips(v ?? 1)}
-                    style={{ width: 80 }}
-                    size="small"
-                  />
+            <span className="user-see-hand-action">
+              <Popover
+                visible={!!seeHandPopOpen[id]}
+                onVisibleChange={(open: boolean) => setSeeHandPopOpen((prev) => ({ ...prev, [id]: open }))}
+                trigger="click"
+                placement="top"
+                getPopupContainer={() => document.body}
+                zIndex={10050}
+                content={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                    <InputNumber
+                      min={1}
+                      max={Math.max(1, self.stack ?? 0)}
+                      value={seeHandChips}
+                      onChange={(v) => setSeeHandChips(v ?? 1)}
+                      style={{ width: 80 }}
+                      size="small"
+                    />
+                    <Button
+                      type="primary"
+                      size="small"
+                      icon={<CheckOutlined />}
+                      onClick={() => {
+                        ws_requestSeeHand(id, seeHandChips);
+                        setSeeHandPopOpen((prev) => ({ ...prev, [id]: false }));
+                      }}
+                      disabled={(self.stack ?? 0) < seeHandChips}
+                    />
+                  </div>
+                }
+              >
+                <Tooltip title="申请看牌">
                   <Button
                     type="primary"
                     size="small"
-                    icon={<CheckOutlined />}
-                    onClick={() => {
-                      ws_requestSeeHand(id, seeHandChips);
-                      setSeeHandPopOpen((prev) => ({ ...prev, [id]: false }));
-                    }}
-                    disabled={(self.stack ?? 0) < seeHandChips}
+                    icon={<EyeOutlined />}
+                    style={{ background: '#1890ff', borderColor: '#1890ff', flexShrink: 0 }}
                   />
-                </div>
-              }
-            >
-              <Tooltip title="申请看牌">
-                <Button
-                  type="primary"
-                  size="small"
-                  icon={<EyeOutlined />}
-                  style={{ background: '#1890ff', borderColor: '#1890ff', flexShrink: 0 }}
-                />
-              </Tooltip>
-            </Popover>
+                </Tooltip>
+              </Popover>
+            </span>
           )}
-          {nickname}
+          <span className="user-nickname" title={nickname}>{nickname}</span>
           {supportedTargetId === id && (
             <span
+              className="user-supported-flag"
               style={{
                 marginLeft: 6,
                 fontSize: 12,
@@ -571,34 +534,6 @@ export function User({
             >
               🚩
             </span>
-          )}
-          {self?.isRoomOwner && !isSelf && (
-            <Popconfirm
-              title="确认踢出该玩家吗？"
-              onConfirm={() => ws_kickUser(id)}
-              okText="确定"
-              cancelText="取消"
-            >
-              <Tooltip title="踢出房间">
-                <Button
-                  size="small"
-                  icon={<BootIcon />}
-                  style={{
-                    flexShrink: 0,
-                    padding: 0,
-                    width: 24,
-                    height: 24,
-                    borderRadius: 6,
-                    background: "#1c2833",
-                    border: "1px solid #00b894",
-                    color: "#00b894",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                />
-              </Tooltip>
-            </Popconfirm>
           )}
         </div>
         <div className="stack" style={{
@@ -661,7 +596,7 @@ export function User({
           <div className={`card-box card-box-stacked ${showHolePhase ? (isOmahaGame ? "card-box-stacked-omaha4" : "card-box-stacked-2") : ""} ${(showMax5Phase || showAsWinner) ? "card-box-stacked-5" : ""} ${showAsWinner ? "settle-winner-cards" : ""}`}>
             {(showMax5Phase || showAsWinner) && (
               <div
-                className={`handstype ${showAsWinner ? "settle-winner-type" : ""}`}
+                className={`handstype hand-type-below-cards ${showAsWinner ? "settle-winner-type" : ""}`}
                 style={{
                   ...(handTypeRanks[handsTypeToShow || ""] >= 4 ? { color: "#ffd700", textShadow: "0 0 15px rgba(255, 215, 0, 0.8)", animation: "handTypeGlow 1.5s ease-in-out infinite alternate" } : { color: "white", textShadow: "1px 1px 2px rgba(0,0,0,0.8)" }),
                 }}
@@ -698,7 +633,7 @@ export function User({
           ))}
           {!isSettlingCountdown && (
             <div
-              className="handstype"
+              className="handstype hand-type-below-cards"
               style={{
                 ...(handsTypeToShow && handTypeRanks[handsTypeToShow] >= 4 ? {
                   color: '#ffd700',

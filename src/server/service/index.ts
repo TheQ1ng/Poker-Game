@@ -17,6 +17,7 @@ import {
   getTotalChips,
   normalizeChipsRecord,
 } from "./chips";
+import { MAX_ROOM_PLAYERS } from "../../ApiType";
 const RED_PACKET_WAIT_MS = 5000;
 const RED_PACKET_RESULT_MS = 3000;
 const RED_PACKET_FLOW_MS = RED_PACKET_WAIT_MS + RED_PACKET_RESULT_MS;
@@ -86,7 +87,7 @@ export function getAllRooms(): Array<{
     id: room.id,
     smallBlind: room.smallBlind,
     playerCount: room.users.length,
-    maxPlayers: 12, // 房间最大人数上限 12 人
+    maxPlayers: MAX_ROOM_PLAYERS,
     ownerName:
       room.users.length > 0
         ? (() => {
@@ -1143,26 +1144,38 @@ export function userSendMessage(token: Token, message: string) {
 // 机器人功能
 // ========================================
 
-// 机器人用户名列表
-const botNames = [
-  "幸运星", "扑克侠", "牌神", "好运来", "牌王", 
-  "赢大奖", "小赌神", "大赢家", "牌手", "梭哈王",
-  "德州王", "手气好", "福将", "赌圣", "牌皇"
-];
-
 // 机器人映射
 const botMap: { [token: string]: { name: string; roomid: string } } = {};
 
 // 添加机器人到房间
-export function addBotToRoom(roomid: RoomID): string {
+export function addBotToRoom(ownerToken: Token, roomid: RoomID): string {
+  const owner = userMap[ownerToken];
   const room = roomMap[roomid];
   if (!room) {
     throw `房间${roomid}不存在`;
   }
+  if (
+    !owner ||
+    !owner.isRoomOwner ||
+    owner.roomid !== roomid ||
+    !room.users.includes(ownerToken)
+  ) {
+    throw "只有当前房间房主可以添加机器人";
+  }
+  if (room.users.length >= MAX_ROOM_PLAYERS) {
+    throw "房间已满，无法添加机器人";
+  }
   
   // 生成唯一的机器人token
-  const botToken = `bot_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-  const botName = botNames[Math.floor(Math.random() * botNames.length)];
+  let botToken = `bot_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  while (userMap[botToken]) {
+    botToken = `bot_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  }
+  let botIndex = 1;
+  let botName = `测试机器人${botIndex}`;
+  while (room.chipsRecords.some((record) => record.name === botName)) {
+    botName = `测试机器人${++botIndex}`;
+  }
   
   // 创建机器人用户
   const botUser = new User(botToken, botName, "");
@@ -1173,7 +1186,10 @@ export function addBotToRoom(roomid: RoomID): string {
   userMap[botToken] = botUser;
   
   // 添加到房间
-  room.addUser(botToken);
+  if (!room.addUser(botToken)) {
+    delete userMap[botToken];
+    throw "机器人加入房间失败";
+  }
   
   // 记录机器人信息
   botMap[botToken] = { name: botName, roomid };
@@ -1186,6 +1202,7 @@ export function addBotToRoom(roomid: RoomID): string {
     action: "botJoined",
     botName: botName,
   });
+  publish2all(roomid);
   
   return botToken;
 }
@@ -1282,14 +1299,8 @@ export function kickUser(token: Token, userId: string) {
     throw "房间不存在";
   }
   
-  // 找到要踢的用户的token
-  let targetToken: Token | null = null;
-  for (const t in userMap) {
-    if (userMap[t].chipsRecordID === userId) {
-      targetToken = t;
-      break;
-    }
-  }
+  const targetToken =
+    room.users.find((t) => userMap[t]?.chipsRecordID === userId) || null;
   
   if (!targetToken) {
     throw "用户不存在";
@@ -1332,6 +1343,10 @@ export function kickUser(token: Token, userId: string) {
   
   // 发布房间状态更新，确保所有玩家看到最新状态
   publish2all(roomid);
+  if (botMap[targetToken]) {
+    delete botMap[targetToken];
+    delete userMap[targetToken];
+  }
 }
 
 function calcRoomBalance(room: Room): number {

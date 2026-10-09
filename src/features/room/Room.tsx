@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-import { Button, Popconfirm, Tooltip, Modal, message, InputNumber, Progress, Select } from "antd";
+import { Button, Popconfirm, Tooltip, Modal, message, InputNumber, Progress, Select, Dropdown, Menu, Input } from "antd";
+import html2canvas from "html2canvas";
 import { Card as PokerCard } from "../../ApiType";
 import {
   LoginOutlined,
@@ -20,6 +21,9 @@ import {
   SaveOutlined,
   SwapOutlined,
   BugOutlined,
+  DownOutlined,
+  LogoutOutlined,
+  UserAddOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { User } from "./User";
@@ -59,6 +63,8 @@ import {
   ws_transferRoomOwner,
   ws_repairRoomBalance,
   ws_revealBoardCard,
+  ws_addBot,
+  ws_kickUser,
 } from "../../app/websocket";
 import { Poker } from "./Poker";
 import { CountDown } from "./CountDown";
@@ -67,10 +73,26 @@ import GameHistory from "../gamehistory/GameHistory";
 import { Spectators } from "./Spectators";
 import { soundManager } from "../../utils/soundManager";
 import { selectChipsRecord } from "../chipsrecord/chipsRecordSlice";
+import { logout } from "../home/homeSlice";
+import { fetchProfile, updateProfile } from "../home/homeAPI";
+import { MAX_ROOM_PLAYERS } from "../../ApiType";
+
+const avatarOptions = [
+  { filename: "playerIcon.png", img: require("../../assets/playerIcon.png") },
+  { filename: "playerIcon (1).png", img: require("../../assets/playerIcon (1).png") },
+  { filename: "playerIcon (2).png", img: require("../../assets/playerIcon (2).png") },
+  { filename: "playerIcon (3).png", img: require("../../assets/playerIcon (3).png") },
+  { filename: "playerIcon (4).png", img: require("../../assets/playerIcon (4).png") },
+  { filename: "playerIcon (5).png", img: require("../../assets/playerIcon (5).png") },
+  { filename: "playerIcon (6).png", img: require("../../assets/playerIcon (6).png") },
+  { filename: "playerIcon (7).png", img: require("../../assets/playerIcon (7).png") },
+  { filename: "playerIcon (8).png", img: require("../../assets/playerIcon (8).png") },
+];
 
 function Room() {
   const dispatch = useAppDispatch();
   const centerRef = useRef(null);
+  const chipsRecordImageRef = useRef<HTMLDivElement>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -78,6 +100,9 @@ function Room() {
   const [activeTab, setActiveTab] = useState('history');
   const [, setTick] = useState(0);
   const [disclaimerModalVisible, setDisclaimerModalVisible] = useState(false);
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileNickname, setProfileNickname] = useState("");
+  const [profileAvatar, setProfileAvatar] = useState("");
   const [redPacketSendVisible, setRedPacketSendVisible] = useState(false);
   const [redPacketAmount, setRedPacketAmount] = useState<number>(0);
   const [supportAmounts, setSupportAmounts] = useState<Record<string, number>>({});
@@ -86,6 +111,8 @@ function Room() {
   const [overtimeConfirmVisible, setOvertimeConfirmVisible] = useState(false);
   const [transferOwnerVisible, setTransferOwnerVisible] = useState(false);
   const [transferOwnerTarget, setTransferOwnerTarget] = useState<string>("");
+  const [kickUserVisible, setKickUserVisible] = useState(false);
+  const [kickUserTarget, setKickUserTarget] = useState<string>("");
   const [viewport, setViewport] = useState(() => ({
     width: typeof window === "undefined" ? 1200 : window.innerWidth,
     height: typeof window === "undefined" ? 800 : window.innerHeight,
@@ -93,6 +120,11 @@ function Room() {
 
   const roomid = useAppSelector(selectRoomID);
   const users = useAppSelector(selectUsers);
+  const seatUsers: (string | undefined)[] = Array(MAX_ROOM_PLAYERS - 1).fill(undefined);
+  users.forEach((id, index) => {
+    const seatIndex = Math.round((index * seatUsers.length) / users.length);
+    seatUsers[seatIndex] = id;
+  });
   const room = useAppSelector(selectRoom);
   const self = useAppSelector(selectSelf);
   const chipsRecordState = useAppSelector(selectChipsRecord);
@@ -162,6 +194,7 @@ function Room() {
   const canEnableShortDeck = !room?.isOmaha && seatedPlayerCount < 7;
   const shortDeckToggleDisabled = !isShortDeckConfigured && !canEnableShortDeck;
   const transferOwnerCandidates = (room?.users || []).filter((u) => u.id !== self?.id);
+  const kickUserCandidates = (room?.users || []).filter((u) => u.id !== self?.id);
   const isMobile = viewport.width <= 768;
   const isPortraitMobile = isMobile && viewport.height > viewport.width;
   const sidebarPanelWidth = isMobile
@@ -494,7 +527,84 @@ function Room() {
     }
   }
 
+  async function handleOpenProfile() {
+    try {
+      const profile = await fetchProfile();
+      const nickname = profile.data?.nickname || "";
+      const avatar = profile.data?.avatar || "";
+      setProfileNickname(nickname || localStorage.getItem("nickname") || "");
+      setProfileAvatar(avatar || localStorage.getItem("avatar") || "");
+      localStorage.setItem("nickname", nickname);
+      localStorage.setItem("avatar", avatar);
+    } catch (error) {
+      setProfileNickname(localStorage.getItem("nickname") || "");
+      setProfileAvatar(localStorage.getItem("avatar") || "");
+      message.error(error instanceof Error ? error.message : "读取个人资料失败");
+    }
+    setProfileModalVisible(true);
+  }
+
+  async function handleSaveProfile() {
+    try {
+      await updateProfile(profileNickname, profileAvatar);
+      localStorage.setItem("nickname", profileNickname);
+      localStorage.setItem("avatar", profileAvatar);
+      setProfileModalVisible(false);
+      message.success("个人资料保存成功");
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async function handleSaveChipsRecord() {
+    const imageClipboard = navigator.clipboard as (Clipboard & {
+      write?: (items: object[]) => Promise<void>;
+    }) | undefined;
+    const ClipboardItemConstructor = (window as Window & {
+      ClipboardItem?: new (items: Record<string, Promise<Blob>>) => object;
+    }).ClipboardItem;
+    const clipboardWriter = imageClipboard?.write?.bind(imageClipboard);
+    const clipboardSupported =
+      window.isSecureContext &&
+      !!clipboardWriter &&
+      typeof ClipboardItemConstructor === "function";
+    let clipboardWrite: Promise<void> | null = null;
+    let resolveImage: ((blob: Blob) => void) | undefined;
+    let rejectImage: ((error: Error) => void) | undefined;
+
+    if (clipboardWriter && ClipboardItemConstructor && chipsRecordImageRef.current) {
+      const imageBlob = new Promise<Blob>((resolve, reject) => {
+        resolveImage = resolve;
+        rejectImage = reject;
+      });
+      try {
+        clipboardWrite = clipboardWriter([
+          new ClipboardItemConstructor({ "image/png": imageBlob }),
+        ]);
+      } catch (error) {
+        clipboardWrite = Promise.reject(error);
+      }
+
+      html2canvas(chipsRecordImageRef.current, {
+        backgroundColor: "#103522",
+        scale: 2,
+        logging: false,
+      })
+        .then(
+          (canvas) =>
+            new Promise<Blob>((resolve, reject) => {
+              canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error("积分榜图片生成失败"));
+              }, "image/png");
+            })
+        )
+        .then((blob) => resolveImage?.(blob))
+        .catch((error: unknown) =>
+          rejectImage?.(error instanceof Error ? error : new Error(String(error)))
+        );
+    }
+
     try {
       const chipsRecordData = chipsRecords.map((record) => {
         const totalChips = Number(record.chips) || 0;
@@ -521,7 +631,17 @@ function Room() {
 
       const data = await response.json();
       if (data.code === 0) {
-        message.success("积分榜保存成功");
+        if (!clipboardSupported || !clipboardWrite) {
+          message.warning("积分榜已保存，但当前浏览器不支持复制图片到剪贴板");
+          return;
+        }
+        try {
+          await clipboardWrite;
+          message.success("积分榜已保存，图片已复制，可直接粘贴发送");
+        } catch (error) {
+          console.error("复制积分榜图片失败:", error);
+          message.warning("积分榜已保存，但复制图片失败，请检查浏览器剪贴板权限");
+        }
       } else {
         message.error(data.error || "保存失败");
       }
@@ -531,20 +651,212 @@ function Room() {
     }
   }
 
+  const roomOwnerActions = self?.isRoomOwner ? (
+    <div className="room-owner-actions">
+      {room?.isGaming ? (
+        <Tooltip title="下一场暂停游戏">
+          <Button className="room-action-btn" icon={<PauseOutlined />} onClick={ws_pauseGame} />
+        </Tooltip>
+      ) : (
+        <Tooltip title="开始游戏">
+          <Button className="room-action-btn" type="primary" icon={<CaretRightOutlined />} onClick={ws_startGame} />
+        </Tooltip>
+      )}
+      {roomid && (
+        <Tooltip title="保存当前积分榜到数据库">
+          <Button className="room-action-btn" type="primary" icon={<SaveOutlined />} onClick={handleSaveChipsRecord} />
+        </Tooltip>
+      )}
+      {roomid && (
+        <Tooltip title={(room?.users.length || 0) >= MAX_ROOM_PLAYERS ? "房间已满" : "添加布局测试机器人"}>
+          <Button
+            className={`room-action-btn ${(room?.users.length || 0) >= MAX_ROOM_PLAYERS ? "room-action-btn-disabled" : ""}`}
+            icon={<UserAddOutlined />}
+            aria-disabled={(room?.users.length || 0) >= MAX_ROOM_PLAYERS}
+            onClick={() => {
+              if ((room?.users.length || 0) >= MAX_ROOM_PLAYERS) return;
+              ws_addBot(roomid);
+            }}
+          />
+        </Tooltip>
+      )}
+      {kickUserCandidates.length > 0 && (
+        <Tooltip title="踢出房间玩家">
+          <Button
+            className="room-action-btn"
+            icon={<DeleteOutlined />}
+            onClick={() => {
+              setKickUserTarget(kickUserCandidates[0].id);
+              setKickUserVisible(true);
+            }}
+          />
+        </Tooltip>
+      )}
+      {roomid && (
+        <Popconfirm
+          title={roomBalanceDiff === 0 ? "当前账目已平，无需修复" : `检测到差异 ${roomBalanceDiff}，是否自动修复并记录日志？`}
+          okText="立即修复"
+          cancelText="取消"
+          onConfirm={ws_repairRoomBalance}
+          disabled={roomBalanceDiff === 0}
+        >
+          <Tooltip title={roomBalanceDiff === 0 ? "账目已平" : `账不平差异 ${roomBalanceDiff}，点击修复`}>
+            <Button
+              className={`room-action-btn room-balance-btn ${roomBalanceDiff !== 0 ? "room-balance-btn-unbalanced" : "room-balance-btn-balanced"}`}
+              icon={<BugOutlined />}
+            />
+          </Tooltip>
+        </Popconfirm>
+      )}
+      {roomid && !room?.isOmaha && (
+        <Tooltip
+          title={
+            isShortDeckConfigured
+              ? "切回长牌（下一局生效）"
+              : canEnableShortDeck
+                ? "切换短牌（下一局生效）"
+                : "人数达到7人时不可切换短牌"
+          }
+        >
+          <Button
+            className={`room-action-btn room-deck-toggle ${shortDeckToggleDisabled ? "room-action-btn-disabled" : ""}`}
+            type={isShortDeckConfigured ? "primary" : "default"}
+            aria-disabled={shortDeckToggleDisabled}
+            onClick={() => {
+              if (shortDeckToggleDisabled) return;
+              ws_setShortDeck(!isShortDeckConfigured);
+            }}
+          >
+            {isShortDeckConfigured ? "短牌" : "长牌"}
+          </Button>
+        </Tooltip>
+      )}
+      {roomid && transferOwnerCandidates.length > 0 && (
+        <Tooltip title="转移房主给房间内玩家">
+          <Button
+            className="room-action-btn"
+            icon={<SwapOutlined />}
+            onClick={() => {
+              setTransferOwnerTarget(transferOwnerCandidates[0]?.id || "");
+              setTransferOwnerVisible(true);
+            }}
+          />
+        </Tooltip>
+      )}
+    </div>
+  ) : null;
+
+  const roomTopActions = (
+    <div className="room-top-actions flex-row" style={{ color: "white", gap: 8 }}>
+      <span className="room-id-chip">房间: {roomid}</span>
+      <Tooltip title={soundEnabled ? "关闭音效" : "开启音效"}>
+        <Button
+          className="room-action-btn"
+          icon={soundEnabled ? <SoundOutlined /> : <AudioMutedOutlined />}
+          onClick={async () => {
+            await soundManager.init().catch((err) => console.warn("Sound init failed:", err));
+            const newState = !soundEnabled;
+            setSoundEnabled(newState);
+            soundManager.setEnabled(newState);
+            if (newState) soundManager.playButton();
+          }}
+        />
+      </Tooltip>
+      {canSendRedPacket && (
+        <Tooltip title={`发拼手气红包（范围 ${minRedPacketAmount}~${maxRedPacketAmount}，上限为盈利 ${redPacketMaxPercent}%）`}>
+          <Button
+            className="room-action-btn redpacket-send-btn"
+            onClick={() => {
+              setRedPacketAmount(minRedPacketAmount);
+              setRedPacketSendVisible(true);
+            }}
+          >
+            🧧
+          </Button>
+        </Tooltip>
+      )}
+      {!self?.isSpectator && self?.isReady && (
+        <Tooltip title="暂时不参与游戏">
+          <Button className="room-action-btn" icon={<CoffeeOutlined />} onClick={ws_userHangup} />
+        </Tooltip>
+      )}
+      {self?.isSpectator ? (
+        <Tooltip title="参与游戏（落座）">
+          <Button className="room-action-btn" type="primary" icon={<UserOutlined />} onClick={() => ws_userWatch(false)} />
+        </Tooltip>
+      ) : (
+        !self?.isReady && (
+          <Tooltip title="进入观战模式">
+            <Button className="room-action-btn" icon={<EyeOutlined />} onClick={() => ws_userWatch(true)} />
+          </Tooltip>
+        )
+      )}
+      <Tooltip title="免责声明">
+        <Button
+          className="room-action-btn"
+          icon={<InfoCircleOutlined />}
+          onClick={() => setDisclaimerModalVisible(true)}
+        />
+      </Tooltip>
+      <Popconfirm
+        title="如果在游戏中，将会自动放弃。确认离开？"
+        okText="确定离开"
+        cancelText="留下"
+        onConfirm={ws_userLeave}
+        onCancel={() => setShowConfirm(false)}
+        visible={showConfirm}
+      >
+        <Tooltip title="退出房间">
+          <Button className="room-action-btn" icon={<LoginOutlined />} onClick={() => setShowConfirm(true)} />
+        </Tooltip>
+      </Popconfirm>
+    </div>
+  );
+
+  const accountMenu = (
+    <Menu className="user-menu room-account-menu">
+      <Menu.Item key="profile" onClick={handleOpenProfile}>
+        <UserOutlined /> 个人资料
+      </Menu.Item>
+      <Menu.Item key="clearCache" onClick={handleClearCache}>
+        <DeleteOutlined /> 清除缓存
+      </Menu.Item>
+      <Menu.Divider />
+      <Menu.Item key="logout" danger onClick={() => dispatch(logout())}>
+        <LogoutOutlined /> 注销
+      </Menu.Item>
+    </Menu>
+  );
+
   return (
     <div
       className="room-root"
       ref={centerRef}
       style={{
         display: "flex",
-        flexDirection: "row",
+        flexDirection: "column",
         flex: 1,
         overflow: "hidden",
         height: "100dvh",
         width: "100vw",
-        padding: isMobile ? "6px" : "10px",
+        padding: 0,
       }}
     >
+      <header className="room-site-header">
+        <div className="room-site-brand">🌟 欢乐积分王</div>
+        <div className="room-header-controls">
+          {roomTopActions}
+          {roomOwnerActions}
+        </div>
+        <Dropdown overlay={accountMenu} trigger={["click"]} placement="bottomRight">
+          <button className="room-site-account" type="button">
+            <span className="room-site-account-name">
+              {localStorage.getItem("nickname") || self?.nickname || self?.name || localStorage.getItem("name")}
+            </span>
+            <DownOutlined />
+          </button>
+        </Dropdown>
+      </header>
       {/* 左侧边栏 */}
       <div
         className="room-sidebar"
@@ -649,26 +961,6 @@ function Room() {
       >
       </Button>
 
-      {/* 免责声明按钮 */}
-      <Button
-        type="default"
-        icon={<InfoCircleOutlined />}
-        onClick={() => setDisclaimerModalVisible(true)}
-        className="room-disclaimer-btn"
-        style={{
-          position: "absolute",
-          right: "10px",
-          top: "10px",
-          zIndex: 100,
-          borderRadius: "30px",
-          boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
-          background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
-          border: "2px solid rgba(201, 162, 39, 0.5)",
-          color: "#fff",
-        }}
-      >
-      </Button>
-
       {/* 牌桌区域 */}
       <div
         className="card room-main-card"
@@ -676,12 +968,41 @@ function Room() {
           flex: 1,
           position: "relative",
           margin: "0 auto",
-          background: "linear-gradient(145deg, #1a3d28 0%, #0f2518 100%)",
-          borderRadius: isMobile ? "28px" : "60px",
-          border: `${isMobile ? 8 : 15}px solid #4a2c17`,
-          boxShadow: "inset 0 0 80px rgba(0,0,0,0.5), 0 10px 30px rgba(0,0,0,0.5)",
+          background: "radial-gradient(ellipse at center, #1b4a30 0%, #123b26 65%, #0d2a1b 100%)",
+          borderRadius: 0,
+          border: 0,
+          boxShadow: "inset 0 0 80px rgba(0,0,0,0.28)",
         }}
       >
+        <div ref={chipsRecordImageRef} className="chips-record-image-capture" aria-hidden="true">
+          <div className="chips-record-image-title">房间积分榜</div>
+          <table>
+            <thead>
+              <tr>
+                <th>玩家</th>
+                <th>欢乐豆</th>
+                <th>初始</th>
+                <th>积分</th>
+              </tr>
+            </thead>
+            <tbody>
+              {chipsRecords.map((record) => {
+                const chips = Number(record.chips) || 0;
+                const profit = chips - record.buyIn;
+                return (
+                  <tr key={record.id}>
+                    <td>{record.nickname || record.name}</td>
+                    <td>{chips}</td>
+                    <td>{record.buyIn}</td>
+                    <td className={profit >= 0 ? "positive" : "negative"}>
+                      {profit > 0 ? "+" : ""}{profit}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         <Spectators />
         {/* 结算阶段：有人申请看我的手牌时，在被请求者屏幕中央弹出对话框 */}
         {isSettling && self && pendingSeeHandRequests && pendingSeeHandRequests.length > 0 && (
@@ -1295,208 +1616,18 @@ function Room() {
             height: `${100/zoom}%`,
           }}
         >
-          <div className="roominfo room-top-actions flex-row flex-center" style={{ color: 'white', gap: '8px' }}>
-            {/* 房间号显示 */}
-            <span className="room-id-chip" style={{
-              fontSize: '14px',
-              fontWeight: 'bold',
-              color: '#ffd700',
-              textShadow: '0 0 8px rgba(255, 215, 0, 0.5)',
-              marginRight: '4px',
-            }}>房间: {roomid}</span>
-            <Tooltip title={soundEnabled ? "关闭音效" : "开启音效"}>
-                  <Button
-                    className="room-action-btn"
-                    icon={soundEnabled ? <SoundOutlined /> : <AudioMutedOutlined />}
-                    onClick={async () => {
-                      // 确保音效管理器已经初始化
-                      await soundManager.init().catch(err => console.warn('Sound init failed:', err));
-                      
-                      const newState = !soundEnabled;
-                      setSoundEnabled(newState);
-                      soundManager.setEnabled(newState);
-                      if (newState) {
-                        soundManager.playButton();
-                      }
-                    }}
-                  />
-                </Tooltip>
-            {self?.isRoomOwner ? (
-              room?.isGaming ? (
-                <Tooltip title="下一场暂停游戏">
-                  <Button
-                    className="room-action-btn"
-                    icon={<PauseOutlined />}
-                    onClick={ws_pauseGame}
-                  />
-                </Tooltip>
-              ) : (
-                <Tooltip title="开始游戏">
-                  <Button
-                    className="room-action-btn"
-                    type="primary"
-                    icon={<CaretRightOutlined />}
-                    onClick={ws_startGame}
-                  />
-                </Tooltip>
-              )
-            ) : null}
-            {/* 保存积分榜按钮 - 仅房主可见 */}
-            {self?.isRoomOwner && roomid && (
-              <Tooltip title="保存当前积分榜到数据库">
-                <Button
-                  className="room-action-btn"
-                  type="primary"
-                  icon={<SaveOutlined />}
-                  onClick={handleSaveChipsRecord}
-                />
-              </Tooltip>
-            )}
-            {self?.isRoomOwner && roomid && (
-              <Popconfirm
-                title={
-                  roomBalanceDiff === 0
-                    ? "当前账目已平，无需修复"
-                    : `检测到差异 ${roomBalanceDiff}，是否自动修复并记录日志？`
-                }
-                okText="立即修复"
-                cancelText="取消"
-                onConfirm={ws_repairRoomBalance}
-                disabled={roomBalanceDiff === 0}
-              >
-                <Tooltip
-                  title={
-                    roomBalanceDiff === 0
-                      ? "账目已平"
-                      : `账不平差异 ${roomBalanceDiff}，点击修复`
-                  }
-                >
-                  <Button
-                    className="room-action-btn"
-                    danger={roomBalanceDiff !== 0}
-                    icon={<BugOutlined />}
-                    disabled={roomBalanceDiff === 0}
-                  />
-                </Tooltip>
-              </Popconfirm>
-            )}
-            {self?.isRoomOwner && roomid && !room?.isOmaha && (
-              <Tooltip
-                title={
-                  isShortDeckConfigured
-                    ? "切回长牌（下一局生效）"
-                    : canEnableShortDeck
-                      ? "切换短牌（下一局生效）"
-                      : "人数达到7人时不可切换短牌"
-                }
-              >
-                <Button
-                  className="room-action-btn"
-                  type={isShortDeckConfigured ? "primary" : "default"}
-                  onClick={() => ws_setShortDeck(!isShortDeckConfigured)}
-                  disabled={shortDeckToggleDisabled}
-                >
-                  {isShortDeckConfigured ? "短牌" : "长牌"}
-                </Button>
-              </Tooltip>
-            )}
-            {self?.isRoomOwner && roomid && transferOwnerCandidates.length > 0 && (
-              <Tooltip title="转移房主给房间内玩家">
-                <Button
-                  className="room-action-btn"
-                  icon={<SwapOutlined />}
-                  onClick={() => {
-                    const defaultTarget = transferOwnerCandidates[0]?.id || "";
-                    setTransferOwnerTarget(defaultTarget);
-                    setTransferOwnerVisible(true);
-                  }}
-                />
-              </Tooltip>
-            )}
-            {canSendRedPacket && (
-              <Tooltip
-                title={`发拼手气红包（范围 ${minRedPacketAmount}~${maxRedPacketAmount}，上限为盈利 ${redPacketMaxPercent}%）`}
-              >
-                <Button
-                  className="room-action-btn redpacket-send-btn"
-                  onClick={() => {
-                    setRedPacketAmount(minRedPacketAmount);
-                    setRedPacketSendVisible(true);
-                  }}
-                >
-                  🧧
-                </Button>
-              </Tooltip>
-            )}
-            {!self?.isSpectator && self?.isReady && (
-              <Tooltip title="暂时不参与游戏">
-                <Button
-                  className="room-action-btn"
-                  icon={<CoffeeOutlined />}
-                  onClick={ws_userHangup}
-                />
-              </Tooltip>
-            )}
-            {/* 观战 / 落座切换：非观战时显示眼睛，观战时显示座位 */}
-            {self?.isSpectator ? (
-              <Tooltip title="参与游戏（落座）">
-                <Button
-                  className="room-action-btn"
-                  type="primary"
-                  icon={<UserOutlined />}
-                  onClick={() => ws_userWatch(false)}
-                />
-              </Tooltip>
-            ) : (
-              !self?.isReady && (
-                <Tooltip title="进入观战模式">
-                  <Button
-                    className="room-action-btn"
-                    icon={<EyeOutlined />}
-                    onClick={() => ws_userWatch(true)}
-                  />
-                </Tooltip>
-              )
-            )}
-
-            <Tooltip title="清除缓存和本地存储">
-              <Button
-                className="room-action-btn"
-                icon={<DeleteOutlined />}
-                onClick={handleClearCache}
-              />
-            </Tooltip>
-            <Popconfirm
-              title="如果在游戏中，将会自动放弃。确认离开？"
-              okText="确定离开"
-              cancelText="留下"
-              onConfirm={() => ws_userLeave()}
-              onCancel={() => setShowConfirm(false)}
-              visible={showConfirm}
-            >
-              <Tooltip title="退出房间">
-                <Button
-                  className="room-action-btn"
-                  icon={<LoginOutlined />}
-                  onClick={() => {
-                    setShowConfirm(true);
-                  }}
-                />
-              </Tooltip>
-            </Popconfirm>
-          </div>
-          {/* 玩家布局：围着桌子的三个面坐一圈，根据人数动态分配 */}
+          {/* 玩家布局：根据人数均匀分布到固定座位，避免少人数时挤在一侧 */}
           <div className="room-seats-layout flex1 flex-row">
             {/* 左侧玩家（1个） */}
             <div className="room-seat-side flex1 flex-column flex-center" style={{ maxWidth: isPortraitMobile ? '86px' : isMobile ? '110px' : '150px' }}>
-              {users.length > 0 && (
+              {seatUsers[0] && (
                 <User
-                  id={`${users[0]}`}
-                  key={users[0]}
+                  id={seatUsers[0]}
+                  key={seatUsers[0]}
                   settleRevealStep={settleRevealStep}
                   showdownOrder={showdownOrder}
                   totalShowdown={totalShowdown}
-                  isActingUser={actingUserId === users[0]}
+                  isActingUser={actingUserId === seatUsers[0]}
                   isSettlingCountdown={isSettlingCountdown}
                   isSettleCountdownActive={isSettleCountdownActive}
                   nextPositionUserIds={nextPositionUserIds}
@@ -1505,134 +1636,110 @@ function Room() {
             </div>
             
             {/* 中间区域：牌桌中心和上方玩家 */}
-            <div className="flex3 flex-column">
-              {/* 上方玩家（对面，数量比两边多） */}
-              <div className="room-top-seats flex1 flex-row" style={{ justifyContent: 'space-around', padding: isPortraitMobile ? '0 6px' : isMobile ? '0 10px' : '0 20px' }}>
-                {users.slice(1, users.length - 1).map((id) => (
-                  <User
-                    id={`${id}`}
-                    key={id}
-                    settleRevealStep={settleRevealStep}
-                    showdownOrder={showdownOrder}
-                    totalShowdown={totalShowdown}
-                    isActingUser={actingUserId === id}
-                    isSettlingCountdown={isSettlingCountdown}
-                    isSettleCountdownActive={isSettleCountdownActive}
-                    nextPositionUserIds={nextPositionUserIds}
-                  />
-                ))}
+            <div className="room-table-center flex3 flex-column">
+              {/* 固定五个上方座位，玩家数量变化时不挤动其他座位 */}
+              <div className="room-top-seats flex1 flex-row">
+                {Array.from({ length: 5 }, (_, index) => {
+                  const id = seatUsers[index + 1];
+                  return (
+                    <div className="room-seat-slot" key={`seat-${index + 1}`}>
+                      {id ? (
+                        <User
+                          id={`${id}`}
+                          key={id}
+                          settleRevealStep={settleRevealStep}
+                          showdownOrder={showdownOrder}
+                          totalShowdown={totalShowdown}
+                          isActingUser={actingUserId === id}
+                          isSettlingCountdown={isSettlingCountdown}
+                          isSettleCountdownActive={isSettleCountdownActive}
+                          nextPositionUserIds={nextPositionUserIds}
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
               
               {/* 牌桌中心 */}
               <div className="room-center-area flex2 flex-column flex-center">
-                <div style={{ width: 100 }}>{/* 结算倒计时读条改为右上角圆形动画，这里留空 */}</div>
-                <div className="boards flex-row flex-center">
-                  {displayBoardCards.map((card, i) => {
-                    const isRevealSlot =
-                      canRevealHiddenBoardCards && i >= revealableBoardStartIndex;
-                    return (
-                      <div
-                        key={`${card ? `${card.num}${card.suit}` : "hidden"}-${i}`}
-                        className={`board-card-slot ${isRevealSlot ? "board-card-slot-reveal" : ""}`}
-                      >
-                        <Poker
-                          card={card}
-                          isSelected={true}
-                          animation={card ? (i >= revealableBoardStartIndex ? "flip" : "deal") : "none"}
-                          showShowHandButton={false}
-                        />
-                        {isRevealSlot && !card ? (
-                          <Button
-                            type="primary"
-                            size="small"
-                            className="board-card-reveal-btn"
-                            onClick={() => {
-                              soundManager.playButton();
-                              ws_revealBoardCard(i);
-                            }}
-                            style={{
-                              position: "absolute",
-                              left: "50%",
-                              top: "50%",
-                              transform: "translate(-50%, -50%)",
-                              zIndex: 3,
-                              whiteSpace: "nowrap",
-                              padding: "0 8px",
-                              borderRadius: 12,
-                              fontSize: 12,
-                              background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
-                              border: "1px solid rgba(201, 162, 39, 0.7)",
-                              boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
-                            }}
-                          >
-                            查看
-                          </Button>
-                        ) : null}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="room-pot-row" style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  width: "100%",
-                  maxWidth: isPortraitMobile ? "100%" : "400px",
-                  marginBottom: "20px",
-                }}>
-                  {/* 左侧总积分区域 */}
-                  <div className="pots" style={{
-                    background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.2) 100%)",
-                    borderRadius: "20px",
-                    padding: "10px 20px",
-                    border: "2px solid rgba(255, 215, 0, 0.3)",
-                  }}>
-                    <span style={{
-                      fontSize: "12px",
-                      color: "rgba(255, 255, 255, 0.7)",
-                      textTransform: "uppercase",
-                      letterSpacing: "2px",
-                      marginRight: "10px",
-                    }}>总积分</span>
-                    <span style={{
-                      fontSize: "24px",
-                      fontWeight: "bold",
-                      color: "#ffd700",
-                      textShadow: "0 0 10px rgba(255, 215, 0, 0.5)",
-                    }}>🌟{game?.pots || 0}</span>
+                <div className="room-center-content">
+                  <div className="boards flex-row flex-center">
+                    {displayBoardCards.map((card, i) => {
+                      const isRevealSlot =
+                        canRevealHiddenBoardCards && i >= revealableBoardStartIndex;
+                      return (
+                        <div
+                          key={`${card ? `${card.num}${card.suit}` : "hidden"}-${i}`}
+                          className={`board-card-slot ${isRevealSlot ? "board-card-slot-reveal" : ""}`}
+                        >
+                          <Poker
+                            card={card}
+                            isSelected={true}
+                            animation={card ? (i >= revealableBoardStartIndex ? "flip" : "deal") : "none"}
+                            showShowHandButton={false}
+                          />
+                          {isRevealSlot && !card ? (
+                            <Button
+                              type="primary"
+                              size="small"
+                              className="board-card-reveal-btn"
+                              onClick={() => {
+                                soundManager.playButton();
+                                ws_revealBoardCard(i);
+                              }}
+                              style={{
+                                position: "absolute",
+                                left: "50%",
+                                top: "50%",
+                                transform: "translate(-50%, -50%)",
+                                zIndex: 3,
+                                whiteSpace: "nowrap",
+                                padding: "0 8px",
+                                borderRadius: 12,
+                                fontSize: 12,
+                                background: "linear-gradient(135deg, #2d5a3d 0%, #1a3d28 100%)",
+                                border: "1px solid rgba(201, 162, 39, 0.7)",
+                                boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
+                              }}
+                            >
+                              查看
+                            </Button>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
-                  
-                  {/* 右侧免责声明内容 */}
-                  <div className="room-center-disclaimer" style={{
-                    textAlign: "right",
-                    maxWidth: "150px",
-                    fontSize: "10px",
-                    color: "#fff",
-                    lineHeight: 1.4,
-                  }}>
-                    <p>健康游戏，适度娱乐</p>
-                    <p>本项目仅供朋友间训练</p>
-                    <p>请勿用于商业用途</p>
+                  <div className="room-pot-row">
+                    <div className="pots">
+                      <span>总积分</span>
+                      <strong>🌟{game?.pots || 0}</strong>
+                    </div>
+                    <div className="room-center-disclaimer">
+                      <p>健康游戏，适度娱乐</p>
+                      <p>本项目仅供朋友间训练</p>
+                      <p>请勿用于商业用途</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
             
-            {/* 右侧玩家（1个） */}
-            <div className="room-seat-side flex1 flex-column flex-center" style={{ maxWidth: isPortraitMobile ? '86px' : isMobile ? '110px' : '150px' }}>
-              {users.length > 1 && (
+            {/* 右侧上下两个固定座位 */}
+            <div className="room-seat-side room-seat-side-right flex1 flex-column flex-center" style={{ maxWidth: isPortraitMobile ? '86px' : isMobile ? '110px' : '150px' }}>
+              {[seatUsers[6], seatUsers[7]].map((id) => id ? (
                 <User
-                  id={`${users[users.length - 1]}`}
-                  key={users[users.length - 1]}
+                  id={`${id}`}
+                  key={id}
                   settleRevealStep={settleRevealStep}
                   showdownOrder={showdownOrder}
                   totalShowdown={totalShowdown}
-                  isActingUser={actingUserId === users[users.length - 1]}
+                  isActingUser={actingUserId === id}
                   isSettlingCountdown={isSettlingCountdown}
                   isSettleCountdownActive={isSettleCountdownActive}
                   nextPositionUserIds={nextPositionUserIds}
                 />
-              )}
+              ) : null)}
             </div>
           </div>
           {selectSettleStatus ? (
@@ -1675,7 +1782,7 @@ function Room() {
               </div>
             </div>
           ) : null}
-          <div className="flex1">
+          <div className="room-owner-area flex1">
             <Owner
               zoom={zoom}
               settleRevealStep={settleRevealStep}
@@ -1714,6 +1821,38 @@ function Room() {
           onChange={(v) => setTransferOwnerTarget(v)}
           placeholder="请选择目标玩家"
           options={transferOwnerCandidates.map((u) => ({
+            value: u.id,
+            label: `${u.nickname || u.name}${u.isSpectator ? "（观战）" : ""}`,
+          }))}
+        />
+      </Modal>
+
+      <Modal
+        title={<span style={{ color: "#f7d777" }}>踢出房间玩家</span>}
+        visible={kickUserVisible}
+        onCancel={() => setKickUserVisible(false)}
+        onOk={() => {
+          if (!kickUserTarget) {
+            message.warning("请选择要踢出的玩家");
+            return;
+          }
+          ws_kickUser(kickUserTarget);
+          setKickUserVisible(false);
+        }}
+        okText="确认踢出"
+        cancelText="取消"
+      >
+        <div style={{ color: "rgba(255,255,255,0.8)", marginBottom: 10 }}>
+          选择一名玩家并确认踢出房间。
+        </div>
+        <Select
+          showSearch
+          optionFilterProp="label"
+          style={{ width: "100%" }}
+          value={kickUserTarget || undefined}
+          onChange={(id) => setKickUserTarget(id)}
+          placeholder="请选择玩家"
+          options={kickUserCandidates.map((u) => ({
             value: u.id,
             label: `${u.nickname || u.name}${u.isSpectator ? "（观战）" : ""}`,
           }))}
@@ -1828,6 +1967,52 @@ function Room() {
             strokeColor={{ "0%": "#f7d777", "100%": "#ffec99" }}
             trailColor="rgba(255,255,255,0.18)"
           />
+        </div>
+      </Modal>
+
+      <Modal
+        title={<span style={{ color: "#ffd700" }}>👤 个人资料</span>}
+        visible={profileModalVisible}
+        onCancel={() => setProfileModalVisible(false)}
+        footer={null}
+        width={450}
+        centered
+        className="room-profile-modal"
+      >
+        <div className="room-profile-form">
+          <label>
+            用户名
+            <Input disabled value={localStorage.getItem("name") || ""} />
+          </label>
+          <label>
+            玩家昵称
+            <Input
+              placeholder="请输入昵称，不填则显示用户名"
+              value={profileNickname}
+              onChange={(event) => setProfileNickname(event.target.value)}
+              maxLength={20}
+            />
+          </label>
+          <div>
+            <div className="room-profile-label">选择头像</div>
+            <div className="room-profile-avatars">
+              {avatarOptions.map((avatar) => (
+                <button
+                  key={avatar.filename}
+                  type="button"
+                  className={profileAvatar === avatar.filename ? "selected" : ""}
+                  onClick={() => setProfileAvatar(avatar.filename)}
+                  aria-label={`选择头像 ${avatar.filename}`}
+                >
+                  <img src={avatar.img} alt="" />
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="room-profile-actions">
+            <Button onClick={() => setProfileModalVisible(false)}>取消</Button>
+            <Button type="primary" onClick={handleSaveProfile}>保存</Button>
+          </div>
         </div>
       </Modal>
 

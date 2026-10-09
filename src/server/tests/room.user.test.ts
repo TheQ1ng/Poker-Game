@@ -225,6 +225,7 @@ describe("Game Test", () => {
       getChipsRecoud(room, sb.token).buyIn = 5000;
       getChipsRecoud(room, bb.token).buyIn = 7001;
       userReBuy(sb.token);
+      game.nextGameTime = Date.now() - 50;
       startGame(sb.isRoomOwner ? sb.token : bb.token);
       assert.equal(room.isGaming, true);
       logGame(game);

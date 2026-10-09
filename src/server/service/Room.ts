@@ -16,7 +16,7 @@ import {
 } from "../utils/game-engine";
 import { logGame } from "../tests/utils";
 import { publish2all, publishLog2all, send2user, send2all } from "../api/ws";
-import { Card } from "../../ApiType";
+import { Card, MAX_ROOM_PLAYERS } from "../../ApiType";
 import {
   applyTableStackToRecord,
   applyTotalDelta,
@@ -1385,6 +1385,9 @@ class Room {
 
   addUser(token: Token): boolean {
     if (this.users.findIndex((t) => t == token) == -1) {
+      if (this.users.length >= MAX_ROOM_PLAYERS) {
+        throw "房间人数已达上限";
+      }
       this.users.push(token);
 
       // 存储用户UUID、用户名和昵称的对应关系

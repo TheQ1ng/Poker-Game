@@ -8,6 +8,7 @@ import {
   Card,
 } from "../../ApiType";
 import { RootState } from "../../app/store";
+import { MAX_ROOM_PLAYERS } from "../../ApiType";
 
 export interface SeeHandRequestPayload {
   requestId: string;
@@ -236,7 +237,10 @@ export const selectUsers = (state: RootState) => {
   if (!room || !self) return [];
   const ids = room.users.filter((u) => !u.isSpectator).map((u) => u.id) || [];
   const selfIndex = ids.indexOf(self.id);
-  return [...[...ids].splice(selfIndex + 1), ...[...ids].splice(0, selfIndex)];
+  return [...[...ids].splice(selfIndex + 1), ...[...ids].splice(0, selfIndex)].slice(
+    0,
+    MAX_ROOM_PLAYERS - 1
+  );
 };
 export const selectSpectators = (state: RootState) => {
   const { room, self } = state.room;

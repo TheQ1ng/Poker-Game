@@ -9,7 +9,7 @@ import {
   Input,
   message,
 } from "antd";
-import { SendOutlined, SmileOutlined, CaretRightOutlined } from "@ant-design/icons";
+import { SmileOutlined, CaretRightOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useAppSelector, useAppDispatch } from "../../app/hooks";
@@ -446,7 +446,7 @@ export function Owner({
     <div className="owner-seat flex-row flex-center" style={{ height: "100%" }}>
       <audio src={hintsound} autoPlay={false} ref={hintSoundRef} />
       <audio src={dealcardsound} autoPlay={false} ref={dealCardSoundRef} />
-      <div className="flex3 flex flex-center" style={{ position: 'relative' }}>
+      <div className="owner-control-column flex3 flex flex-center" style={{ position: 'relative' }}>
         {isActing && !isSettling && (
           <div style={{
             position: 'absolute',
@@ -467,6 +467,7 @@ export function Owner({
           </div>
         )}
         <div className={`owner ${!inGame ? "fold" : ""}`}>
+          <div className="owner-profile-info">
           <div style={{ position: 'relative', display: 'inline-block', width: 64, height: 64, overflow: 'visible' }}>
             {/* 状态指示器 - 头像左上角 */}
             <div style={{ position: 'absolute', top: -4, left: -4, display: 'flex', gap: '2px', zIndex: 10 }}>
@@ -650,15 +651,55 @@ export function Owner({
             <span className="coins">🌟</span>
             <RollingNumber value={displayStack} style={{ fontSize: "12px", fontWeight: "bold" }} />
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
-              gap: 8,
-              width: "100%",
-              marginTop: 6,
-            }}
-          >
+          </div>
+          <div className="owner-finance-actions" style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr)",
+            gap: 8,
+            width: "100%",
+            marginTop: 6,
+          }}>
+            {showOwnerDealButton || showReadyButton ? (
+              <div className="owner-deal-action">
+                <Tooltip
+                  title={
+                    showOwnerDealButton
+                      ? isSettleCountdownActive
+                        ? `倒计时结束后可发牌（剩余 ${settleCountdownLeft}s）`
+                        : "点击发牌开始下一局"
+                      : "点击准备进入下一局"
+                  }
+                >
+                  <Button
+                    className={`owner-deal-button ${showOwnerDealButton ? "owner-deal-button-deal" : "owner-deal-button-ready"}`}
+                    type="primary"
+                    size="small"
+                    aria-disabled={showOwnerDealButton && isSettleCountdownActive}
+                    onClick={() => {
+                      if (showOwnerDealButton && isSettleCountdownActive) return;
+                      if (showOwnerDealButton) ws_startGame();
+                      else ws_userReady();
+                    }}
+                    style={{
+                      background: showOwnerDealButton
+                        ? "linear-gradient(135deg, #ff9f43 0%, #d35400 100%)"
+                        : "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)",
+                      border: "2px solid rgba(255, 255, 255, 0.3)",
+                      boxShadow: showOwnerDealButton
+                        ? "0 4px 15px rgba(255, 159, 67, 0.45), 0 0 20px rgba(255, 159, 67, 0.25)"
+                        : "0 4px 15px rgba(76, 175, 80, 0.5), 0 0 20px rgba(76, 175, 80, 0.3)",
+                    }}
+                  >
+                    {showOwnerDealButton ? <CaretRightOutlined /> : (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white" />
+                      </svg>
+                    )}
+                    {showOwnerDealButton ? "发牌" : "准备"}
+                  </Button>
+                </Tooltip>
+              </div>
+            ) : null}
             <div style={{ minWidth: 0 }}>
               <Tooltip title={buyTooltip}>
                 <span style={{ display: "block", width: "100%" }}>
@@ -752,7 +793,7 @@ export function Owner({
             ) : null;
           })()}
           {/* 聊天输入：最多 15 字 */}
-          <div className="owner-chat-input-wrap" style={{ display: 'flex', alignItems: 'center' }}>
+          <div className="owner-chat-input-wrap">
             <Popover
               content={
                 <div style={{ padding: '12px', width: '600px' }}>
@@ -797,21 +838,9 @@ export function Owner({
               }}
             >
               <Button
+                className="owner-emoji-button"
                 size="small"
                 icon={<SmileOutlined />}
-                style={{
-                  borderRadius: '50%',
-                  width: 20,
-                  height: 20,
-                  background: 'linear-gradient(135deg, #ff9800 0%, #f57c00 100%)',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  boxShadow: '0 1px 4px rgba(255, 152, 0, 0.4)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 6,
-                  transition: 'all 0.3s ease'
-                }}
               />
             </Popover>
             <Popover
@@ -859,6 +888,7 @@ export function Owner({
               }}
             >
               <Input
+                className="owner-chat-input"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value.slice(0, 50))}
                 placeholder="说点什么..."
@@ -872,94 +902,13 @@ export function Owner({
                   }
                 }}
                 onClick={() => setQuickChatVisible(true)}
-                style={{ width: 180, borderRadius: 14 }}
               />
             </Popover>
-            <Button
-              type="primary"
-              size="small"
-              icon={<SendOutlined />}
-              onClick={() => {
-                const t = chatInput.trim();
-                if (t) { 
-                  ws_sendMessage(t); 
-                  setChatInput(""); 
-                }
-              }}
-              style={{
-                borderRadius: '50%',
-                width: 20,
-                height: 20,
-                background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                boxShadow: '0 1px 4px rgba(76, 175, 80, 0.4)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginLeft: 6,
-                transition: 'all 0.3s ease'
-              }}
-              className="chat-send-btn"
-            />
           </div>
         </div>
       </div>
-      <div className="flex3 flex flex-column" style={{ height: "100%", position: 'relative' }}>
-        {/* 准备按钮 - 手牌上方浮动 */}
-        {showOwnerDealButton || showReadyButton ? (
-          <div
-            style={{
-              position: "absolute",
-              top: -40,
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 200,
-            }}
-          >
-            <Tooltip
-              title={
-                showOwnerDealButton
-                  ? isSettleCountdownActive
-                    ? `倒计时结束后可发牌（剩余 ${settleCountdownLeft}s）`
-                    : "点击发牌开始下一局"
-                  : "点击准备进入下一局"
-              }
-            >
-              <Button
-                type="primary"
-                size="small"
-                onClick={showOwnerDealButton ? ws_startGame : ws_userReady}
-                disabled={showOwnerDealButton && isSettleCountdownActive}
-                style={{
-                  background: showOwnerDealButton
-                    ? "linear-gradient(135deg, #ff9f43 0%, #d35400 100%)"
-                    : "linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%)",
-                  border: "2px solid rgba(255, 255, 255, 0.3)",
-                  boxShadow: showOwnerDealButton
-                    ? "0 4px 15px rgba(255, 159, 67, 0.45), 0 0 20px rgba(255, 159, 67, 0.25)"
-                    : "0 4px 15px rgba(76, 175, 80, 0.5), 0 0 20px rgba(76, 175, 80, 0.3)",
-                  fontWeight: "bold",
-                  padding: "0 20px",
-                  height: 36,
-                  fontSize: 14,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                {showOwnerDealButton ? (
-                  <CaretRightOutlined />
-                ) : (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="white" />
-                  </svg>
-                )}
-                {showOwnerDealButton ? "发牌" : "准备"}
-              </Button>
-            </Tooltip>
-          </div>
-        ) : null}
-        <div className="bet" style={{ color: 'white', fontWeight: 'bold' }}>
+      <div className="flex3 flex flex-column owner-hand-column" style={{ height: "100%", position: 'relative' }}>
+        <div className="bet owner-hand-status" style={{ color: 'white', fontWeight: 'bold' }}>
           {self?.actionName}
           {bet == 0 ? null : (
             <span style={{
@@ -974,7 +923,22 @@ export function Owner({
             </span>
           )}
         </div>
-        <div className="flex1 flex-row flex-center">
+        <div className="flex flex-row flex-center owner-action-countdown">
+          {isActing ? (
+            <Tooltip title={`点击加时，需支付其他玩家各🌟${overtimeCost}`}>
+              <Button
+                type="text"
+                onClick={() => {
+                  ws_overtime();
+                  setNow(now + 1);
+                }}
+              >
+                <CountDown time={Math.floor(leftTime / 1000)} now={now} />
+              </Button>
+            </Tooltip>
+          ) : null}
+        </div>
+        <div className="owner-hole-cards flex1 flex-row flex-center">
           {showPhasedCards ? (
             <div
               className={`card-box card-box-stacked ${
@@ -989,7 +953,7 @@ export function Owner({
             >
               {(showMax5Phase || showAsWinner) && (
                 <div
-                  className={`handstype ${showAsWinner ? "settle-winner-type" : ""}`}
+                  className={`handstype hand-type-below-cards ${showAsWinner ? "settle-winner-type" : ""}`}
                   style={{
                     ...(self?.handsType && handTypeRanks[self.handsType] >= 4 ? { color: "#ffd700", textShadow: "0 0 15px rgba(255, 215, 0, 0.8)", animation: "handTypeGlow 1.5s ease-in-out infinite alternate" } : { color: "white", textShadow: "1px 1px 2px rgba(0,0,0,0.8)" }),
                   }}
@@ -1027,6 +991,7 @@ export function Owner({
                   ))}
                   {!isSettlingCountdown && (
                     <div
+                      className="hand-type-below-cards"
                       style={{
                         fontWeight: "bold",
                         marginLeft: "10px",
@@ -1065,6 +1030,7 @@ export function Owner({
                   />
                   {!isSettlingCountdown && (
                     <div
+                      className="hand-type-below-cards"
                       style={{
                         fontWeight: "bold",
                         marginLeft: "10px",
@@ -1088,26 +1054,8 @@ export function Owner({
             </>
           )}
         </div>
-        <div className="flex flex-row flex-center">
-          {isActing ? (
-            <Tooltip title={`点击加时，需支付其他玩家各🌟${overtimeCost}`}>
-              <Button
-                type="text"
-                style={{ width: 300 }}
-                onClick={() => {
-                  ws_overtime();
-                  setNow(now + 1);
-                }}
-              >
-                <CountDown time={Math.floor(leftTime / 1000)} now={now} />
-              </Button>
-            </Tooltip>
-          ) : (
-            <div>&nbsp;</div>
-          )}
-        </div>
       </div>
-      <div className="flex4 flex flex-colomn user-actions" style={{
+      <div className={`flex4 flex flex-colomn user-actions ${isActing ? "is-acting" : "is-waiting"}`} style={{
         transform: `scale(${ zoom < 1 ? 0.8/zoom : 1})`,
         zoom: `${zoom < 1 ? 1/zoom : 1}`,
         flex: zoom < 1 ? 12 : 4,
@@ -1116,6 +1064,7 @@ export function Owner({
       }}>
         {isWaiting ? (
           <div
+            className="owner-auto-options"
             style={{
               color: 'white',
               display: 'flex',
